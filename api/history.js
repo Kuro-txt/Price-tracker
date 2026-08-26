@@ -61,7 +61,7 @@ export default async function handler(req, res) {
         GROUP BY strftime('%Y-%m-%d %H:00:00', recorded_at)
         ORDER BY recorded_at ASC
       `;
-    } else {
+    } else if (range === "90d" || range === "3m") {
       sqlQuery = `
         SELECT 
           item_name, 
@@ -71,6 +71,18 @@ export default async function handler(req, res) {
         WHERE item_name = ? COLLATE NOCASE 
           AND recorded_at >= datetime('now', '-90 days')
         GROUP BY (strftime('%s', recorded_at) / (6 * 3600))
+        ORDER BY recorded_at ASC
+      `;
+    } else {
+      // 'all' timeframe: Full historical data with 12h block smoothing
+      sqlQuery = `
+        SELECT 
+          item_name, 
+          ROUND(AVG(price), 6) AS price, 
+          strftime('%Y-%m-%d %H:00:00', recorded_at) AS recorded_at
+        FROM resource_prices
+        WHERE item_name = ? COLLATE NOCASE 
+        GROUP BY (strftime('%s', recorded_at) / (12 * 3600))
         ORDER BY recorded_at ASC
       `;
     }
@@ -84,7 +96,7 @@ export default async function handler(req, res) {
               FROM resource_prices 
               WHERE item_name = ? COLLATE NOCASE 
               ORDER BY recorded_at ASC 
-              LIMIT 50`,
+              LIMIT 100`,
         args: [item],
       });
       rows = fallback.rows;
