@@ -32,7 +32,7 @@
             <div class="flex items-center gap-3 w-full sm:w-auto">
                 <div class="flex items-center gap-2 bg-slate-950 border border-slate-800 px-3 py-2 rounded-xl text-xs text-slate-400">
                     <input type="checkbox" id="autoRefreshCheck" checked class="accent-emerald-500 cursor-pointer">
-                    <label for="autoRefreshCheck" class="cursor-pointer select-none">Live Auto-Sync (15s)</label>
+                    <label for="autoRefreshCheck" class="cursor-pointer select-none">Auto-Sync (15s)</label>
                 </div>
                 <button id="refreshBtn" onclick="fetchPrices()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl text-sm font-medium transition flex items-center gap-2 justify-center shadow-md">
                     <i class="fa-solid fa-rotate" id="refreshIcon"></i> Refresh
@@ -52,7 +52,7 @@
                 <span class="absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-500">
                     <i class="fa-solid fa-magnifying-glass"></i>
                 </span>
-                <input type="text" id="searchInput" oninput="filterAndSortData()" placeholder="Search item (e.g. Sunflower, Wood, Iron, Egg)..." 
+                <input type="text" id="searchInput" oninput="filterAndSortData()" placeholder="Search item (e.g. Sunflower, Wood, Obsidian)..." 
                     class="w-full pl-10 pr-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm focus:outline-none focus:border-emerald-500 text-slate-100 placeholder-slate-500 transition">
             </div>
 
@@ -63,6 +63,7 @@
                     <select id="marketType" onchange="filterAndSortData()" class="bg-slate-950 border border-slate-800 text-slate-200 text-sm rounded-xl px-3 py-2 focus:outline-none focus:border-emerald-500">
                         <option value="p2p">Plaza (P2P)</option>
                         <option value="seq">Sequence (Seq)</option>
+                        <option value="ge">Goblin Exchange (GE)</option>
                     </select>
                 </div>
                 <div class="flex items-center gap-2">
@@ -77,10 +78,30 @@
             </div>
         </div>
 
+        <!-- Quick Stats Banner -->
+        <div id="statsBanner" class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6 hidden">
+            <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl text-center">
+                <span class="text-xs text-slate-500 uppercase font-semibold">Tracked Items</span>
+                <p id="totalItemsCount" class="text-xl font-bold text-slate-200 mt-1">0</p>
+            </div>
+            <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl text-center">
+                <span class="text-xs text-slate-500 uppercase font-semibold">Most Expensive</span>
+                <p id="highestItem" class="text-sm font-bold text-emerald-400 truncate mt-1">-</p>
+            </div>
+            <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl text-center">
+                <span class="text-xs text-slate-500 uppercase font-semibold">Cheapest Crop</span>
+                <p id="lowestItem" class="text-sm font-bold text-emerald-400 truncate mt-1">-</p>
+            </div>
+            <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl text-center">
+                <span class="text-xs text-slate-500 uppercase font-semibold">Status</span>
+                <p class="text-sm font-bold text-emerald-400 mt-1">Connected</p>
+            </div>
+        </div>
+
         <!-- Loading State -->
         <div id="loadingState" class="flex flex-col items-center justify-center py-24">
             <i class="fa-solid fa-circle-notch fa-spin text-4xl text-emerald-500 mb-4"></i>
-            <p class="text-slate-400 text-sm">Extracting live prices...</p>
+            <p class="text-slate-400 text-sm">Extracting live prices from sfl.world...</p>
         </div>
 
         <!-- Error State -->
@@ -102,31 +123,8 @@
     </footer>
 
     <script>
-        let rawData = [];
+        let fullMarketData = { p2p: [], seq: [], ge: [] };
         let autoRefreshTimer = null;
-
-        // Universal parser to extract numeric price from whatever shape the API supplies
-        function extractPriceNumber(val) {
-            if (val === null || val === undefined) return 0;
-            if (typeof val === 'number') return val;
-            if (typeof val === 'string') {
-                const parsed = parseFloat(val);
-                return isNaN(parsed) ? 0 : parsed;
-            }
-            if (typeof val === 'object') {
-                // If nested object has price, sfl, floor, val, or amount
-                if (val.price !== undefined) return extractPriceNumber(val.price);
-                if (val.sfl !== undefined) return extractPriceNumber(val.sfl);
-                if (val.floor !== undefined) return extractPriceNumber(val.floor);
-                if (val.value !== undefined) return extractPriceNumber(val.value);
-                // Check first object value
-                const firstVal = Object.values(val)[0];
-                if (typeof firstVal === 'number' || typeof firstVal === 'string') {
-                    return extractPriceNumber(firstVal);
-                }
-            }
-            return 0;
-        }
 
         async function fetchPrices() {
             const loadingState = document.getElementById('loadingState');
@@ -134,8 +132,9 @@
             const priceGrid = document.getElementById('priceGrid');
             const refreshIcon = document.getElementById('refreshIcon');
             const lastUpdatedLabel = document.getElementById('lastUpdatedLabel');
+            const statsBanner = document.getElementById('statsBanner');
 
-            if (rawData.length === 0) {
+            if (fullMarketData.p2p.length === 0) {
                 loadingState.classList.remove('hidden');
                 priceGrid.classList.add('hidden');
             }
@@ -163,8 +162,8 @@
 
             refreshIcon.classList.remove('fa-spin');
 
-            if (!result) {
-                if (rawData.length === 0) {
+            if (!result || !result.data) {
+                if (fullMarketData.p2p.length === 0) {
                     loadingState.classList.add('hidden');
                     errorState.classList.remove('hidden');
                     document.getElementById('errorMessage').innerText = "Unable to reach SFL API. Check your proxy route.";
@@ -173,75 +172,44 @@
             }
 
             try {
-                // Update time display
-                if (result.updatedAt || result.updated_text) {
-                    const t = result.updatedAt ? new Date(result.updatedAt).toLocaleTimeString() : result.updated_text;
-                    lastUpdatedLabel.innerText = `Last API sync: ${t}`;
-                } else {
-                    lastUpdatedLabel.innerText = `Live at ${new Date().toLocaleTimeString()}`;
-                }
+                // Update timestamp
+                const timeText = result.updated_text || (result.updatedAt ? new Date(result.updatedAt).toLocaleTimeString() : 'Just now');
+                lastUpdatedLabel.innerText = `Last SFL Sync: ${timeText}`;
 
-                // Metadata keys to ignore
-                const ignoredKeys = new Set(['updatedAt', 'updated_text', 'data', 'status', 'success', 'timestamp']);
+                // Parse nested data { p2p: {...}, seq: {...}, ge: {...} }
+                const markets = ['p2p', 'seq', 'ge'];
+                
+                markets.forEach(m => {
+                    const marketObj = result.data[m] || {};
+                    fullMarketData[m] = Object.entries(marketObj).map(([name, price]) => ({
+                        name: name,
+                        price: parseFloat(price) || 0
+                    }));
+                });
 
-                // Find the dictionary of items (either at top-level or inside result.data)
-                let itemsMap = {};
-                if (result.data && typeof result.data === 'object' && !Array.isArray(result.data)) {
-                    itemsMap = result.data;
-                } else if (typeof result === 'object' && !Array.isArray(result)) {
-                    itemsMap = result;
-                }
-
-                const parsedList = [];
-
-                if (Array.isArray(result)) {
-                    result.forEach(item => {
-                        const name = item.name || item.resource || item.item;
-                        if (name) {
-                            parsedList.push({
-                                name: name,
-                                p2p: extractPriceNumber(item.p2p ?? item.price ?? item.sfl),
-                                seq: extractPriceNumber(item.seq)
-                            });
-                        }
-                    });
-                } else {
-                    for (const [key, value] of Object.entries(itemsMap)) {
-                        if (ignoredKeys.has(key)) continue;
-                        
-                        let p2pPrice = 0;
-                        let seqPrice = 0;
-
-                        if (typeof value === 'object' && value !== null) {
-                            if (value.p2p !== undefined) p2pPrice = extractPriceNumber(value.p2p);
-                            if (value.seq !== undefined) seqPrice = extractPriceNumber(value.seq);
-                            
-                            // If neither p2p nor seq is explicitly named, try price/sfl
-                            if (p2pPrice === 0 && seqPrice === 0) {
-                                p2pPrice = extractPriceNumber(value);
-                            }
-                        } else {
-                            p2pPrice = extractPriceNumber(value);
-                        }
-
-                        // Only add items that represent actual game resources
-                        if (key.length > 1) {
-                            parsedList.push({
-                                name: key,
-                                p2p: p2pPrice,
-                                seq: seqPrice
-                            });
-                        }
-                    }
-                }
-
-                rawData = parsedList;
+                updateQuickStats();
                 filterAndSortData();
+
                 loadingState.classList.add('hidden');
                 priceGrid.classList.remove('hidden');
+                statsBanner.classList.remove('hidden');
             } catch (err) {
                 console.error("Format parsing error:", err);
             }
+        }
+
+        function updateQuickStats() {
+            const items = fullMarketData.p2p;
+            if (!items.length) return;
+
+            document.getElementById('totalItemsCount').innerText = items.length;
+
+            const sortedByPrice = [...items].sort((a, b) => b.price - a.price);
+            const highest = sortedByPrice[0];
+            const lowest = sortedByPrice[sortedByPrice.length - 1];
+
+            document.getElementById('highestItem').innerText = `${highest.name} (${highest.price} SFL)`;
+            document.getElementById('lowestItem').innerText = `${lowest.name} (${lowest.price} SFL)`;
         }
 
         function filterAndSortData() {
@@ -249,18 +217,18 @@
             const sortOption = document.getElementById('sortSelect').value;
             const marketType = document.getElementById('marketType').value;
 
-            let filtered = rawData.filter(item => item.name.toLowerCase().includes(searchKeyword));
+            const items = fullMarketData[marketType] || [];
+
+            let filtered = items.filter(item => item.name.toLowerCase().includes(searchKeyword));
 
             filtered.sort((a, b) => {
                 const nameA = a.name.toLowerCase();
                 const nameB = b.name.toLowerCase();
-                const priceA = a[marketType] || 0;
-                const priceB = b[marketType] || 0;
 
                 if (sortOption === 'name-asc') return nameA.localeCompare(nameB);
                 if (sortOption === 'name-desc') return nameB.localeCompare(nameA);
-                if (sortOption === 'price-desc') return priceB - priceA;
-                if (sortOption === 'price-asc') return priceA - priceB;
+                if (sortOption === 'price-desc') return b.price - a.price;
+                if (sortOption === 'price-asc') return a.price - b.price;
                 return 0;
             });
 
@@ -269,8 +237,8 @@
 
         function formatDisplayPrice(price) {
             if (!price || price === 0) return "-";
-            if (price < 0.001) return price.toFixed(6);
-            if (price < 1) return price.toFixed(4);
+            if (price < 0.001) return price.toFixed(8).replace(/\.?0+$/, "");
+            if (price < 1) return price.toFixed(6).replace(/\.?0+$/, "");
             return price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 });
         }
 
@@ -282,19 +250,15 @@
                 priceGrid.innerHTML = `
                     <div class="col-span-full text-center py-16 text-slate-500">
                         <i class="fa-solid fa-box-open text-3xl mb-2"></i>
-                        <p class="text-sm">No items found matching your search.</p>
+                        <p class="text-sm">No items found in <strong>${marketType.toUpperCase()}</strong> market matching your search.</p>
                     </div>
                 `;
                 return;
             }
 
             data.forEach(item => {
-                const activePrice = item[marketType];
-                const secondaryPrice = marketType === 'p2p' ? item.seq : item.p2p;
-                const secondaryLabel = marketType === 'p2p' ? 'Seq' : 'P2P';
-
                 const card = document.createElement('div');
-                card.className = "bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col justify-between hover:border-emerald-500/40 transition shadow-sm";
+                card.className = "bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col justify-between hover:border-emerald-500/40 transition shadow-sm hover:scale-[1.01]";
                 
                 card.innerHTML = `
                     <div>
@@ -307,19 +271,14 @@
                     </div>
                     <div class="pt-3 border-t border-slate-800">
                         <div class="flex items-baseline justify-between">
-                            <span class="text-[11px] text-slate-500 uppercase font-semibold">Floor</span>
+                            <span class="text-[11px] text-slate-500 uppercase font-semibold">Floor Price</span>
                             <div class="text-right">
-                                <span class="text-lg font-bold font-mono ${activePrice > 0 ? 'text-emerald-400' : 'text-slate-600'}">
-                                    ${formatDisplayPrice(activePrice)}
+                                <span class="text-lg font-bold font-mono ${item.price > 0 ? 'text-emerald-400' : 'text-slate-600'}">
+                                    ${formatDisplayPrice(item.price)}
                                 </span>
                                 <span class="text-[11px] text-slate-400 ml-0.5">SFL</span>
                             </div>
                         </div>
-                        ${secondaryPrice > 0 ? `
-                        <div class="flex items-center justify-between text-[11px] text-slate-400 mt-2 pt-2 border-t border-slate-800/50">
-                            <span>${secondaryLabel} Floor:</span>
-                            <span class="font-mono text-slate-300">${formatDisplayPrice(secondaryPrice)} SFL</span>
-                        </div>` : ''}
                     </div>
                 `;
                 priceGrid.appendChild(card);
