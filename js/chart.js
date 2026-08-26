@@ -91,7 +91,7 @@ function updatePriceChangeBadge(firstPrice, lastPrice) {
 
 function changeRange(range) {
     selectedRange = range;
-    const ranges = ['6h', '12h', '24h', '7d', '30d', '90d'];
+    const ranges = ['6h', '12h', '24h', '7d', '30d', '90d', 'all'];
     ranges.forEach(r => {
         const btn = document.getElementById(`range-${r}`);
         if (!btn) return;
@@ -189,15 +189,19 @@ function renderChart() {
         const season = getSeasonForDate(validDate);
         itemSeasons.push(season);
 
-        // 6H, 12H, and 24H all format as Time (HH:MM)
+        // Smart adaptive label ticks for all timeframes
         if (['6h', '12h', '24h'].includes(selectedRange)) {
             labels.push(validDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
         } else if (selectedRange === '7d') {
             labels.push(isMobile 
                 ? `${validDate.getDate()}/${validDate.getMonth()+1} ${validDate.getHours()}:00` 
-                : `${season.icon} ${validDate.toLocaleDateString([], { month: 'short', day: 'numeric' })}, ${validDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`);
+                : `${validDate.toLocaleDateString([], { month: 'short', day: 'numeric' })}, ${validDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`);
+        } else if (selectedRange === 'all') {
+            labels.push(isMobile
+                ? `${validDate.getDate()}/${validDate.getMonth()+1}`
+                : `${validDate.toLocaleDateString([], { month: 'short', day: 'numeric', year: '2-digit' })}`);
         } else {
-            labels.push(`${season.icon} ${validDate.getDate()}/${validDate.getMonth()+1}`);
+            labels.push(`${validDate.getDate()} ${validDate.toLocaleDateString([], { month: 'short' })}`);
         }
 
         fullDateTooltips.push(validDate.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }));
@@ -213,6 +217,7 @@ function renderChart() {
     const maxPrice = Math.max(...prices);
     const priceRange = Math.max(maxPrice - minPrice, 0.0001);
 
+    // Clean margin breathing room
     const margin = priceRange * 0.18 * yPaddingMultiplier;
     const yMin = Math.max(0, minPrice - margin);
     const yMax = maxPrice + margin;
@@ -223,17 +228,17 @@ function renderChart() {
 
     const isDark = document.documentElement.classList.contains('dark');
     
-    const gridColor = isDark ? '#14141c' : '#e6dcce';
+    // Clean, subtle dashed grid colors
+    const gridColor = isDark ? 'rgba(255, 255, 255, 0.04)' : 'rgba(0, 0, 0, 0.06)';
     const tickColor = isDark ? '#71717a' : '#736655';
     const tooltipBg = isDark ? '#000000' : '#241b12';
 
     const pointColors = itemSeasons.map(s => s.color);
 
+    // Subtle gradient glow
     const gradient = ctx.createLinearGradient(0, 0, 0, isMobile ? 180 : 240);
-    gradient.addColorStop(0, isDark ? 'rgba(245, 158, 11, 0.25)' : 'rgba(217, 119, 6, 0.20)');
+    gradient.addColorStop(0, isDark ? 'rgba(245, 158, 11, 0.22)' : 'rgba(217, 119, 6, 0.18)');
     gradient.addColorStop(1, 'rgba(0, 0, 0, 0.0)');
-
-    const pointRadius = (visibleData.length > 30) ? 0 : (isMobile ? 3 : 4);
 
     chartInstance = new Chart(ctx, {
         type: 'line',
@@ -252,12 +257,13 @@ function renderChart() {
                 borderWidth: isMobile ? 2 : 2.5,
                 backgroundColor: gradient,
                 fill: true,
-                tension: 0.35,
+                tension: 0.32,
                 pointBackgroundColor: pointColors,
                 pointBorderColor: isDark ? '#000000' : '#ede2cf',
                 pointBorderWidth: 1.5,
-                pointRadius: pointRadius,
-                pointHoverRadius: 6,
+                pointRadius: visibleData.length > 20 ? 0 : (isMobile ? 2.5 : 3.5),
+                pointHoverRadius: 5.5,
+                pointHoverBorderWidth: 2,
             }]
         },
         options: {
@@ -272,6 +278,7 @@ function renderChart() {
                     titleColor: '#faf7f2',
                     bodyColor: '#fbbf24',
                     padding: 10,
+                    cornerRadius: 10,
                     displayColors: false,
                     callbacks: {
                         title: (items) => {
@@ -286,23 +293,32 @@ function renderChart() {
             },
             scales: {
                 x: {
-                    grid: { color: gridColor },
+                    grid: { 
+                        color: gridColor,
+                        borderDash: [3, 3] 
+                    },
                     ticks: { 
                         font: { family: 'Plus Jakarta Sans', size: isMobile ? 9 : 10, weight: '600' }, 
                         color: tickColor, 
-                        maxTicksLimit: isMobile ? 5 : 8 
-                    }
+                        maxTicksLimit: isMobile ? 5 : 7,
+                        maxRotation: 0
+                    },
+                    border: { display: false }
                 },
                 y: {
                     min: yMin,
                     max: yMax,
-                    grid: { color: gridColor },
+                    grid: { 
+                        color: gridColor,
+                        borderDash: [3, 3] 
+                    },
                     ticks: { 
                         font: { family: 'Plus Jakarta Sans', size: isMobile ? 9 : 10, weight: '600' }, 
                         color: tickColor, 
                         maxTicksLimit: 5,
                         callback: (val) => formatPrice(val) 
-                    }
+                    },
+                    border: { display: false }
                 }
             }
         }
