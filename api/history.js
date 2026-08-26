@@ -14,29 +14,68 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Item parameter is required" });
     }
 
-    // Map range parameter to SQLite datetime modifier
-    let timeModifier = "-24 hours";
-    if (range === "7d") timeModifier = "-7 days";
-    else if (range === "30d" || range === "1m") timeModifier = "-30 days";
-    else if (range === "90d" || range === "3m") timeModifier = "-90 days";
+    let sqlQuery = "";
+    let args = [];
 
-    const result = await db.execute({
-      sql: `SELECT item_name, price, recorded_at 
-            FROM resource_prices 
-            WHERE LOWER(item_name) = LOWER(?) 
-              AND recorded_at >= datetime('now', ?) 
-            ORDER BY recorded_at ASC`,
-      args: [item, timeModifier],
-    });
+    if (range === "24h") {
+      // Full raw resolution for 24H (approx 96 points)
+      sqlQuery = `
+        SELECT item_name, price, recorded_at 
+        FROM resource_prices 
+        WHERE item_name = ? COLLATE NOCASE 
+          AND recorded_at >= datetime('now', '-24 hours')
+        ORDER BY recorded_at ASC
+      `;
+      args = [item];
+    } else if (range === "7d") {
+      // Raw resolution for 7D
+      sqlQuery = `
+        SELECT item_name, price, recorded_at 
+        FROM resource_prices 
+        WHERE item_name = ? COLLATE NOCASE 
+          AND recorded_at >= datetime('now', '-7 days')
+        ORDER BY recorded_at ASC
+      `;
+      args = [item];
+    } else if (range === "30d" || range === "1m") {
+      // 30 Days: Average price grouped by Hour (~720 points)
+      sqlQuery = `
+        SELECT 
+          item_name, 
+          ROUND(AVG(price), 6) AS price, 
+          strftime('%Y-%m-%d %H:00:00', recorded_at) AS recorded_at
+        FROM resource_prices
+        WHERE item_name = ? COLLATE NOCASE 
+          AND recorded_at >= datetime('now', '-30 days')
+        GROUP BY strftime('%Y-%m-%d %H:00:00', recorded_at)
+        ORDER BY recorded_at ASC
+      `;
+      args = [item];
+    } else {
+      // 90 Days: Average price grouped every 6 Hours (~360 points)
+      sqlQuery = `
+        SELECT 
+          item_name, 
+          ROUND(AVG(price), 6) AS price, 
+          strftime('%Y-%m-%d %H:00:00', recorded_at) AS recorded_at
+        FROM resource_prices
+        WHERE item_name = ? COLLATE NOCASE 
+          AND recorded_at >= datetime('now', '-90 days')
+        GROUP BY (strftime('%s', recorded_at) / (6 * 3600))
+        ORDER BY recorded_at ASC
+      `;
+      args = [item];
+    }
 
+    const result = await db.execute({ sql: sqlQuery, args });
     let rows = result.rows;
 
-    // Fallback: If no records exist in the selected range, fetch recent available entries
+    // Fallback if data points are sparse (e.g. brand new database)
     if (rows.length === 0) {
       const fallback = await db.execute({
         sql: `SELECT item_name, price, recorded_at 
               FROM resource_prices 
-              WHERE LOWER(item_name) = LOWER(?) 
+              WHERE item_name = ? COLLATE NOCASE 
               ORDER BY recorded_at ASC 
               LIMIT 50`,
         args: [item],
@@ -48,7 +87,7 @@ export default async function handler(req, res) {
     res.setHeader("Cache-Control", "s-maxage=10, stale-while-revalidate");
     return res.status(200).json(rows);
   } catch (error) {
-    console.error("History fetch error:", error);
+    console.error("History API Error:", error);
     return res.status(500).json({ error: error.message });
   }
 }
