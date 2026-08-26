@@ -74,7 +74,7 @@
                             <span class="w-1.5 h-1.5 rounded-full bg-emerald-600 dark:bg-emerald-400 animate-pulse"></span> LIVE
                         </span>
                     </div>
-                    <p class="text-[10px] text-[#7a6d5c] dark:text-zinc-500 font-medium truncate" id="lastUpdatedLabel">Connecting...</p>
+                    <p class="text-[10px] text-[#7a6d5c] dark:text-zinc-500 font-medium truncate" id="lastUpdatedLabel">Connecting to SFL Plaza...</p>
                 </div>
             </div>
 
@@ -221,10 +221,10 @@
 
                 </div>
 
-                <!-- Right Column: Slideable Price Chart Workspace -->
+                <!-- Right Column: Clean Slideable Price Chart Workspace -->
                 <div class="lg:col-span-7 warm-surface border rounded-2xl p-4 sm:p-5 transition-colors duration-200 space-y-3">
                     
-                    <!-- Header Controls Bar with 6H Filter -->
+                    <!-- Header Controls Bar -->
                     <div class="flex flex-wrap items-center justify-between gap-2 pb-1">
                         <div class="flex items-center gap-2 min-w-0">
                             <span class="text-xs font-black text-[#292017] dark:text-zinc-200 uppercase tracking-wider flex items-center gap-1.5 shrink-0">
@@ -235,8 +235,8 @@
                             </span>
                         </div>
 
-                        <!-- Timeframe Selectors (6H, 12H, 24H, 7D, 1M, 3M) -->
-                        <div class="flex items-center gap-1.5">
+                        <!-- All Timeframe Selectors: 6H, 12H, 24H, 7D, 1M, 3M, ALL -->
+                        <div class="flex items-center gap-1.5 overflow-x-auto max-w-full pb-0.5">
                             <div class="flex items-center bg-[#dfd3bf] dark:bg-black p-0.5 rounded-xl border border-[#c5b59f] dark:border-[#1c1c26] text-[10px] font-extrabold shrink-0">
                                 <button onclick="changeRange('6h')" id="range-6h" class="px-2 py-1 rounded-lg transition text-[#635443] dark:text-zinc-400 hover:text-black dark:hover:text-white">6H</button>
                                 <button onclick="changeRange('12h')" id="range-12h" class="px-2 py-1 rounded-lg transition text-[#635443] dark:text-zinc-400 hover:text-black dark:hover:text-white">12H</button>
@@ -244,17 +244,18 @@
                                 <button onclick="changeRange('7d')" id="range-7d" class="px-2 py-1 rounded-lg transition text-[#635443] dark:text-zinc-400 hover:text-black dark:hover:text-white">7D</button>
                                 <button onclick="changeRange('30d')" id="range-30d" class="px-2 py-1 rounded-lg transition text-[#635443] dark:text-zinc-400 hover:text-black dark:hover:text-white">1M</button>
                                 <button onclick="changeRange('90d')" id="range-90d" class="px-2 py-1 rounded-lg transition text-[#635443] dark:text-zinc-400 hover:text-black dark:hover:text-white">3M</button>
+                                <button onclick="changeRange('all')" id="range-all" class="px-2 py-1 rounded-lg transition text-[#635443] dark:text-zinc-400 hover:text-black dark:hover:text-white">ALL</button>
                             </div>
 
-                            <button id="resetSlideBtn" onclick="resetSlideView()" class="hidden px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-stone-950 text-[10px] font-black transition shadow-xs">
+                            <button id="resetSlideBtn" onclick="resetSlideView()" class="hidden px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-stone-950 text-[10px] font-black transition shadow-xs shrink-0">
                                 <i class="fa-solid fa-arrow-rotate-left mr-0.5"></i> Reset
                             </button>
                         </div>
                     </div>
 
-                    <!-- Canvas Container -->
+                    <!-- Clean Canvas Container -->
                     <div class="relative group">
-                        <div class="bg-[#ede2cf] dark:bg-black border border-[#cbbeaa] dark:border-[#1c1c26] rounded-xl p-2.5 sm:p-3 relative h-64 sm:h-72 flex items-center justify-center select-none overflow-hidden transition-colors duration-200">
+                        <div class="bg-[#ede2cf] dark:bg-black border border-[#cbbeaa] dark:border-[#1c1c26] rounded-xl p-3 sm:p-4 relative h-64 sm:h-72 flex items-center justify-center select-none overflow-hidden transition-colors duration-200">
                             <div id="chartSpinner" class="hidden absolute inset-0 bg-[#ede2cf]/80 dark:bg-black/80 backdrop-blur-xs flex flex-col items-center justify-center z-10 rounded-xl">
                                 <i class="fa-solid fa-circle-notch fa-spin text-xl text-amber-600 dark:text-amber-500 mb-1.5"></i>
                                 <span class="text-[10px] text-[#706250] dark:text-zinc-400 font-bold">Loading history...</span>
