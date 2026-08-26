@@ -2,6 +2,10 @@ let chartInstance = null;
 let lastHistoryData = [];
 let selectedRange = "24h";
 
+// Dynamic Interactive Scale States
+let xScalePercentage = 100; // 15% (tight zoom) to 100% (full range)
+let yScalePadding = 20;     // 2% (tight fit to catch micro-changes) to 100% (wide scale)
+
 // SFL 4-Season Cycle (7 Days each = 28-day loop)
 const SEASONS = [
     { name: 'Spring', icon: '🌱', color: '#10b981', textColor: 'text-emerald-500', bg: 'bg-emerald-100 dark:bg-emerald-950/80', border: 'border-emerald-200 dark:border-emerald-800/60' },
@@ -37,7 +41,7 @@ function updateActiveSeasonBadge() {
     if (!badge) return;
 
     const currentSeason = getSeasonForDate(new Date());
-    badge.className = `inline-flex items-center gap-1 text-[10px] sm:text-xs font-bold px-2 sm:px-2.5 py-0.5 rounded-full border ${currentSeason.bg} ${currentSeason.border} ${currentSeason.textColor}`;
+    badge.className = `inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${currentSeason.bg} ${currentSeason.border} ${currentSeason.textColor}`;
     badge.innerHTML = `<span>${currentSeason.icon}</span> <span>${currentSeason.name} (Day ${currentSeason.day}/7)</span>`;
 }
 
@@ -48,49 +52,57 @@ function changeRange(range) {
         const btn = document.getElementById(`range-${r}`);
         if (!btn) return;
         if (r === range) {
-            btn.className = "px-2 py-0.5 rounded-md transition bg-white dark:bg-slate-800 text-amber-600 dark:text-amber-400 shadow-2xs";
+            btn.className = "px-2.5 py-0.5 rounded-md transition bg-white dark:bg-slate-800 text-amber-600 dark:text-amber-400 shadow-2xs";
         } else {
-            btn.className = "px-2 py-0.5 rounded-md transition text-stone-500 dark:text-slate-400 hover:text-stone-900 dark:hover:text-white";
+            btn.className = "px-2.5 py-0.5 rounded-md transition text-stone-500 dark:text-slate-400 hover:text-stone-900 dark:hover:text-white";
         }
     });
-
-    hideResetButton();
 
     if (window.activeItem) {
         loadItemHistoryGraph(window.activeItem.name);
     }
 }
 
-// Zoom Controls
-function zoomIn() {
-    if (chartInstance) {
-        chartInstance.zoom(1.25);
-        showResetButton();
+// Axis Scale Handlers
+function adjustXScale(val) {
+    xScalePercentage = parseInt(val, 10);
+    const label = document.getElementById('xScaleLabel');
+    if (label) label.innerText = `${xScalePercentage}%`;
+    if (lastHistoryData.length > 0) {
+        renderChart(lastHistoryData);
     }
 }
 
-function zoomOut() {
-    if (chartInstance) {
-        chartInstance.zoom(0.8);
-        showResetButton();
+function adjustYScale(val) {
+    yScalePadding = parseInt(val, 10);
+    const label = document.getElementById('yScaleLabel');
+    if (label) {
+        if (yScalePadding <= 5) label.innerText = "Tight";
+        else if (yScalePadding >= 70) label.innerText = "Wide";
+        else label.innerText = "Auto";
+    }
+    if (lastHistoryData.length > 0) {
+        renderChart(lastHistoryData);
     }
 }
 
-function resetZoom() {
-    if (chartInstance) {
-        chartInstance.resetZoom();
-        hideResetButton();
+function resetAxes() {
+    xScalePercentage = 100;
+    yScalePadding = 20;
+
+    const xSlider = document.getElementById('xScaleSlider');
+    const ySlider = document.getElementById('yScaleSlider');
+    const xLabel = document.getElementById('xScaleLabel');
+    const yLabel = document.getElementById('yScaleLabel');
+
+    if (xSlider) xSlider.value = "100";
+    if (ySlider) ySlider.value = "20";
+    if (xLabel) xLabel.innerText = "100%";
+    if (yLabel) yLabel.innerText = "Auto";
+
+    if (lastHistoryData.length > 0) {
+        renderChart(lastHistoryData);
     }
-}
-
-function showResetButton() {
-    const btn = document.getElementById('resetZoomBtn');
-    if (btn) btn.classList.remove('hidden');
-}
-
-function hideResetButton() {
-    const btn = document.getElementById('resetZoomBtn');
-    if (btn) btn.classList.add('hidden');
 }
 
 async function loadItemHistoryGraph(itemName) {
@@ -122,7 +134,6 @@ async function loadItemHistoryGraph(itemName) {
 
     lastHistoryData = historyData;
     updateActiveSeasonBadge();
-    hideResetButton();
     renderChart(historyData);
 }
 
@@ -132,11 +143,18 @@ function renderChart(historyData) {
     const ctx = canvas.getContext('2d');
     const isMobile = window.innerWidth < 640;
 
+    // Apply X-Axis slicing based on slider percentage
+    let displayData = historyData;
+    if (xScalePercentage < 100 && historyData.length > 3) {
+        const sliceCount = Math.max(3, Math.round((historyData.length * xScalePercentage) / 100));
+        displayData = historyData.slice(historyData.length - sliceCount);
+    }
+
     const labels = [];
     const itemSeasons = [];
     const fullDateTooltips = [];
 
-    historyData.forEach(h => {
+    displayData.forEach(h => {
         const rawDate = h.recorded_at ? h.recorded_at.replace(" ", "T") + (h.recorded_at.includes("Z") ? "" : "Z") : new Date().toISOString();
         const d = new Date(rawDate);
         const validDate = isNaN(d.getTime()) ? new Date() : d;
@@ -157,7 +175,22 @@ function renderChart(historyData) {
         fullDateTooltips.push(validDate.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }));
     });
 
-    const prices = historyData.map(h => parseFloat(h.price));
+    const prices = displayData.map(h => parseFloat(h.price));
+
+    // Dynamic Y-Axis boundary calculation based on slider padding
+    const minPrice = Math.min(...prices);
+    const maxPrice = Math.max(...prices);
+    const priceRange = maxPrice - minPrice;
+
+    let yMin = undefined;
+    let yMax = undefined;
+
+    if (priceRange > 0) {
+        const paddingRatio = yScalePadding / 100;
+        const margin = priceRange * paddingRatio;
+        yMin = Math.max(0, minPrice - margin);
+        yMax = maxPrice + margin;
+    }
 
     if (chartInstance) {
         chartInstance.destroy();
@@ -174,7 +207,7 @@ function renderChart(historyData) {
     gradient.addColorStop(0, 'rgba(245, 158, 11, 0.20)');
     gradient.addColorStop(1, 'rgba(245, 158, 11, 0.0)');
 
-    const pointRadius = (selectedRange === '30d' || selectedRange === '90d' || historyData.length > 30) ? 0 : (isMobile ? 3 : 4);
+    const pointRadius = (selectedRange === '30d' || selectedRange === '90d' || displayData.length > 30) ? 0 : (isMobile ? 3 : 4);
 
     chartInstance = new Chart(ctx, {
         type: 'line',
@@ -222,25 +255,6 @@ function renderChart(historyData) {
                         },
                         label: (ctx) => ` Price: ${window.formatDisplayPrice(ctx.parsed.y)} SFL`
                     }
-                },
-                // Zoom & Pan Configuration
-                zoom: {
-                    pan: {
-                        enabled: true,
-                        mode: 'x',
-                        onPanStart: () => showResetButton()
-                    },
-                    zoom: {
-                        wheel: {
-                            enabled: true,
-                            speed: 0.08
-                        },
-                        pinch: {
-                            enabled: true
-                        },
-                        mode: 'x',
-                        onZoomStart: () => showResetButton()
-                    }
                 }
             },
             scales: {
@@ -253,6 +267,8 @@ function renderChart(historyData) {
                     }
                 },
                 y: {
+                    min: yMin,
+                    max: yMax,
                     grid: { color: gridColor },
                     ticks: { 
                         font: { family: 'Plus Jakarta Sans', size: isMobile ? 9 : 10 }, 
@@ -274,9 +290,9 @@ window.addEventListener('resize', () => {
 
 // Expose globals
 window.changeRange = changeRange;
-window.zoomIn = zoomIn;
-window.zoomOut = zoomOut;
-window.resetZoom = resetZoom;
+window.adjustXScale = adjustXScale;
+window.adjustYScale = adjustYScale;
+window.resetAxes = resetAxes;
 window.loadItemHistoryGraph = loadItemHistoryGraph;
 window.renderChart = renderChart;
 window.getSeasonForDate = getSeasonForDate;
