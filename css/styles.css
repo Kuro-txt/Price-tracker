@@ -4,25 +4,63 @@
     box-sizing: border-box;
 }
 
-/* Warm Ivory & Obsidian Scrollbars */
-html {
-    scrollbar-width: thin;
-    scrollbar-color: #d6cbba transparent;
-}
-
-html.dark {
-    scrollbar-color: #1e293b transparent;
-}
-
+/* Crisp 8-Bit Pixel Canvas Background */
 body {
     font-family: 'Plus Jakarta Sans', sans-serif;
     -webkit-tap-highlight-color: transparent;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
+    
+    /* Warm Farmstead Pixel Grid (Light Mode) */
+    background-color: #dfd4c0;
+    background-image: 
+        linear-gradient(to right, rgba(175, 158, 132, 0.35) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(175, 158, 132, 0.35) 1px, transparent 1px),
+        linear-gradient(45deg, rgba(206, 192, 170, 0.45) 25%, transparent 25%, transparent 75%, rgba(206, 192, 170, 0.45) 75%),
+        linear-gradient(45deg, rgba(206, 192, 170, 0.45) 25%, transparent 25%, transparent 75%, rgba(206, 192, 170, 0.45) 75%);
+    background-size: 16px 16px, 16px 16px, 32px 32px, 32px 32px;
+    background-position: 0 0, 0 0, 0 0, 16px 16px;
+    image-rendering: pixelated;
+}
+
+/* Deep Obsidian Pixel Grid (Dark Mode) */
+html.dark body {
+    background-color: #070a12;
+    background-image: 
+        linear-gradient(to right, rgba(30, 41, 59, 0.4) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(30, 41, 59, 0.4) 1px, transparent 1px),
+        linear-gradient(45deg, rgba(15, 23, 42, 0.5) 25%, transparent 25%, transparent 75%, rgba(15, 23, 42, 0.5) 75%),
+        linear-gradient(45deg, rgba(15, 23, 42, 0.5) 25%, transparent 25%, transparent 75%, rgba(15, 23, 42, 0.5) 75%);
+    background-size: 16px 16px, 16px 16px, 32px 32px, 32px 32px;
+    background-position: 0 0, 0 0, 0 0, 16px 16px;
+}
+
+/* Warm Parchment Surface for Cards */
+.warm-surface {
+    background: rgba(248, 243, 233, 0.94);
+    backdrop-filter: blur(8px);
+    border-color: #cbbeaa;
+    box-shadow: 0 4px 16px -2px rgba(100, 80, 50, 0.08), 0 2px 4px rgba(100, 80, 50, 0.04);
+}
+
+html.dark .warm-surface {
+    background: rgba(13, 18, 30, 0.85);
+    backdrop-filter: blur(12px);
+    border-color: #1e293b;
+    box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.4);
 }
 
 /* Custom Scrollbars */
+html {
+    scrollbar-width: thin;
+    scrollbar-color: #baa992 transparent;
+}
+
+html.dark {
+    scrollbar-color: #1e293b transparent;
+}
+
 ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
@@ -33,12 +71,12 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-    background: #dcd0bf;
+    background: #baa992;
     border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: #c5b6a0;
+    background: #a18f77;
 }
 
 html.dark ::-webkit-scrollbar-thumb {
@@ -59,25 +97,4 @@ input[type="number"]::-webkit-outer-spin-button {
 
 input[type="number"] {
     -moz-appearance: textfield;
-}
-
-/* Eye-Friendly Warm Layer Utilities */
-.warm-surface {
-    background: linear-gradient(135deg, rgba(255, 253, 248, 0.94) 0%, rgba(253, 249, 241, 0.88) 100%);
-    box-shadow: 0 4px 20px -3px rgba(140, 110, 70, 0.06), 0 1px 3px rgba(140, 110, 70, 0.04);
-}
-
-.dark .warm-surface {
-    background: rgba(15, 23, 42, 0.65);
-    box-shadow: 0 4px 20px -3px rgba(0, 0, 0, 0.35);
-}
-
-.warm-inset {
-    background: #f3ece0;
-    border-color: #e5dbc9;
-}
-
-.dark .warm-inset {
-    background: #060911;
-    border-color: #1e293b;
 }
