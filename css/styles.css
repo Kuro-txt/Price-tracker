@@ -1,0 +1,15 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+body {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #fdfbf7; }
+::-webkit-scrollbar-thumb { background: #e2d9cc; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #c8bdae; }
+
+html.dark ::-webkit-scrollbar-track { background: #090d16; }
+html.dark ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
+html.dark ::-webkit-scrollbar-thumb:hover { background: #334155; }
