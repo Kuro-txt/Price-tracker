@@ -1,6 +1,21 @@
 let chartInstance = null;
-let lastHistoryData = [];
+let fullHistoryData = [];
 let selectedRange = "24h";
+
+// Sliding & Scaling Window State
+let viewStart = 0;
+let viewEnd = 0;
+let yPaddingMultiplier = 1.0; // 1.0 = Default Auto Height
+
+// Pointer & Drag Gesture State
+let isDragging = false;
+let startPointerX = 0;
+let startPointerY = 0;
+let dragStartViewStart = 0;
+let dragStartViewEnd = 0;
+let dragStartYPadding = 1.0;
+let hasCustomView = false;
+let initialPinchDistance = null;
 
 // SFL 4-Season Cycle (7 Days each = 28-day loop)
 const SEASONS = [
@@ -54,29 +69,33 @@ function changeRange(range) {
         }
     });
 
-    hideResetButton();
+    resetSlideView();
 
     if (window.activeItem) {
         loadItemHistoryGraph(window.activeItem.name);
     }
 }
 
-// Reset custom dragged/slid position
-function resetSlideView() {
-    if (chartInstance) {
-        chartInstance.resetZoom();
-        hideResetButton();
-    }
-}
-
 function showResetButton() {
+    hasCustomView = true;
     const btn = document.getElementById('resetSlideBtn');
     if (btn) btn.classList.remove('hidden');
 }
 
 function hideResetButton() {
+    hasCustomView = false;
     const btn = document.getElementById('resetSlideBtn');
     if (btn) btn.classList.add('hidden');
+}
+
+function resetSlideView() {
+    viewStart = 0;
+    viewEnd = Math.max(0, fullHistoryData.length - 1);
+    yPaddingMultiplier = 1.0;
+    hideResetButton();
+    if (fullHistoryData.length > 0) {
+        renderChart();
+    }
 }
 
 async function loadItemHistoryGraph(itemName) {
@@ -106,23 +125,33 @@ async function loadItemHistoryGraph(itemName) {
         if (countLabel) countLabel.innerText = `${historyData.length} records (${selectedRange.toUpperCase()})`;
     }
 
-    lastHistoryData = historyData;
+    fullHistoryData = historyData;
+    viewStart = 0;
+    viewEnd = fullHistoryData.length - 1;
+    yPaddingMultiplier = 1.0;
+
     updateActiveSeasonBadge();
     hideResetButton();
-    renderChart(historyData);
+    renderChart();
+    attachDirectGestures();
 }
 
-function renderChart(historyData) {
+function renderChart() {
     const canvas = document.getElementById('priceHistoryChart');
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     const isMobile = window.innerWidth < 640;
 
+    // Slice active visible data window
+    const clampedStart = Math.max(0, Math.min(viewStart, fullHistoryData.length - 2));
+    const clampedEnd = Math.max(clampedStart + 1, Math.min(viewEnd, fullHistoryData.length - 1));
+    const visibleData = fullHistoryData.slice(clampedStart, clampedEnd + 1);
+
     const labels = [];
     const itemSeasons = [];
     const fullDateTooltips = [];
 
-    historyData.forEach(h => {
+    visibleData.forEach(h => {
         const rawDate = h.recorded_at ? h.recorded_at.replace(" ", "T") + (h.recorded_at.includes("Z") ? "" : "Z") : new Date().toISOString();
         const d = new Date(rawDate);
         const validDate = isNaN(d.getTime()) ? new Date() : d;
@@ -143,7 +172,16 @@ function renderChart(historyData) {
         fullDateTooltips.push(validDate.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }));
     });
 
-    const prices = historyData.map(h => parseFloat(h.price));
+    const prices = visibleData.map(h => parseFloat(h.price));
+
+    // Dynamic Y-Axis scale calculation with slide multiplier
+    const minPrice = Math.min(...prices);
+    const maxPrice = Math.max(...prices);
+    const priceRange = Math.max(maxPrice - minPrice, 0.0001);
+
+    const margin = priceRange * 0.15 * yPaddingMultiplier;
+    const yMin = Math.max(0, minPrice - margin);
+    const yMax = maxPrice + margin;
 
     if (chartInstance) {
         chartInstance.destroy();
@@ -160,7 +198,7 @@ function renderChart(historyData) {
     gradient.addColorStop(0, 'rgba(245, 158, 11, 0.20)');
     gradient.addColorStop(1, 'rgba(245, 158, 11, 0.0)');
 
-    const pointRadius = (selectedRange === '30d' || selectedRange === '90d' || historyData.length > 30) ? 0 : (isMobile ? 3 : 4);
+    const pointRadius = (visibleData.length > 30) ? 0 : (isMobile ? 3 : 4);
 
     chartInstance = new Chart(ctx, {
         type: 'line',
@@ -171,8 +209,8 @@ function renderChart(historyData) {
                 data: prices,
                 borderColor: '#f59e0b',
                 segment: {
-                    borderColor: ctx => {
-                        const pIndex = ctx.p1DataIndex;
+                    borderColor: ctxSeg => {
+                        const pIndex = ctxSeg.p1DataIndex;
                         return itemSeasons[pIndex]?.color || '#f59e0b';
                     }
                 },
@@ -190,6 +228,7 @@ function renderChart(historyData) {
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            animation: false, // Instant response while sliding
             interaction: { mode: 'index', intersect: false },
             plugins: {
                 legend: { display: false },
@@ -206,27 +245,7 @@ function renderChart(historyData) {
                             const timeStr = fullDateTooltips[index];
                             return `${season?.icon || '🌱'} ${season?.name || 'Spring'} Season (Day ${season?.day || 1}/7)\n📅 ${timeStr}`;
                         },
-                        label: (ctx) => ` Price: ${window.formatDisplayPrice(ctx.parsed.y)} SFL`
-                    }
-                },
-                // Direct Slide & Pinch Gestures
-                zoom: {
-                    pan: {
-                        enabled: true,
-                        mode: 'xy',
-                        threshold: 5,
-                        onPanStart: () => showResetButton()
-                    },
-                    zoom: {
-                        wheel: {
-                            enabled: true,
-                            speed: 0.08
-                        },
-                        pinch: {
-                            enabled: true
-                        },
-                        mode: 'xy',
-                        onZoomStart: () => showResetButton()
+                        label: (ctxLabel) => ` Price: ${window.formatDisplayPrice(ctxLabel.parsed.y)} SFL`
                     }
                 }
             },
@@ -240,6 +259,8 @@ function renderChart(historyData) {
                     }
                 },
                 y: {
+                    min: yMin,
+                    max: yMax,
                     grid: { color: gridColor },
                     ticks: { 
                         font: { family: 'Plus Jakarta Sans', size: isMobile ? 9 : 10 }, 
@@ -253,9 +274,136 @@ function renderChart(historyData) {
     });
 }
 
+// Attach Gesture Handlers (Slide X, Slide Y, Wheel & Pinch)
+function attachDirectGestures() {
+    const canvas = document.getElementById('priceHistoryChart');
+    if (!canvas || canvas.dataset.gesturesAttached) return;
+    canvas.dataset.gesturesAttached = "true";
+
+    // Pointer Down
+    canvas.addEventListener('pointerdown', (e) => {
+        if (fullHistoryData.length < 3) return;
+        isDragging = true;
+        canvas.setPointerCapture(e.pointerId);
+        startPointerX = e.clientX;
+        startPointerY = e.clientY;
+        dragStartViewStart = viewStart;
+        dragStartViewEnd = viewEnd;
+        dragStartYPadding = yPaddingMultiplier;
+    });
+
+    // Pointer Move (Slide X & Y)
+    canvas.addEventListener('pointermove', (e) => {
+        if (!isDragging || fullHistoryData.length < 3) return;
+
+        const deltaX = e.clientX - startPointerX;
+        const deltaY = e.clientY - startPointerY;
+
+        // Slide Horizontally (Time Pan)
+        const totalVisible = dragStartViewEnd - dragStartViewStart;
+        const pixelsPerItem = canvas.clientWidth / totalVisible;
+        const itemsShifted = Math.round(deltaX / pixelsPerItem);
+
+        if (itemsShifted !== 0) {
+            let newStart = dragStartViewStart - itemsShifted;
+            let newEnd = dragStartViewEnd - itemsShifted;
+
+            if (newStart < 0) {
+                newEnd -= newStart;
+                newStart = 0;
+            }
+            if (newEnd >= fullHistoryData.length) {
+                newStart -= (newEnd - (fullHistoryData.length - 1));
+                newEnd = fullHistoryData.length - 1;
+            }
+
+            viewStart = Math.max(0, newStart);
+            viewEnd = Math.min(fullHistoryData.length - 1, newEnd);
+            showResetButton();
+        }
+
+        // Slide Vertically (Stretch / Compress Price Height)
+        if (Math.abs(deltaY) > 5) {
+            const ySensitivity = 0.005;
+            const newYPadding = Math.max(0.1, Math.min(4.0, dragStartYPadding + (deltaY * ySensitivity)));
+            if (Math.abs(newYPadding - yPaddingMultiplier) > 0.02) {
+                yPaddingMultiplier = newYPadding;
+                showResetButton();
+            }
+        }
+
+        renderChart();
+    });
+
+    const stopDragging = (e) => {
+        if (isDragging) {
+            isDragging = false;
+            try { canvas.releasePointerCapture(e.pointerId); } catch (_) {}
+        }
+    };
+
+    canvas.addEventListener('pointerup', stopDragging);
+    canvas.addEventListener('pointercancel', stopDragging);
+
+    // Mouse Wheel Zoom
+    canvas.addEventListener('wheel', (e) => {
+        if (fullHistoryData.length < 3) return;
+        e.preventDefault();
+
+        const zoomFactor = e.deltaY < 0 ? -1 : 1;
+        const currentSpan = viewEnd - viewStart;
+        const change = Math.max(1, Math.round(currentSpan * 0.15)) * zoomFactor;
+
+        let newStart = viewStart + change;
+        let newEnd = viewEnd - change;
+
+        if (newEnd - newStart >= 3 && newStart >= 0 && newEnd < fullHistoryData.length) {
+            viewStart = newStart;
+            viewEnd = newEnd;
+            showResetButton();
+            renderChart();
+        }
+    }, { passive: false });
+
+    // Touch Pinch Zoom
+    canvas.addEventListener('touchmove', (e) => {
+        if (e.touches.length === 2 && fullHistoryData.length >= 3) {
+            e.preventDefault();
+            const touch1 = e.touches[0];
+            const touch2 = e.touches[1];
+            const currentDistance = Math.hypot(touch1.clientX - touch2.clientX, touch1.clientY - touch2.clientY);
+
+            if (initialPinchDistance) {
+                const diff = currentDistance - initialPinchDistance;
+                if (Math.abs(diff) > 10) {
+                    const zoomDirection = diff > 0 ? -1 : 1;
+                    const change = Math.max(1, Math.round((viewEnd - viewStart) * 0.08)) * zoomDirection;
+
+                    let newStart = viewStart + change;
+                    let newEnd = viewEnd - change;
+
+                    if (newEnd - newStart >= 3 && newStart >= 0 && newEnd < fullHistoryData.length) {
+                        viewStart = newStart;
+                        viewEnd = newEnd;
+                        showResetButton();
+                        renderChart();
+                    }
+                    initialPinchDistance = currentDistance;
+                }
+            } else {
+                initialPinchDistance = currentDistance;
+            }
+        }
+    }, { passive: false });
+
+    canvas.addEventListener('touchend', () => {
+        initialPinchDistance = null;
+    });
+}
+
 window.addEventListener('resize', () => {
-    if (lastHistoryData.length > 0) {
-        renderChart(lastHistoryData);
+    if (fullHistoryData.length > 0) {
+        renderChart();
     }
 });
 
