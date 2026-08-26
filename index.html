@@ -23,6 +23,9 @@
     <!-- Styles & Dependencies -->
     <link rel="stylesheet" href="css/style.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Gesture & Slide/Pan Plugins -->
+    <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.2.0/dist/chartjs-plugin-zoom.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body class="bg-[#f8f6f0] dark:bg-[#0c111c] text-stone-800 dark:text-slate-100 min-h-screen flex flex-col justify-between selection:bg-amber-200 dark:selection:bg-amber-900 selection:text-amber-900 dark:selection:text-amber-200 transition-colors duration-150">
@@ -185,10 +188,10 @@
 
                 </div>
 
-                <!-- Right Column: Interactive Price History Graph with X & Y Scale Sliders -->
+                <!-- Right Column: Interactive Price History Graph -->
                 <div class="lg:col-span-7 bg-white dark:bg-slate-900 border border-stone-200/80 dark:border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xs transition-colors duration-150 space-y-3">
                     
-                    <!-- Top Bar: Header, Season Badge, Time Range Filters -->
+                    <!-- Top Bar: Season Badge, Time Range Filters & Reset View -->
                     <div class="flex flex-wrap items-center justify-between gap-2 pb-1">
                         <div class="flex items-center gap-2 min-w-0">
                             <span class="text-xs font-bold text-stone-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1 shrink-0">
@@ -199,52 +202,29 @@
                             </span>
                         </div>
 
-                        <!-- Range Filter Controls -->
-                        <div class="flex items-center bg-stone-100 dark:bg-slate-950 p-0.5 rounded-lg border border-stone-200 dark:border-slate-800 text-[10px] font-bold shrink-0">
-                            <button onclick="changeRange('24h')" id="range-24h" class="px-2.5 py-0.5 rounded-md transition bg-white dark:bg-slate-800 text-amber-600 dark:text-amber-400 shadow-2xs">24H</button>
-                            <button onclick="changeRange('7d')" id="range-7d" class="px-2.5 py-0.5 rounded-md transition text-stone-500 dark:text-slate-400 hover:text-stone-900 dark:hover:text-white">7D</button>
-                            <button onclick="changeRange('30d')" id="range-30d" class="px-2.5 py-0.5 rounded-md transition text-stone-500 dark:text-slate-400 hover:text-stone-900 dark:hover:text-white">1M</button>
-                            <button onclick="changeRange('90d')" id="range-90d" class="px-2.5 py-0.5 rounded-md transition text-stone-500 dark:text-slate-400 hover:text-stone-900 dark:hover:text-white">3M</button>
+                        <!-- Range Filters & Slide Reset Control -->
+                        <div class="flex items-center gap-1.5">
+                            <div class="flex items-center bg-stone-100 dark:bg-slate-950 p-0.5 rounded-lg border border-stone-200 dark:border-slate-800 text-[10px] font-bold shrink-0">
+                                <button onclick="changeRange('24h')" id="range-24h" class="px-2.5 py-0.5 rounded-md transition bg-white dark:bg-slate-800 text-amber-600 dark:text-amber-400 shadow-2xs">24H</button>
+                                <button onclick="changeRange('7d')" id="range-7d" class="px-2.5 py-0.5 rounded-md transition text-stone-500 dark:text-slate-400 hover:text-stone-900 dark:hover:text-white">7D</button>
+                                <button onclick="changeRange('30d')" id="range-30d" class="px-2.5 py-0.5 rounded-md transition text-stone-500 dark:text-slate-400 hover:text-stone-900 dark:hover:text-white">1M</button>
+                                <button onclick="changeRange('90d')" id="range-90d" class="px-2.5 py-0.5 rounded-md transition text-stone-500 dark:text-slate-400 hover:text-stone-900 dark:hover:text-white">3M</button>
+                            </div>
+
+                            <!-- Contextual Reset Button (Appears automatically when slid / dragged) -->
+                            <button id="resetSlideBtn" onclick="resetSlideView()" class="hidden px-2 py-0.5 rounded-md bg-amber-500 hover:bg-amber-400 text-stone-950 text-[10px] font-bold transition shadow-2xs">
+                                <i class="fa-solid fa-arrow-rotate-left mr-0.5"></i> Reset
+                            </button>
                         </div>
                     </div>
 
-                    <!-- Interactive X & Y Axis Scale Toolbar -->
-                    <div class="flex flex-wrap items-center justify-between gap-2.5 bg-stone-50 dark:bg-slate-950/80 border border-stone-200/80 dark:border-slate-800 p-2 rounded-xl text-[10px] font-medium text-stone-600 dark:text-slate-300">
-                        <div class="flex items-center gap-3 flex-wrap">
-                            <!-- X-Axis Scale Control -->
-                            <div class="flex items-center gap-1.5">
-                                <span class="font-bold text-stone-700 dark:text-slate-200 flex items-center gap-1">
-                                    <i class="fa-solid fa-arrows-left-right text-[9px] text-amber-500"></i> X-Axis:
-                                </span>
-                                <input type="range" id="xScaleSlider" min="15" max="100" value="100" oninput="adjustXScale(this.value)" 
-                                    class="w-16 sm:w-20 accent-amber-500 cursor-pointer h-1.5 bg-stone-200 dark:bg-slate-800 rounded-lg">
-                                <span id="xScaleLabel" class="text-[9px] font-mono text-stone-400 dark:text-slate-500 w-7">100%</span>
-                            </div>
-
-                            <!-- Y-Axis Scale Control -->
-                            <div class="flex items-center gap-1.5">
-                                <span class="font-bold text-stone-700 dark:text-slate-200 flex items-center gap-1">
-                                    <i class="fa-solid fa-arrows-up-down text-[9px] text-amber-500"></i> Y-Axis:
-                                </span>
-                                <input type="range" id="yScaleSlider" min="2" max="100" value="20" oninput="adjustYScale(this.value)" 
-                                    class="w-16 sm:w-20 accent-amber-500 cursor-pointer h-1.5 bg-stone-200 dark:bg-slate-800 rounded-lg">
-                                <span id="yScaleLabel" class="text-[9px] font-mono text-stone-400 dark:text-slate-500 w-7">Fit</span>
-                            </div>
-                        </div>
-
-                        <!-- Reset Axis Scale -->
-                        <button onclick="resetAxes()" class="px-2 py-0.5 rounded-lg bg-white dark:bg-slate-800 hover:bg-stone-100 dark:hover:bg-slate-700 text-stone-700 dark:text-slate-200 border border-stone-200 dark:border-slate-700 font-bold transition shadow-2xs">
-                            Reset Axis
-                        </button>
-                    </div>
-
-                    <!-- Canvas Container -->
-                    <div class="bg-stone-50 dark:bg-slate-950 border border-stone-200/80 dark:border-slate-800 rounded-xl p-2.5 sm:p-3 relative h-60 sm:h-72 flex items-center justify-center transition-colors duration-150">
+                    <!-- Canvas Container (Direct slide/drag enabled) -->
+                    <div class="bg-stone-50 dark:bg-slate-950 border border-stone-200/80 dark:border-slate-800 rounded-xl p-2.5 sm:p-3 relative h-64 sm:h-72 flex items-center justify-center transition-colors duration-150 select-none">
                         <div id="chartSpinner" class="hidden absolute inset-0 bg-white/80 dark:bg-slate-950/80 backdrop-blur-xs flex flex-col items-center justify-center z-10 rounded-xl">
                             <i class="fa-solid fa-circle-notch fa-spin text-lg text-amber-500 mb-1"></i>
                             <span class="text-[10px] text-stone-500 dark:text-slate-400 font-medium">Loading history...</span>
                         </div>
-                        <canvas id="priceHistoryChart" class="w-full h-full"></canvas>
+                        <canvas id="priceHistoryChart" class="w-full h-full cursor-grab active:cursor-grabbing"></canvas>
                     </div>
 
                     <!-- Season Legend Indicator -->
