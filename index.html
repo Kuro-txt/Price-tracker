@@ -11,7 +11,301 @@
         tailwind.config = {
             darkMode: 'class',
             theme: {
+                extend: {<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Sunflower Land - Market Tracker</title>
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
                 extend: {
+                    fontFamily: {
+                        sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+                        mono: ['"JetBrains Mono"', 'monospace'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Theme Controller (Initializes Theme & Global Toggle) -->
+    <script>
+        function applyTheme(isDark) {
+            if (isDark) {
+                document.documentElement.classList.add('dark');
+                localStorage.setItem('theme', 'dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+                localStorage.setItem('theme', 'light');
+            }
+        }
+
+        const savedTheme = localStorage.getItem('theme');
+        const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        applyTheme(savedTheme === 'dark' || (!savedTheme && systemPrefersDark));
+
+        function toggleTheme() {
+            const isCurrentlyDark = document.documentElement.classList.contains('dark');
+            applyTheme(!isCurrentlyDark);
+            if (window.renderChart && window.fullHistoryData && window.fullHistoryData.length > 0) {
+                window.renderChart();
+            }
+        }
+        window.toggleTheme = toggleTheme;
+    </script>
+
+    <!-- Styles & Dependencies -->
+    <link rel="stylesheet" href="css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+<body class="bg-[#dfd4c0] dark:bg-black text-[#2b2219] dark:text-zinc-100 min-h-screen flex flex-col justify-between selection:bg-amber-400 selection:text-stone-950 transition-colors duration-200">
+
+    <!-- Header Navigation -->
+    <header class="bg-[#ede4d4]/95 dark:bg-black/95 backdrop-blur-md border-b border-[#cbbeaa] dark:border-[#1c1c26] sticky top-0 z-50 transition-colors duration-200 shadow-xs">
+        <div class="max-w-6xl mx-auto px-4 sm:px-6 py-2.5 sm:py-3 flex items-center justify-between gap-3">
+            
+            <!-- Branding -->
+            <div class="flex items-center space-x-2.5 min-w-0">
+                <div class="relative">
+                    <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-amber-500 to-amber-300 text-stone-950 flex items-center justify-center shadow-md shadow-amber-500/25 border border-amber-600/30">
+                        <i class="fa-solid fa-sun text-base animate-[spin_16s_linear_infinite]"></i>
+                    </div>
+                </div>
+                <div class="min-w-0">
+                    <div class="flex items-center gap-2">
+                        <h1 class="text-sm sm:text-base font-extrabold tracking-tight text-[#221a12] dark:text-white truncate">
+                            Sunflower Market
+                        </h1>
+                        <span class="inline-flex items-center gap-1.5 text-[9px] bg-emerald-500/20 dark:bg-emerald-500/10 text-emerald-900 dark:text-emerald-400 font-black px-2 py-0.5 rounded-full border border-emerald-600/30 dark:border-emerald-500/30 shrink-0">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-600 dark:bg-emerald-400 animate-pulse"></span> LIVE
+                        </span>
+                    </div>
+                    <p class="text-[10px] text-[#7a6d5c] dark:text-zinc-500 font-medium truncate" id="lastUpdatedLabel">Connecting to SFL Plaza...</p>
+                </div>
+            </div>
+
+            <!-- Action Controls -->
+            <div class="flex items-center gap-2 shrink-0">
+                <!-- Theme Toggle -->
+                <button onclick="toggleTheme()" id="themeToggleBtn" aria-label="Toggle Theme" class="bg-[#dfd3bf] dark:bg-[#111116] hover:bg-[#d5c7b1] dark:hover:bg-[#1c1c24] text-[#4a3d2f] dark:text-amber-400 w-8 h-8 rounded-xl transition flex items-center justify-center border border-[#c5b59f] dark:border-[#22222e] shadow-xs active:scale-95">
+                    <i class="fa-solid fa-moon text-xs block dark:hidden"></i>
+                    <i class="fa-solid fa-sun text-xs hidden dark:block"></i>
+                </button>
+
+                <!-- Auto Sync Indicator -->
+                <div class="flex items-center gap-1.5 bg-[#dfd3bf] dark:bg-[#111116] border border-[#c5b59f] dark:border-[#22222e] px-2.5 py-1.5 rounded-xl text-[11px] font-bold text-[#544636] dark:text-zinc-300">
+                    <input type="checkbox" id="autoRefreshCheck" checked class="accent-amber-500 cursor-pointer w-3 h-3">
+                    <label for="autoRefreshCheck" class="cursor-pointer select-none">15s Sync</label>
+                </div>
+
+                <!-- Refresh Button -->
+                <button id="refreshBtn" onclick="fetchPrices()" class="bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-stone-950 px-3.5 py-1.5 rounded-xl text-xs font-black transition flex items-center gap-1.5 shadow-sm shadow-amber-500/20 active:scale-95">
+                    <i class="fa-solid fa-rotate text-[11px]" id="refreshIcon"></i> 
+                    <span class="hidden sm:inline">Refresh</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <main class="max-w-6xl mx-auto px-4 sm:px-6 py-5 sm:py-7 flex-1 w-full space-y-4">
+
+        <!-- Search & Selection Panel -->
+        <div class="warm-surface border rounded-2xl p-3.5 sm:p-4 transition-colors duration-200">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                
+                <!-- Autocomplete Input -->
+                <div class="relative">
+                    <label class="block text-[10px] font-bold text-[#7d6f5d] dark:text-zinc-400 uppercase tracking-wider mb-1 ml-1">Search Crop or Resource</label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 flex items-center pl-3.5 text-[#8f806e] dark:text-zinc-500 pointer-events-none">
+                            <i class="fa-solid fa-magnifying-glass text-xs"></i>
+                        </span>
+                        <input type="text" id="searchInput" oninput="handleSearchInput(this.value)" onfocus="showAutocomplete()" placeholder="Search item (e.g. Sunflower, Iron, Egg)..." 
+                            class="w-full pl-9 pr-4 py-2 bg-[#eae0cf] dark:bg-black border border-[#cbbeaa] dark:border-[#1c1c26] rounded-xl text-xs sm:text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 focus:bg-[#f6eee0] dark:focus:bg-[#0c0c10] text-[#2b2219] dark:text-white placeholder-[#8f806e] dark:placeholder-zinc-600 transition">
+                    </div>
+                    <div id="autocompleteList" class="hidden absolute left-0 right-0 top-full mt-1.5 bg-[#f6eee0] dark:bg-[#0c0c10] border border-[#cbbeaa] dark:border-[#22222e] rounded-xl max-h-56 overflow-y-auto z-50 shadow-2xl divide-y divide-[#dfd3be] dark:divide-[#1a1a24]"></div>
+                </div>
+
+                <!-- Dropdown Selector -->
+                <div>
+                    <label for="itemDropdown" class="block text-[10px] font-bold text-[#7d6f5d] dark:text-zinc-400 uppercase tracking-wider mb-1 ml-1">Or Select from Catalog</label>
+                    <select id="itemDropdown" onchange="onDropdownSelect(this.value)" class="w-full bg-[#eae0cf] dark:bg-black border border-[#cbbeaa] dark:border-[#1c1c26] text-[#2b2219] dark:text-white text-xs sm:text-sm font-semibold rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 focus:bg-[#f6eee0] dark:focus:bg-[#0c0c10] transition cursor-pointer">
+                        <option value="">-- Choose an item --</option>
+                    </select>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Loading State -->
+        <div id="loadingState" class="flex flex-col items-center justify-center py-16 warm-surface border rounded-2xl">
+            <div class="w-12 h-12 rounded-2xl bg-amber-500/20 flex items-center justify-center text-amber-700 dark:text-amber-400 text-xl mb-3 animate-pulse">
+                <i class="fa-solid fa-seedling"></i>
+            </div>
+            <p class="text-[#6d5f4e] dark:text-zinc-400 text-xs font-bold">Syncing live Sunflower Land market prices...</p>
+        </div>
+
+        <!-- Error State -->
+        <div id="errorState" class="hidden bg-rose-100/90 dark:bg-rose-950/40 border border-rose-300 dark:border-rose-900/60 text-rose-900 dark:text-rose-300 p-4 rounded-2xl text-center shadow-xs">
+            <i class="fa-solid fa-circle-exclamation text-lg mb-1 text-rose-600 dark:text-rose-500"></i>
+            <p id="errorMessage" class="font-bold text-xs">Failed to fetch pricing data.</p>
+        </div>
+
+        <!-- Empty State -->
+        <div id="emptyState" class="warm-surface border-2 border-dashed border-[#cbbeaa] dark:border-[#1c1c26] rounded-2xl p-12 text-center space-y-2">
+            <div class="w-12 h-12 bg-amber-500/20 text-amber-800 dark:text-amber-400 rounded-2xl flex items-center justify-center mx-auto text-lg">
+                <i class="fa-solid fa-basket-shopping"></i>
+            </div>
+            <h3 class="text-sm sm:text-base font-extrabold text-[#2b2219] dark:text-white">No Asset Selected</h3>
+            <p class="text-[#7d6f5d] dark:text-zinc-500 text-xs max-w-xs mx-auto">
+                Select or search for a resource above to inspect floor pricing and seasonal history.
+            </p>
+        </div>
+
+        <!-- Selected Item Workspace (2-Column Grid) -->
+        <div id="itemDetailsContainer" class="hidden">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+                
+                <!-- Left Column: Floor Card, Stack Multipliers & Total Calculator -->
+                <div class="lg:col-span-5 space-y-4">
+                    
+                    <div class="warm-surface border rounded-2xl p-4 sm:p-5 transition-all duration-200 space-y-4">
+                        <div class="flex items-start justify-between gap-3">
+                            <div class="min-w-0">
+                                <div class="flex items-center gap-1.5 mb-1.5 flex-wrap">
+                                    <span class="inline-flex items-center gap-1 bg-amber-500/20 dark:bg-amber-400/10 text-amber-950 dark:text-amber-300 text-[10px] font-black px-2.5 py-0.5 rounded-full border border-amber-600/30 dark:border-amber-400/20">
+                                        <i class="fa-solid fa-gem text-[8px]"></i> Plaza Asset
+                                    </span>
+                                    <span id="priceChangeBadge" class="inline-flex items-center gap-1 text-[10px] font-black px-2.5 py-0.5 rounded-full border bg-[#e4d9c6] dark:bg-[#111116] text-[#4c3f30] dark:text-zinc-400 border-[#cbbeaa] dark:border-[#22222e] transition-all">
+                                        0.00%
+                                    </span>
+                                </div>
+                                <h2 id="selectedItemName" class="text-2xl sm:text-3xl font-black text-[#1b140d] dark:text-white tracking-tight truncate">-</h2>
+                            </div>
+
+                            <!-- Warm Golden Floor Pill -->
+                            <div class="bg-gradient-to-br from-amber-400 via-amber-500 to-amber-600 text-stone-950 px-4 py-2.5 rounded-xl shadow-md shadow-amber-500/25 border border-amber-600/30 text-right shrink-0">
+                                <span class="text-[9px] font-black uppercase tracking-wider block opacity-90">Current Floor</span>
+                                <div class="flex items-baseline justify-end gap-1 mt-0.5">
+                                    <span class="text-xl sm:text-2xl font-black font-mono tracking-tight" id="selectedItemPrice">0.00</span>
+                                    <span class="text-[10px] font-black">SFL</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 3-Column Stack Multipliers -->
+                        <div class="grid grid-cols-3 gap-2 pt-2 border-t border-[#dfd3be] dark:border-[#1c1c26]">
+                            <div class="bg-[#e9decb] dark:bg-black border border-[#cbbeaa] dark:border-[#1c1c26] p-2.5 rounded-xl text-center hover:border-amber-500/50 transition">
+                                <span class="text-[9px] font-bold text-[#7a6d5c] dark:text-zinc-500 uppercase tracking-wider block">x10 Stack</span>
+                                <span class="text-xs sm:text-sm font-black font-mono text-[#221a12] dark:text-white mt-0.5 block truncate" id="stack10Price">-</span>
+                                <span class="text-[9px] text-[#7a6d5c] dark:text-zinc-500 font-bold">SFL</span>
+                            </div>
+                            <div class="bg-[#e9decb] dark:bg-black border border-[#cbbeaa] dark:border-[#1c1c26] p-2.5 rounded-xl text-center hover:border-amber-500/50 transition">
+                                <span class="text-[9px] font-bold text-[#7a6d5c] dark:text-zinc-500 uppercase tracking-wider block">x100 Stack</span>
+                                <span class="text-xs sm:text-sm font-black font-mono text-[#221a12] dark:text-white mt-0.5 block truncate" id="stack100Price">-</span>
+                                <span class="text-[9px] text-[#7a6d5c] dark:text-zinc-500 font-bold">SFL</span>
+                            </div>
+                            <div class="bg-[#e9decb] dark:bg-black border border-[#cbbeaa] dark:border-[#1c1c26] p-2.5 rounded-xl text-center hover:border-amber-500/50 transition">
+                                <span class="text-[9px] font-bold text-[#7a6d5c] dark:text-zinc-500 uppercase tracking-wider block">x1k Stack</span>
+                                <span class="text-xs sm:text-sm font-black font-mono text-[#221a12] dark:text-white mt-0.5 block truncate" id="stack1000Price">-</span>
+                                <span class="text-[9px] text-[#7a6d5c] dark:text-zinc-500 font-bold">SFL</span>
+                            </div>
+                        </div>
+
+                        <!-- Compact Calculator -->
+                        <div class="bg-[#e9decb] dark:bg-black border border-[#cbbeaa] dark:border-[#1c1c26] p-3 rounded-xl flex items-center justify-between gap-3">
+                            <div class="flex items-center gap-2 min-w-0 flex-1">
+                                <span class="text-[10px] font-black text-[#7a6d5c] dark:text-zinc-400 uppercase tracking-wider shrink-0">Qty</span>
+                                <input type="number" id="calcQuantity" value="50" min="1" oninput="calculateCustomStack()" 
+                                    class="w-20 sm:w-28 bg-[#f6eee0] dark:bg-[#0c0c10] border border-[#cbbeaa] dark:border-[#22222e] rounded-lg px-2.5 py-1 text-xs font-black font-mono text-[#221a12] dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50">
+                            </div>
+                            <div class="text-right shrink-0">
+                                <span class="text-[10px] font-bold text-[#7a6d5c] dark:text-zinc-500 uppercase mr-1">Total:</span>
+                                <span class="text-sm sm:text-base font-black font-mono text-amber-950 dark:text-amber-400" id="calcResult">0.00</span>
+                                <span class="text-[10px] font-black text-amber-900 dark:text-amber-500 ml-0.5">SFL</span>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- Right Column: Slideable Price Chart Workspace -->
+                <div class="lg:col-span-7 warm-surface border rounded-2xl p-4 sm:p-5 transition-colors duration-200 space-y-3">
+                    
+                    <!-- Header Controls Bar -->
+                    <div class="flex flex-wrap items-center justify-between gap-2 pb-1">
+                        <div class="flex items-center gap-2 min-w-0">
+                            <span class="text-xs font-black text-[#292017] dark:text-zinc-200 uppercase tracking-wider flex items-center gap-1.5 shrink-0">
+                                <i class="fa-solid fa-chart-line text-amber-600 dark:text-amber-500 text-xs"></i> History
+                            </span>
+                            <span id="currentSeasonBadge" class="inline-flex items-center gap-1 text-[10px] font-black px-2.5 py-0.5 rounded-full border bg-emerald-100 dark:bg-emerald-950/80 text-emerald-900 dark:text-emerald-400 border-emerald-300 dark:border-emerald-800/60 truncate">
+                                🌱 Spring
+                            </span>
+                        </div>
+
+                        <!-- Timeframe Selectors -->
+                        <div class="flex items-center gap-1.5">
+                            <div class="flex items-center bg-[#dfd3bf] dark:bg-black p-0.5 rounded-xl border border-[#c5b59f] dark:border-[#1c1c26] text-[10px] font-extrabold shrink-0">
+                                <button onclick="changeRange('12h')" id="range-12h" class="px-2.5 py-1 rounded-lg transition text-[#635443] dark:text-zinc-400 hover:text-black dark:hover:text-white">12H</button>
+                                <button onclick="changeRange('24h')" id="range-24h" class="px-2.5 py-1 rounded-lg transition bg-[#f6eee0] dark:bg-[#181820] text-amber-800 dark:text-amber-400 shadow-xs">24H</button>
+                                <button onclick="changeRange('7d')" id="range-7d" class="px-2.5 py-1 rounded-lg transition text-[#635443] dark:text-zinc-400 hover:text-black dark:hover:text-white">7D</button>
+                                <button onclick="changeRange('30d')" id="range-30d" class="px-2.5 py-1 rounded-lg transition text-[#635443] dark:text-zinc-400 hover:text-black dark:hover:text-white">1M</button>
+                                <button onclick="changeRange('90d')" id="range-90d" class="px-2.5 py-1 rounded-lg transition text-[#635443] dark:text-zinc-400 hover:text-black dark:hover:text-white">3M</button>
+                            </div>
+
+                            <button id="resetSlideBtn" onclick="resetSlideView()" class="hidden px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-stone-950 text-[10px] font-black transition shadow-xs">
+                                <i class="fa-solid fa-arrow-rotate-left mr-0.5"></i> Reset
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Canvas Container -->
+                    <div class="relative group">
+                        <div class="bg-[#ede2cf] dark:bg-black border border-[#cbbeaa] dark:border-[#1c1c26] rounded-xl p-2.5 sm:p-3 relative h-64 sm:h-72 flex items-center justify-center select-none overflow-hidden transition-colors duration-200">
+                            <div id="chartSpinner" class="hidden absolute inset-0 bg-[#ede2cf]/80 dark:bg-black/80 backdrop-blur-xs flex flex-col items-center justify-center z-10 rounded-xl">
+                                <i class="fa-solid fa-circle-notch fa-spin text-xl text-amber-600 dark:text-amber-500 mb-1.5"></i>
+                                <span class="text-[10px] text-[#706250] dark:text-zinc-400 font-bold">Loading history...</span>
+                            </div>
+                            <canvas id="priceHistoryChart" class="w-full h-full cursor-grab active:cursor-grabbing" style="touch-action: none;"></canvas>
+                        </div>
+                        <div class="flex items-center justify-between text-[9px] font-bold text-[#7d6f5d] dark:text-zinc-500 mt-1.5 px-1">
+                            <span>↔️ Drag horizontal to slide timeline</span>
+                            <span>↕️ Drag vertical to stretch price</span>
+                        </div>
+                    </div>
+
+                    <!-- Season Color Key -->
+                    <div class="flex items-center justify-between pt-1 text-[10px] font-extrabold text-[#5c4e3e] dark:text-zinc-400 px-1 border-t border-[#dfd3be] dark:border-[#1c1c26]">
+                        <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-emerald-600 dark:bg-emerald-400 shadow-xs"></span> 🌱 Spring</span>
+                        <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-amber-500 dark:bg-amber-400 shadow-xs"></span> ☀️ Summer</span>
+                        <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-orange-600 dark:bg-orange-400 shadow-xs"></span> 🍂 Autumn</span>
+                        <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-sky-500 dark:bg-sky-400 shadow-xs"></span> ❄️ Winter</span>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-[#cbbeaa] dark:border-[#1c1c26] bg-[#ede4d4]/80 dark:bg-black/80 backdrop-blur-md text-center py-3 text-[10px] text-[#7a6d5c] dark:text-zinc-500 font-bold transition-colors duration-200">
+        <p>Market data synced live from <a href="https://sfl.world" target="_blank" class="text-amber-800 dark:text-amber-400 hover:underline font-black">sfl.world</a></p>
+    </footer>
+
+    <!-- Scripts -->
+    <script src="js/chart.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
                     fontFamily: {
                         sans: ['"Plus Jakarta Sans"', 'sans-serif'],
                         mono: ['"JetBrains Mono"', 'monospace'],
