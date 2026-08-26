@@ -189,12 +189,13 @@ function renderChart() {
         const season = getSeasonForDate(validDate);
         itemSeasons.push(season);
 
-        if (selectedRange === '6h' || selectedRange === '12h' || selectedRange === '24h') {
+        // 6H, 12H, and 24H all format as Time (HH:MM)
+        if (['6h', '12h', '24h'].includes(selectedRange)) {
             labels.push(validDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
         } else if (selectedRange === '7d') {
             labels.push(isMobile 
-                ? `${season.icon} ${validDate.getDate()}/${validDate.getMonth()+1}` 
-                : `${season.icon} ${validDate.toLocaleDateString([], { month: 'short', day: 'numeric' })}, ${validDate.getHours()}:00`);
+                ? `${validDate.getDate()}/${validDate.getMonth()+1} ${validDate.getHours()}:00` 
+                : `${season.icon} ${validDate.toLocaleDateString([], { month: 'short', day: 'numeric' })}, ${validDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`);
         } else {
             labels.push(`${season.icon} ${validDate.getDate()}/${validDate.getMonth()+1}`);
         }
