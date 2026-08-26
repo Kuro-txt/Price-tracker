@@ -15,10 +15,17 @@ export default async function handler(req, res) {
     }
 
     let sqlQuery = "";
-    let args = [];
+    let args = [item];
 
-    if (range === "24h") {
-      // Full raw resolution for 24H (approx 96 points)
+    if (range === "12h") {
+      sqlQuery = `
+        SELECT item_name, price, recorded_at 
+        FROM resource_prices 
+        WHERE item_name = ? COLLATE NOCASE 
+          AND recorded_at >= datetime('now', '-12 hours')
+        ORDER BY recorded_at ASC
+      `;
+    } else if (range === "24h") {
       sqlQuery = `
         SELECT item_name, price, recorded_at 
         FROM resource_prices 
@@ -26,9 +33,7 @@ export default async function handler(req, res) {
           AND recorded_at >= datetime('now', '-24 hours')
         ORDER BY recorded_at ASC
       `;
-      args = [item];
     } else if (range === "7d") {
-      // Raw resolution for 7D
       sqlQuery = `
         SELECT item_name, price, recorded_at 
         FROM resource_prices 
@@ -36,9 +41,7 @@ export default async function handler(req, res) {
           AND recorded_at >= datetime('now', '-7 days')
         ORDER BY recorded_at ASC
       `;
-      args = [item];
     } else if (range === "30d" || range === "1m") {
-      // 30 Days: Average price grouped by Hour (~720 points)
       sqlQuery = `
         SELECT 
           item_name, 
@@ -50,9 +53,7 @@ export default async function handler(req, res) {
         GROUP BY strftime('%Y-%m-%d %H:00:00', recorded_at)
         ORDER BY recorded_at ASC
       `;
-      args = [item];
     } else {
-      // 90 Days: Average price grouped every 6 Hours (~360 points)
       sqlQuery = `
         SELECT 
           item_name, 
@@ -64,13 +65,12 @@ export default async function handler(req, res) {
         GROUP BY (strftime('%s', recorded_at) / (6 * 3600))
         ORDER BY recorded_at ASC
       `;
-      args = [item];
     }
 
     const result = await db.execute({ sql: sqlQuery, args });
     let rows = result.rows;
 
-    // Fallback if data points are sparse (e.g. brand new database)
+    // Fallback if data is sparse
     if (rows.length === 0) {
       const fallback = await db.execute({
         sql: `SELECT item_name, price, recorded_at 
