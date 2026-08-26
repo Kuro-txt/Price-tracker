@@ -5,7 +5,7 @@ let selectedRange = "24h";
 // Sliding & Scaling Window State
 let viewStart = 0;
 let viewEnd = 0;
-let yPaddingMultiplier = 1.0; // 1.0 = Default Auto Height
+let yPaddingMultiplier = 1.0;
 
 // Pointer & Drag Gesture State
 let isDragging = false;
@@ -14,7 +14,6 @@ let startPointerY = 0;
 let dragStartViewStart = 0;
 let dragStartViewEnd = 0;
 let dragStartYPadding = 1.0;
-let hasCustomView = false;
 let initialPinchDistance = null;
 
 // SFL 4-Season Cycle (7 Days each = 28-day loop)
@@ -77,13 +76,11 @@ function changeRange(range) {
 }
 
 function showResetButton() {
-    hasCustomView = true;
     const btn = document.getElementById('resetSlideBtn');
     if (btn) btn.classList.remove('hidden');
 }
 
 function hideResetButton() {
-    hasCustomView = false;
     const btn = document.getElementById('resetSlideBtn');
     if (btn) btn.classList.add('hidden');
 }
@@ -142,9 +139,9 @@ function renderChart() {
     const ctx = canvas.getContext('2d');
     const isMobile = window.innerWidth < 640;
 
-    // Slice active visible data window
-    const clampedStart = Math.max(0, Math.min(viewStart, fullHistoryData.length - 2));
-    const clampedEnd = Math.max(clampedStart + 1, Math.min(viewEnd, fullHistoryData.length - 1));
+    // Active Visible Window
+    const clampedStart = Math.max(0, Math.min(Math.round(viewStart), fullHistoryData.length - 2));
+    const clampedEnd = Math.max(clampedStart + 1, Math.min(Math.round(viewEnd), fullHistoryData.length - 1));
     const visibleData = fullHistoryData.slice(clampedStart, clampedEnd + 1);
 
     const labels = [];
@@ -174,12 +171,12 @@ function renderChart() {
 
     const prices = visibleData.map(h => parseFloat(h.price));
 
-    // Dynamic Y-Axis scale calculation with slide multiplier
+    // Responsive Y-Axis Scale Bounds
     const minPrice = Math.min(...prices);
     const maxPrice = Math.max(...prices);
     const priceRange = Math.max(maxPrice - minPrice, 0.0001);
 
-    const margin = priceRange * 0.15 * yPaddingMultiplier;
+    const margin = priceRange * 0.18 * yPaddingMultiplier;
     const yMin = Math.max(0, minPrice - margin);
     const yMax = maxPrice + margin;
 
@@ -228,7 +225,7 @@ function renderChart() {
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            animation: false, // Instant response while sliding
+            animation: false,
             interaction: { mode: 'index', intersect: false },
             plugins: {
                 legend: { display: false },
@@ -274,15 +271,14 @@ function renderChart() {
     });
 }
 
-// Attach Gesture Handlers (Slide X, Slide Y, Wheel & Pinch)
+// Attach High-Velocity Gesture Handlers
 function attachDirectGestures() {
     const canvas = document.getElementById('priceHistoryChart');
     if (!canvas || canvas.dataset.gesturesAttached) return;
     canvas.dataset.gesturesAttached = "true";
 
-    // Pointer Down
     canvas.addEventListener('pointerdown', (e) => {
-        if (fullHistoryData.length < 3) return;
+        if (fullHistoryData.length < 2) return;
         isDragging = true;
         canvas.setPointerCapture(e.pointerId);
         startPointerX = e.clientX;
@@ -292,19 +288,19 @@ function attachDirectGestures() {
         dragStartYPadding = yPaddingMultiplier;
     });
 
-    // Pointer Move (Slide X & Y)
     canvas.addEventListener('pointermove', (e) => {
-        if (!isDragging || fullHistoryData.length < 3) return;
+        if (!isDragging || fullHistoryData.length < 2) return;
 
         const deltaX = e.clientX - startPointerX;
         const deltaY = e.clientY - startPointerY;
 
-        // Slide Horizontally (Time Pan)
-        const totalVisible = dragStartViewEnd - dragStartViewStart;
-        const pixelsPerItem = canvas.clientWidth / totalVisible;
-        const itemsShifted = Math.round(deltaX / pixelsPerItem);
+        // Boosted Horizontal Velocity (Slide Time)
+        const visibleSpan = Math.max(1, dragStartViewEnd - dragStartViewStart);
+        const velocityMultiplier = 2.8; 
+        const pixelsPerItem = (canvas.clientWidth / visibleSpan) / velocityMultiplier;
+        const itemsShifted = deltaX / pixelsPerItem;
 
-        if (itemsShifted !== 0) {
+        if (Math.abs(itemsShifted) >= 0.3) {
             let newStart = dragStartViewStart - itemsShifted;
             let newEnd = dragStartViewEnd - itemsShifted;
 
@@ -312,7 +308,7 @@ function attachDirectGestures() {
                 newEnd -= newStart;
                 newStart = 0;
             }
-            if (newEnd >= fullHistoryData.length) {
+            if (newEnd > fullHistoryData.length - 1) {
                 newStart -= (newEnd - (fullHistoryData.length - 1));
                 newEnd = fullHistoryData.length - 1;
             }
@@ -322,11 +318,11 @@ function attachDirectGestures() {
             showResetButton();
         }
 
-        // Slide Vertically (Stretch / Compress Price Height)
-        if (Math.abs(deltaY) > 5) {
-            const ySensitivity = 0.005;
-            const newYPadding = Math.max(0.1, Math.min(4.0, dragStartYPadding + (deltaY * ySensitivity)));
-            if (Math.abs(newYPadding - yPaddingMultiplier) > 0.02) {
+        // Boosted Vertical Velocity (Stretch / Compress Price Height)
+        if (Math.abs(deltaY) > 2) {
+            const ySensitivity = 0.02; // 4x sensitivity increase
+            const newYPadding = Math.max(0.05, Math.min(5.0, dragStartYPadding + (deltaY * ySensitivity)));
+            if (Math.abs(newYPadding - yPaddingMultiplier) > 0.01) {
                 yPaddingMultiplier = newYPadding;
                 showResetButton();
             }
@@ -347,17 +343,17 @@ function attachDirectGestures() {
 
     // Mouse Wheel Zoom
     canvas.addEventListener('wheel', (e) => {
-        if (fullHistoryData.length < 3) return;
+        if (fullHistoryData.length < 2) return;
         e.preventDefault();
 
-        const zoomFactor = e.deltaY < 0 ? -1 : 1;
+        const zoomDirection = e.deltaY < 0 ? -1 : 1;
         const currentSpan = viewEnd - viewStart;
-        const change = Math.max(1, Math.round(currentSpan * 0.15)) * zoomFactor;
+        const step = Math.max(1, Math.round(currentSpan * 0.2)) * zoomDirection;
 
-        let newStart = viewStart + change;
-        let newEnd = viewEnd - change;
+        let newStart = viewStart + step;
+        let newEnd = viewEnd - step;
 
-        if (newEnd - newStart >= 3 && newStart >= 0 && newEnd < fullHistoryData.length) {
+        if (newEnd - newStart >= 1 && newStart >= 0 && newEnd < fullHistoryData.length) {
             viewStart = newStart;
             viewEnd = newEnd;
             showResetButton();
@@ -367,7 +363,7 @@ function attachDirectGestures() {
 
     // Touch Pinch Zoom
     canvas.addEventListener('touchmove', (e) => {
-        if (e.touches.length === 2 && fullHistoryData.length >= 3) {
+        if (e.touches.length === 2 && fullHistoryData.length >= 2) {
             e.preventDefault();
             const touch1 = e.touches[0];
             const touch2 = e.touches[1];
@@ -375,14 +371,14 @@ function attachDirectGestures() {
 
             if (initialPinchDistance) {
                 const diff = currentDistance - initialPinchDistance;
-                if (Math.abs(diff) > 10) {
+                if (Math.abs(diff) > 4) {
                     const zoomDirection = diff > 0 ? -1 : 1;
-                    const change = Math.max(1, Math.round((viewEnd - viewStart) * 0.08)) * zoomDirection;
+                    const change = Math.max(1, Math.round((viewEnd - viewStart) * 0.12)) * zoomDirection;
 
                     let newStart = viewStart + change;
                     let newEnd = viewEnd - change;
 
-                    if (newEnd - newStart >= 3 && newStart >= 0 && newEnd < fullHistoryData.length) {
+                    if (newEnd - newStart >= 1 && newStart >= 0 && newEnd < fullHistoryData.length) {
                         viewStart = newStart;
                         viewEnd = newEnd;
                         showResetButton();
