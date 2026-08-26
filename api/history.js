@@ -42,14 +42,20 @@ export default async function handler(req, res) {
         ORDER BY recorded_at ASC
       `;
     } else if (range === "7d") {
+      // 7 Days: Grouped into 1-hour average blocks (168 points total)
       sqlQuery = `
-        SELECT item_name, price, recorded_at 
-        FROM resource_prices 
+        SELECT 
+          item_name, 
+          ROUND(AVG(price), 6) AS price, 
+          strftime('%Y-%m-%d %H:00:00', recorded_at) AS recorded_at
+        FROM resource_prices
         WHERE item_name = ? COLLATE NOCASE 
           AND recorded_at >= datetime('now', '-7 days')
+        GROUP BY strftime('%Y-%m-%d %H:00:00', recorded_at)
         ORDER BY recorded_at ASC
       `;
     } else if (range === "30d" || range === "1m") {
+      // 30 Days: Grouped into 1-hour average blocks (720 points total)
       sqlQuery = `
         SELECT 
           item_name, 
@@ -62,6 +68,7 @@ export default async function handler(req, res) {
         ORDER BY recorded_at ASC
       `;
     } else if (range === "90d" || range === "3m") {
+      // 90 Days: Grouped into 6-hour average blocks (360 points total)
       sqlQuery = `
         SELECT 
           item_name, 
@@ -74,7 +81,7 @@ export default async function handler(req, res) {
         ORDER BY recorded_at ASC
       `;
     } else {
-      // 'all' timeframe: Full historical data with 12h block smoothing
+      // All Time: Grouped into 12-hour average blocks
       sqlQuery = `
         SELECT 
           item_name, 
