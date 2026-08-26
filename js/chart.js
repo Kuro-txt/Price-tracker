@@ -91,14 +91,14 @@ function updatePriceChangeBadge(firstPrice, lastPrice) {
 
 function changeRange(range) {
     selectedRange = range;
-    const ranges = ['12h', '24h', '7d', '30d', '90d'];
+    const ranges = ['6h', '12h', '24h', '7d', '30d', '90d'];
     ranges.forEach(r => {
         const btn = document.getElementById(`range-${r}`);
         if (!btn) return;
         if (r === range) {
-            btn.className = "px-2.5 py-1 rounded-lg transition bg-[#f6eee0] dark:bg-[#181820] text-amber-800 dark:text-amber-400 shadow-xs";
+            btn.className = "px-2 py-1 rounded-lg transition bg-[#f6eee0] dark:bg-[#181820] text-amber-800 dark:text-amber-400 shadow-xs";
         } else {
-            btn.className = "px-2.5 py-1 rounded-lg transition text-[#635443] dark:text-zinc-400 hover:text-black dark:hover:text-white";
+            btn.className = "px-2 py-1 rounded-lg transition text-[#635443] dark:text-zinc-400 hover:text-black dark:hover:text-white";
         }
     });
 
@@ -189,7 +189,7 @@ function renderChart() {
         const season = getSeasonForDate(validDate);
         itemSeasons.push(season);
 
-        if (selectedRange === '12h' || selectedRange === '24h') {
+        if (selectedRange === '6h' || selectedRange === '12h' || selectedRange === '24h') {
             labels.push(validDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
         } else if (selectedRange === '7d') {
             labels.push(isMobile 
@@ -222,7 +222,6 @@ function renderChart() {
 
     const isDark = document.documentElement.classList.contains('dark');
     
-    // Pitch OLED Black Theme Tuning
     const gridColor = isDark ? '#14141c' : '#e6dcce';
     const tickColor = isDark ? '#71717a' : '#736655';
     const tooltipBg = isDark ? '#000000' : '#241b12';
