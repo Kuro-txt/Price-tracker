@@ -4,8 +4,24 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sunflower Land - Resource Price Tracker</title>
-    <!-- Tailwind CSS CDN -->
+    
+    <!-- Tailwind CSS CDN with dark mode config -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class'
+        }
+    </script>
+
+    <!-- Prevent theme flicker before body renders -->
+    <script>
+        if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+    </script>
+
     <!-- Chart.js for Historical Graph -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- FontAwesome for Icons -->
@@ -14,41 +30,54 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
     <style>
         body { font-family: 'Plus Jakarta Sans', sans-serif; }
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: #fdfbf7; }
         ::-webkit-scrollbar-thumb { background: #e2d9cc; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #c8bdae; }
+
+        html.dark ::-webkit-scrollbar-track { background: #090d16; }
+        html.dark ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
+        html.dark ::-webkit-scrollbar-thumb:hover { background: #334155; }
     </style>
 </head>
-<body class="bg-[#faf7f2] text-stone-800 min-h-screen flex flex-col justify-between selection:bg-amber-200 selection:text-amber-900">
+<body class="bg-[#faf7f2] dark:bg-slate-950 text-stone-800 dark:text-slate-100 min-h-screen flex flex-col justify-between selection:bg-amber-200 dark:selection:bg-amber-900 selection:text-amber-900 dark:selection:text-amber-200 transition-colors duration-200">
 
     <!-- Header -->
-    <header class="bg-white/90 backdrop-blur-md border-b border-stone-200/80 sticky top-0 z-50 shadow-sm">
+    <header class="bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-stone-200/80 dark:border-slate-800 sticky top-0 z-50 shadow-sm transition-colors duration-200">
         <div class="max-w-5xl mx-auto px-4 sm:px-6 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
             
             <div class="flex items-center space-x-3">
-                <div class="bg-amber-400 text-stone-900 p-2.5 rounded-2xl shadow-md shadow-amber-200 flex items-center justify-center">
+                <div class="bg-amber-400 text-stone-900 p-2.5 rounded-2xl shadow-md shadow-amber-200 dark:shadow-none flex items-center justify-center">
                     <i class="fa-solid fa-sun text-2xl"></i>
                 </div>
                 <div>
-                    <h1 class="text-xl font-extrabold text-stone-900 tracking-tight flex items-center gap-2">
+                    <h1 class="text-xl font-extrabold text-stone-900 dark:text-white tracking-tight flex items-center gap-2">
                         Sunflower Market
-                        <span class="inline-flex items-center gap-1.5 text-[11px] bg-emerald-100 text-emerald-800 font-semibold px-2.5 py-0.5 rounded-full border border-emerald-200">
+                        <span class="inline-flex items-center gap-1.5 text-[11px] bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-400 font-semibold px-2.5 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800/60">
                             <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> LIVE
                         </span>
                     </h1>
-                    <p class="text-xs text-stone-500 font-medium" id="lastUpdatedLabel">Connecting to market...</p>
+                    <p class="text-xs text-stone-500 dark:text-slate-400 font-medium" id="lastUpdatedLabel">Connecting to market...</p>
                 </div>
             </div>
 
             <div class="flex items-center gap-3">
-                <div class="flex items-center gap-2 bg-stone-100 border border-stone-200/70 px-3 py-1.5 rounded-xl text-xs text-stone-600 font-medium">
+                
+                <!-- Dark Mode Toggle Button -->
+                <button onclick="toggleTheme()" id="themeToggleBtn" aria-label="Toggle Dark Mode" class="bg-stone-100 dark:bg-slate-800 hover:bg-stone-200 dark:hover:bg-slate-700 text-stone-700 dark:text-amber-400 w-9 h-9 rounded-xl transition flex items-center justify-center border border-stone-300 dark:border-slate-700 shadow-sm active:scale-95">
+                    <i class="fa-solid fa-moon text-sm block dark:hidden"></i>
+                    <i class="fa-solid fa-sun text-sm hidden dark:block"></i>
+                </button>
+
+                <div class="flex items-center gap-2 bg-stone-100 dark:bg-slate-800/80 border border-stone-200/70 dark:border-slate-700 px-3 py-1.5 rounded-xl text-xs text-stone-600 dark:text-slate-300 font-medium">
                     <input type="checkbox" id="autoRefreshCheck" checked class="accent-amber-500 cursor-pointer w-3.5 h-3.5">
                     <label for="autoRefreshCheck" class="cursor-pointer select-none">Auto-Sync (15s)</label>
                 </div>
-                <button id="refreshBtn" onclick="fetchPrices()" class="bg-white hover:bg-stone-50 text-stone-700 px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 border border-stone-300 shadow-sm active:scale-95">
+
+                <button id="refreshBtn" onclick="fetchPrices()" class="bg-white dark:bg-slate-800 hover:bg-stone-50 dark:hover:bg-slate-700 text-stone-700 dark:text-slate-200 px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 border border-stone-300 dark:border-slate-700 shadow-sm active:scale-95">
                     <i class="fa-solid fa-rotate" id="refreshIcon"></i> Refresh
                 </button>
             </div>
@@ -59,30 +88,30 @@
     <main class="max-w-4xl mx-auto px-4 sm:px-6 py-8 flex-1 w-full space-y-6">
 
         <!-- Search & Dropdown Control Bar -->
-        <div class="bg-white border border-stone-200/90 rounded-3xl p-5 shadow-sm space-y-4">
+        <div class="bg-white dark:bg-slate-900 border border-stone-200/90 dark:border-slate-800 rounded-3xl p-5 shadow-sm space-y-4 transition-colors duration-200">
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 
                 <!-- Search Input with Dropdown / Autocomplete -->
                 <div class="relative">
-                    <label class="block text-xs font-bold text-stone-500 uppercase tracking-wider mb-1.5 ml-1">Search Resource</label>
+                    <label class="block text-xs font-bold text-stone-500 dark:text-slate-400 uppercase tracking-wider mb-1.5 ml-1">Search Resource</label>
                     <div class="relative">
-                        <span class="absolute inset-y-0 left-0 flex items-center pl-3.5 text-stone-400 pointer-events-none">
+                        <span class="absolute inset-y-0 left-0 flex items-center pl-3.5 text-stone-400 dark:text-slate-500 pointer-events-none">
                             <i class="fa-solid fa-magnifying-glass text-sm"></i>
                         </span>
                         <input type="text" id="searchInput" oninput="handleSearchInput(this.value)" onfocus="showAutocomplete()" placeholder="Type to search (e.g. Sunflower, Wood)..." 
-                            class="w-full pl-10 pr-4 py-2.5 bg-stone-50 border border-stone-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 focus:bg-white text-stone-800 placeholder-stone-400 transition font-medium">
+                            class="w-full pl-10 pr-4 py-2.5 bg-stone-50 dark:bg-slate-950 border border-stone-200 dark:border-slate-800 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 focus:bg-white dark:focus:bg-slate-900 text-stone-800 dark:text-slate-100 placeholder-stone-400 dark:placeholder-slate-500 transition font-medium">
                     </div>
 
                     <!-- Autocomplete Dropdown List -->
-                    <div id="autocompleteList" class="hidden absolute left-0 right-0 top-full mt-2 bg-white border border-stone-200 rounded-2xl max-h-60 overflow-y-auto z-50 shadow-xl divide-y divide-stone-100">
+                    <div id="autocompleteList" class="hidden absolute left-0 right-0 top-full mt-2 bg-white dark:bg-slate-900 border border-stone-200 dark:border-slate-800 rounded-2xl max-h-60 overflow-y-auto z-50 shadow-xl divide-y divide-stone-100 dark:divide-slate-800">
                         <!-- Populated dynamically -->
                     </div>
                 </div>
 
                 <!-- Direct Item Dropdown Selection -->
                 <div>
-                    <label for="itemDropdown" class="block text-xs font-bold text-stone-500 uppercase tracking-wider mb-1.5 ml-1">Select from List</label>
-                    <select id="itemDropdown" onchange="onDropdownSelect(this.value)" class="w-full bg-stone-50 border border-stone-200 text-stone-800 text-sm font-medium rounded-2xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:bg-white transition cursor-pointer">
+                    <label for="itemDropdown" class="block text-xs font-bold text-stone-500 dark:text-slate-400 uppercase tracking-wider mb-1.5 ml-1">Select from List</label>
+                    <select id="itemDropdown" onchange="onDropdownSelect(this.value)" class="w-full bg-stone-50 dark:bg-slate-950 border border-stone-200 dark:border-slate-800 text-stone-800 dark:text-slate-100 text-sm font-medium rounded-2xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:bg-white dark:focus:bg-slate-900 transition cursor-pointer">
                         <option value="">-- Choose an item --</option>
                     </select>
                 </div>
@@ -90,35 +119,35 @@
             </div>
 
             <!-- Quick Suggestions Pill Bar -->
-            <div class="pt-2 border-t border-stone-100 flex flex-wrap items-center gap-2">
-                <span class="text-xs font-semibold text-stone-400">Popular:</span>
-                <button onclick="selectItem('Sunflower')" class="text-xs bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200/80 px-2.5 py-1 rounded-xl transition font-medium">🌻 Sunflower</button>
-                <button onclick="selectItem('Wood')" class="text-xs bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200/80 px-2.5 py-1 rounded-xl transition font-medium">🪵 Wood</button>
-                <button onclick="selectItem('Iron')" class="text-xs bg-stone-100 hover:bg-stone-200 text-stone-700 border border-stone-200 px-2.5 py-1 rounded-xl transition font-medium">⛏️ Iron</button>
-                <button onclick="selectItem('Egg')" class="text-xs bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200/80 px-2.5 py-1 rounded-xl transition font-medium">🥚 Egg</button>
-                <button onclick="selectItem('Obsidian')" class="text-xs bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-200/80 px-2.5 py-1 rounded-xl transition font-medium">🔮 Obsidian</button>
+            <div class="pt-2 border-t border-stone-100 dark:border-slate-800/80 flex flex-wrap items-center gap-2">
+                <span class="text-xs font-semibold text-stone-400 dark:text-slate-500">Popular:</span>
+                <button onclick="selectItem('Sunflower')" class="text-xs bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-900/50 text-amber-800 dark:text-amber-300 border border-amber-200/80 dark:border-amber-800/50 px-2.5 py-1 rounded-xl transition font-medium">🌻 Sunflower</button>
+                <button onclick="selectItem('Wood')" class="text-xs bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 text-emerald-800 dark:text-emerald-300 border border-emerald-200/80 dark:border-emerald-800/50 px-2.5 py-1 rounded-xl transition font-medium">🪵 Wood</button>
+                <button onclick="selectItem('Iron')" class="text-xs bg-stone-100 dark:bg-slate-800 hover:bg-stone-200 dark:hover:bg-slate-700 text-stone-700 dark:text-slate-200 border border-stone-200 dark:border-slate-700 px-2.5 py-1 rounded-xl transition font-medium">⛏️ Iron</button>
+                <button onclick="selectItem('Egg')" class="text-xs bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-900/50 text-amber-800 dark:text-amber-300 border border-amber-200/80 dark:border-amber-800/50 px-2.5 py-1 rounded-xl transition font-medium">🥚 Egg</button>
+                <button onclick="selectItem('Obsidian')" class="text-xs bg-purple-50 dark:bg-purple-950/40 hover:bg-purple-100 dark:hover:bg-purple-900/50 text-purple-800 dark:text-purple-300 border border-purple-200/80 dark:border-purple-800/50 px-2.5 py-1 rounded-xl transition font-medium">🔮 Obsidian</button>
             </div>
         </div>
 
         <!-- Loading State -->
-        <div id="loadingState" class="flex flex-col items-center justify-center py-20 bg-white border border-stone-200/80 rounded-3xl">
+        <div id="loadingState" class="flex flex-col items-center justify-center py-20 bg-white dark:bg-slate-900 border border-stone-200/80 dark:border-slate-800 rounded-3xl">
             <i class="fa-solid fa-seedling fa-bounce text-4xl text-amber-500 mb-3"></i>
-            <p class="text-stone-500 text-sm font-medium">Loading Sunflower Land market prices...</p>
+            <p class="text-stone-500 dark:text-slate-400 text-sm font-medium">Loading Sunflower Land market prices...</p>
         </div>
 
         <!-- Error State -->
-        <div id="errorState" class="hidden bg-rose-50 border border-rose-200 text-rose-800 p-5 rounded-3xl text-center">
+        <div id="errorState" class="hidden bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/80 text-rose-800 dark:text-rose-200 p-5 rounded-3xl text-center">
             <i class="fa-solid fa-circle-exclamation text-2xl mb-2 text-rose-500"></i>
             <p id="errorMessage" class="font-bold text-sm">Failed to fetch pricing data.</p>
         </div>
 
         <!-- Empty State (When no item is selected) -->
-        <div id="emptyState" class="bg-white border-2 border-dashed border-stone-200 rounded-3xl p-12 text-center space-y-3">
-            <div class="w-16 h-16 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto text-2xl">
+        <div id="emptyState" class="bg-white dark:bg-slate-900 border-2 border-dashed border-stone-200 dark:border-slate-800 rounded-3xl p-12 text-center space-y-3">
+            <div class="w-16 h-16 bg-amber-100 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 rounded-full flex items-center justify-center mx-auto text-2xl">
                 <i class="fa-solid fa-basket-shopping"></i>
             </div>
-            <h3 class="text-lg font-bold text-stone-800">No Item Selected</h3>
-            <p class="text-stone-500 text-sm max-w-sm mx-auto">
+            <h3 class="text-lg font-bold text-stone-800 dark:text-slate-100">No Item Selected</h3>
+            <p class="text-stone-500 dark:text-slate-400 text-sm max-w-sm mx-auto">
                 Pick a crop or resource using the search box or dropdown above to view its live market floor price and cloud price graph.
             </p>
         </div>
@@ -127,16 +156,16 @@
         <div id="itemDetailsContainer" class="hidden space-y-6">
             
             <!-- Main Hero Item Card -->
-            <div class="bg-gradient-to-br from-white via-white to-amber-50/50 border border-amber-200/80 rounded-3xl p-6 sm:p-8 shadow-sm relative overflow-hidden">
+            <div class="bg-gradient-to-br from-white via-white to-amber-50/50 dark:from-slate-900 dark:via-slate-900 dark:to-slate-950 border border-amber-200/80 dark:border-slate-800 rounded-3xl p-6 sm:p-8 shadow-sm relative overflow-hidden transition-colors duration-200">
                 <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                     <div>
-                        <div class="inline-flex items-center gap-2 bg-amber-100 text-amber-900 text-xs font-bold px-3 py-1 rounded-full border border-amber-200 mb-3">
+                        <div class="inline-flex items-center gap-2 bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-300 text-xs font-bold px-3 py-1 rounded-full border border-amber-200 dark:border-amber-800/50 mb-3">
                             <i class="fa-solid fa-tag text-[10px]"></i> Plaza Market Asset
                         </div>
-                        <h2 id="selectedItemName" class="text-3xl sm:text-4xl font-extrabold text-stone-900 tracking-tight">
+                        <h2 id="selectedItemName" class="text-3xl sm:text-4xl font-extrabold text-stone-900 dark:text-white tracking-tight">
                             -
                         </h2>
-                        <p class="text-xs text-stone-500 mt-1">Live floor pricing directly from Sunflower Land Plaza</p>
+                        <p class="text-xs text-stone-500 dark:text-slate-400 mt-1">Live floor pricing directly from Sunflower Land Plaza</p>
                     </div>
 
                     <!-- Main Floor Badge -->
@@ -150,20 +179,20 @@
                 </div>
 
                 <!-- Price Trend Graph Section -->
-                <div class="mt-8 pt-6 border-t border-stone-200/80">
+                <div class="mt-8 pt-6 border-t border-stone-200/80 dark:border-slate-800">
                     <div class="flex justify-between items-center mb-4">
                         <div>
-                            <h4 class="text-xs font-bold text-stone-700 uppercase tracking-wider flex items-center gap-2">
+                            <h4 class="text-xs font-bold text-stone-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-2">
                                 <i class="fa-solid fa-chart-line text-amber-500"></i> Price History (Cloud Records)
                             </h4>
-                            <p class="text-[11px] text-stone-400 mt-0.5" id="graphDataCount">Loading timeline...</p>
+                            <p class="text-[11px] text-stone-400 dark:text-slate-500 mt-0.5" id="graphDataCount">Loading timeline...</p>
                         </div>
                     </div>
 
-                    <div class="bg-white border border-stone-200 rounded-2xl p-4 sm:p-5 relative min-h-[260px] flex items-center justify-center">
-                        <div id="chartSpinner" class="hidden absolute inset-0 bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center z-10 rounded-2xl">
+                    <div class="bg-white dark:bg-slate-950 border border-stone-200 dark:border-slate-800/80 rounded-2xl p-4 sm:p-5 relative min-h-[260px] flex items-center justify-center transition-colors duration-200">
+                        <div id="chartSpinner" class="hidden absolute inset-0 bg-white/80 dark:bg-slate-950/80 backdrop-blur-sm flex flex-col items-center justify-center z-10 rounded-2xl">
                             <i class="fa-solid fa-circle-notch fa-spin text-2xl text-amber-500 mb-2"></i>
-                            <span class="text-xs text-stone-500 font-medium">Fetching history from Turso...</span>
+                            <span class="text-xs text-stone-500 dark:text-slate-400 font-medium">Fetching history from Turso...</span>
                         </div>
                         <canvas id="priceHistoryChart" class="w-full h-64 max-h-64"></canvas>
                     </div>
@@ -171,39 +200,39 @@
 
                 <!-- Stacks Breakdown -->
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6">
-                    <div class="bg-stone-50/80 border border-stone-200/70 p-4 rounded-2xl">
-                        <span class="text-xs font-bold text-stone-500 uppercase tracking-wider block">x10 Stack</span>
-                        <span class="text-xl font-bold font-mono text-stone-800 mt-1 block" id="stack10Price">-</span>
-                        <span class="text-[11px] text-stone-400 font-medium">SFL</span>
+                    <div class="bg-stone-50/80 dark:bg-slate-950/80 border border-stone-200/70 dark:border-slate-800/80 p-4 rounded-2xl">
+                        <span class="text-xs font-bold text-stone-500 dark:text-slate-400 uppercase tracking-wider block">x10 Stack</span>
+                        <span class="text-xl font-bold font-mono text-stone-800 dark:text-slate-100 mt-1 block" id="stack10Price">-</span>
+                        <span class="text-[11px] text-stone-400 dark:text-slate-500 font-medium">SFL</span>
                     </div>
-                    <div class="bg-stone-50/80 border border-stone-200/70 p-4 rounded-2xl">
-                        <span class="text-xs font-bold text-stone-500 uppercase tracking-wider block">x100 Stack</span>
-                        <span class="text-xl font-bold font-mono text-stone-800 mt-1 block" id="stack100Price">-</span>
-                        <span class="text-[11px] text-stone-400 font-medium">SFL</span>
+                    <div class="bg-stone-50/80 dark:bg-slate-950/80 border border-stone-200/70 dark:border-slate-800/80 p-4 rounded-2xl">
+                        <span class="text-xs font-bold text-stone-500 dark:text-slate-400 uppercase tracking-wider block">x100 Stack</span>
+                        <span class="text-xl font-bold font-mono text-stone-800 dark:text-slate-100 mt-1 block" id="stack100Price">-</span>
+                        <span class="text-[11px] text-stone-400 dark:text-slate-500 font-medium">SFL</span>
                     </div>
-                    <div class="bg-stone-50/80 border border-stone-200/70 p-4 rounded-2xl">
-                        <span class="text-xs font-bold text-stone-500 uppercase tracking-wider block">x1,000 Stack</span>
-                        <span class="text-xl font-bold font-mono text-stone-800 mt-1 block" id="stack1000Price">-</span>
-                        <span class="text-[11px] text-stone-400 font-medium">SFL</span>
+                    <div class="bg-stone-50/80 dark:bg-slate-950/80 border border-stone-200/70 dark:border-slate-800/80 p-4 rounded-2xl">
+                        <span class="text-xs font-bold text-stone-500 dark:text-slate-400 uppercase tracking-wider block">x1,000 Stack</span>
+                        <span class="text-xl font-bold font-mono text-stone-800 dark:text-slate-100 mt-1 block" id="stack1000Price">-</span>
+                        <span class="text-[11px] text-stone-400 dark:text-slate-500 font-medium">SFL</span>
                     </div>
                 </div>
 
                 <!-- Calculator -->
-                <div class="mt-6 bg-white border border-stone-200 p-5 rounded-2xl">
-                    <h4 class="text-xs font-bold text-stone-600 uppercase tracking-wider mb-3 flex items-center gap-2">
+                <div class="mt-6 bg-white dark:bg-slate-950 border border-stone-200 dark:border-slate-800/80 p-5 rounded-2xl transition-colors duration-200">
+                    <h4 class="text-xs font-bold text-stone-600 dark:text-slate-300 uppercase tracking-wider mb-3 flex items-center gap-2">
                         <i class="fa-solid fa-calculator text-amber-500"></i> Quick Total Calculator
                     </h4>
                     <div class="flex flex-col sm:flex-row items-center gap-4">
                         <div class="w-full sm:w-1/2">
-                            <label class="text-xs font-semibold text-stone-500 mb-1 block">Quantity to Trade</label>
+                            <label class="text-xs font-semibold text-stone-500 dark:text-slate-400 mb-1 block">Quantity to Trade</label>
                             <input type="number" id="calcQuantity" value="50" min="1" oninput="calculateCustomStack()" 
-                                class="w-full bg-stone-50 border border-stone-200 rounded-xl px-3 py-2 text-sm font-bold text-stone-800 focus:outline-none focus:ring-2 focus:ring-amber-400">
+                                class="w-full bg-stone-50 dark:bg-slate-900 border border-stone-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm font-bold text-stone-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-400">
                         </div>
-                        <div class="w-full sm:w-1/2 bg-amber-50 border border-amber-200/80 p-3 rounded-xl flex items-center justify-between">
-                            <span class="text-xs font-bold text-amber-900">Total Value:</span>
+                        <div class="w-full sm:w-1/2 bg-amber-50 dark:bg-amber-950/40 border border-amber-200/80 dark:border-amber-800/50 p-3 rounded-xl flex items-center justify-between">
+                            <span class="text-xs font-bold text-amber-900 dark:text-amber-300">Total Value:</span>
                             <div class="text-right">
-                                <span class="text-lg font-extrabold font-mono text-amber-900" id="calcResult">0.00</span>
-                                <span class="text-xs font-bold text-amber-800 ml-1">SFL</span>
+                                <span class="text-lg font-extrabold font-mono text-amber-900 dark:text-amber-300" id="calcResult">0.00</span>
+                                <span class="text-xs font-bold text-amber-800 dark:text-amber-400 ml-1">SFL</span>
                             </div>
                         </div>
                     </div>
@@ -215,8 +244,8 @@
     </main>
 
     <!-- Footer -->
-    <footer class="border-t border-stone-200 bg-white text-center py-6 text-xs text-stone-400 font-medium">
-        <p>Market data synced live from <a href="https://sfl.world" target="_blank" class="text-amber-600 hover:underline font-semibold">sfl.world</a></p>
+    <footer class="border-t border-stone-200 dark:border-slate-800/80 bg-white dark:bg-slate-900 text-center py-6 text-xs text-stone-400 dark:text-slate-500 font-medium transition-colors duration-200">
+        <p>Market data synced live from <a href="https://sfl.world" target="_blank" class="text-amber-600 dark:text-amber-400 hover:underline font-semibold">sfl.world</a></p>
     </footer>
 
     <script>
@@ -224,6 +253,23 @@
         let autoRefreshTimer = null;
         let activeItem = null;
         let chartInstance = null;
+        let lastHistoryData = [];
+
+        // Dark Mode Logic
+        function toggleTheme() {
+            const html = document.documentElement;
+            if (html.classList.contains('dark')) {
+                html.classList.remove('dark');
+                localStorage.setItem('theme', 'light');
+            } else {
+                html.classList.add('dark');
+                localStorage.setItem('theme', 'dark');
+            }
+            // Re-render chart with new theme colors if active
+            if (lastHistoryData.length > 0) {
+                renderChart(lastHistoryData);
+            }
+        }
 
         async function fetchPrices() {
             const loadingState = document.getElementById('loadingState');
@@ -321,10 +367,10 @@
             list.innerHTML = '';
             filtered.slice(0, 8).forEach(item => {
                 const div = document.createElement('div');
-                div.className = "px-4 py-3 text-xs text-stone-700 hover:bg-amber-50 cursor-pointer flex justify-between items-center transition font-medium";
+                div.className = "px-4 py-3 text-xs text-stone-700 dark:text-slate-200 hover:bg-amber-50 dark:hover:bg-slate-800 cursor-pointer flex justify-between items-center transition font-medium";
                 div.innerHTML = `
                     <span>${item.name}</span>
-                    <span class="font-mono text-amber-700 font-bold">${formatDisplayPrice(item.price)} SFL</span>
+                    <span class="font-mono text-amber-600 dark:text-amber-400 font-bold">${formatDisplayPrice(item.price)} SFL</span>
                 `;
                 div.onclick = () => {
                     selectItem(item.name);
@@ -358,11 +404,9 @@
 
             activeItem = item;
 
-            // Sync input bars
             document.getElementById('searchInput').value = item.name;
             document.getElementById('itemDropdown').value = item.name;
 
-            // Update stats
             document.getElementById('selectedItemName').innerText = item.name;
             document.getElementById('selectedItemPrice').innerText = formatDisplayPrice(item.price);
             document.getElementById('stack10Price').innerText = formatDisplayPrice(item.price * 10);
@@ -371,11 +415,9 @@
 
             calculateCustomStack();
 
-            // Reveal container
             document.getElementById('emptyState').classList.add('hidden');
             document.getElementById('itemDetailsContainer').classList.remove('hidden');
 
-            // Load Historical Graph from Cloud (Turso)
             await loadItemHistoryGraph(item.name);
         }
 
@@ -396,7 +438,6 @@
                 spinner.classList.add('hidden');
             }
 
-            // Fallback: If no DB entries exist yet, plot current price
             if (!historyData || historyData.length === 0) {
                 historyData = [{
                     price: activeItem.price,
@@ -407,15 +448,19 @@
                 countLabel.innerText = `Showing last ${historyData.length} recorded snapshots`;
             }
 
+            lastHistoryData = historyData;
             renderChart(historyData);
         }
 
         function renderChart(historyData) {
-            const ctx = document.getElementById('priceHistoryChart').getContext('2d');
+            const canvas = document.getElementById('priceHistoryChart');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
 
             const labels = historyData.map(h => {
-                const d = new Date(h.recorded_at);
-                return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                const rawDate = h.recorded_at ? h.recorded_at.replace(" ", "T") + (h.recorded_at.includes("Z") ? "" : "Z") : new Date().toISOString();
+                const d = new Date(rawDate);
+                return isNaN(d.getTime()) ? "Now" : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             });
 
             const prices = historyData.map(h => parseFloat(h.price));
@@ -424,9 +469,13 @@
                 chartInstance.destroy();
             }
 
-            // Friendly Gradient Fill
+            const isDark = document.documentElement.classList.contains('dark');
+            const gridColor = isDark ? '#1e293b' : '#f5f5f4';
+            const tickColor = isDark ? '#94a3b8' : '#a8a29e';
+            const tooltipBg = isDark ? '#090d16' : '#292524';
+
             const gradient = ctx.createLinearGradient(0, 0, 0, 240);
-            gradient.addColorStop(0, 'rgba(245, 158, 11, 0.25)'); // amber-500
+            gradient.addColorStop(0, 'rgba(245, 158, 11, 0.25)');
             gradient.addColorStop(1, 'rgba(245, 158, 11, 0.0)');
 
             chartInstance = new Chart(ctx, {
@@ -441,7 +490,7 @@
                         backgroundColor: gradient,
                         fill: true,
                         tension: 0.35,
-                        pointBackgroundColor: '#ffffff',
+                        pointBackgroundColor: isDark ? '#0f172a' : '#ffffff',
                         pointBorderColor: '#f59e0b',
                         pointBorderWidth: 2,
                         pointRadius: historyData.length > 30 ? 2 : 4,
@@ -454,7 +503,7 @@
                     plugins: {
                         legend: { display: false },
                         tooltip: {
-                            backgroundColor: '#292524',
+                            backgroundColor: tooltipBg,
                             titleColor: '#fafaf9',
                             bodyColor: '#f59e0b',
                             padding: 10,
@@ -466,14 +515,14 @@
                     },
                     scales: {
                         x: {
-                            grid: { color: '#f5f5f4' },
-                            ticks: { font: { family: 'Plus Jakarta Sans', size: 10 }, color: '#a8a29e' }
+                            grid: { color: gridColor },
+                            ticks: { font: { family: 'Plus Jakarta Sans', size: 10 }, color: tickColor }
                         },
                         y: {
-                            grid: { color: '#f5f5f4' },
+                            grid: { color: gridColor },
                             ticks: { 
                                 font: { family: 'Plus Jakarta Sans', size: 10 }, 
-                                color: '#a8a29e',
+                                color: tickColor,
                                 callback: (val) => formatDisplayPrice(val)
                             }
                         }
