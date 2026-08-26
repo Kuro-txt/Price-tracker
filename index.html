@@ -5,15 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sunflower Land - Resource Price Tracker</title>
     
-    <!-- Tailwind CSS CDN with dark mode config -->
+    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
-        tailwind.config = {
-            darkMode: 'class'
-        }
+        tailwind.config = { darkMode: 'class' }
     </script>
 
-    <!-- Prevent theme flicker before body renders -->
+    <!-- Theme Initializer (Prevents White Flash) -->
     <script>
         if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
             document.documentElement.classList.add('dark');
@@ -22,26 +20,12 @@
         }
     </script>
 
-    <!-- Chart.js for Historical Graph -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- FontAwesome for Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Google Font: Plus Jakarta Sans -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="css/style.css">
     
-    <style>
-        body { font-family: 'Plus Jakarta Sans', sans-serif; }
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: #fdfbf7; }
-        ::-webkit-scrollbar-thumb { background: #e2d9cc; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #c8bdae; }
-
-        html.dark ::-webkit-scrollbar-track { background: #090d16; }
-        html.dark ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
-        html.dark ::-webkit-scrollbar-thumb:hover { background: #334155; }
-    </style>
+    <!-- Dependencies -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body class="bg-[#faf7f2] dark:bg-slate-950 text-stone-800 dark:text-slate-100 min-h-screen flex flex-col justify-between selection:bg-amber-200 dark:selection:bg-amber-900 selection:text-amber-900 dark:selection:text-amber-200 transition-colors duration-200">
 
@@ -65,8 +49,6 @@
             </div>
 
             <div class="flex items-center gap-3">
-                
-                <!-- Dark Mode Toggle Button -->
                 <button onclick="toggleTheme()" id="themeToggleBtn" aria-label="Toggle Dark Mode" class="bg-stone-100 dark:bg-slate-800 hover:bg-stone-200 dark:hover:bg-slate-700 text-stone-700 dark:text-amber-400 w-9 h-9 rounded-xl transition flex items-center justify-center border border-stone-300 dark:border-slate-700 shadow-sm active:scale-95">
                     <i class="fa-solid fa-moon text-sm block dark:hidden"></i>
                     <i class="fa-solid fa-sun text-sm hidden dark:block"></i>
@@ -91,7 +73,6 @@
         <div class="bg-white dark:bg-slate-900 border border-stone-200/90 dark:border-slate-800 rounded-3xl p-5 shadow-sm space-y-4 transition-colors duration-200">
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 
-                <!-- Search Input with Dropdown / Autocomplete -->
                 <div class="relative">
                     <label class="block text-xs font-bold text-stone-500 dark:text-slate-400 uppercase tracking-wider mb-1.5 ml-1">Search Resource</label>
                     <div class="relative">
@@ -101,14 +82,9 @@
                         <input type="text" id="searchInput" oninput="handleSearchInput(this.value)" onfocus="showAutocomplete()" placeholder="Type to search (e.g. Sunflower, Wood)..." 
                             class="w-full pl-10 pr-4 py-2.5 bg-stone-50 dark:bg-slate-950 border border-stone-200 dark:border-slate-800 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 focus:bg-white dark:focus:bg-slate-900 text-stone-800 dark:text-slate-100 placeholder-stone-400 dark:placeholder-slate-500 transition font-medium">
                     </div>
-
-                    <!-- Autocomplete Dropdown List -->
-                    <div id="autocompleteList" class="hidden absolute left-0 right-0 top-full mt-2 bg-white dark:bg-slate-900 border border-stone-200 dark:border-slate-800 rounded-2xl max-h-60 overflow-y-auto z-50 shadow-xl divide-y divide-stone-100 dark:divide-slate-800">
-                        <!-- Populated dynamically -->
-                    </div>
+                    <div id="autocompleteList" class="hidden absolute left-0 right-0 top-full mt-2 bg-white dark:bg-slate-900 border border-stone-200 dark:border-slate-800 rounded-2xl max-h-60 overflow-y-auto z-50 shadow-xl divide-y divide-stone-100 dark:divide-slate-800"></div>
                 </div>
 
-                <!-- Direct Item Dropdown Selection -->
                 <div>
                     <label for="itemDropdown" class="block text-xs font-bold text-stone-500 dark:text-slate-400 uppercase tracking-wider mb-1.5 ml-1">Select from List</label>
                     <select id="itemDropdown" onchange="onDropdownSelect(this.value)" class="w-full bg-stone-50 dark:bg-slate-950 border border-stone-200 dark:border-slate-800 text-stone-800 dark:text-slate-100 text-sm font-medium rounded-2xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:bg-white dark:focus:bg-slate-900 transition cursor-pointer">
@@ -118,7 +94,7 @@
 
             </div>
 
-            <!-- Quick Suggestions Pill Bar -->
+            <!-- Quick Suggestions -->
             <div class="pt-2 border-t border-stone-100 dark:border-slate-800/80 flex flex-wrap items-center gap-2">
                 <span class="text-xs font-semibold text-stone-400 dark:text-slate-500">Popular:</span>
                 <button onclick="selectItem('Sunflower')" class="text-xs bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-900/50 text-amber-800 dark:text-amber-300 border border-amber-200/80 dark:border-amber-800/50 px-2.5 py-1 rounded-xl transition font-medium">🌻 Sunflower</button>
@@ -154,31 +130,25 @@
 
         <!-- Selected Item Display Card -->
         <div id="itemDetailsContainer" class="hidden space-y-6">
-            
-            <!-- Main Hero Item Card -->
             <div class="bg-gradient-to-br from-white via-white to-amber-50/50 dark:from-slate-900 dark:via-slate-900 dark:to-slate-950 border border-amber-200/80 dark:border-slate-800 rounded-3xl p-6 sm:p-8 shadow-sm relative overflow-hidden transition-colors duration-200">
+                
                 <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                     <div>
                         <div class="inline-flex items-center gap-2 bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-300 text-xs font-bold px-3 py-1 rounded-full border border-amber-200 dark:border-amber-800/50 mb-3">
                             <i class="fa-solid fa-tag text-[10px]"></i> Plaza Market Asset
                         </div>
-                        <h2 id="selectedItemName" class="text-3xl sm:text-4xl font-extrabold text-stone-900 dark:text-white tracking-tight">
-                            -
-                        </h2>
+                        <h2 id="selectedItemName" class="text-3xl sm:text-4xl font-extrabold text-stone-900 dark:text-white tracking-tight">-</h2>
                         <p class="text-xs text-stone-500 dark:text-slate-400 mt-1">Live floor pricing directly from Sunflower Land Plaza</p>
                     </div>
 
-                    <!-- Main Floor Badge -->
                     <div class="bg-amber-500 text-stone-950 p-5 rounded-2xl shadow-lg shadow-amber-500/20 text-right min-w-[180px] w-full md:w-auto">
                         <span class="text-xs font-bold uppercase tracking-wider block opacity-90">Current Floor</span>
-                        <div class="text-3xl font-extrabold font-mono tracking-tight mt-1" id="selectedItemPrice">
-                            0.00
-                        </div>
+                        <div class="text-3xl font-extrabold font-mono tracking-tight mt-1" id="selectedItemPrice">0.00</div>
                         <span class="text-xs font-bold">SFL</span>
                     </div>
                 </div>
 
-                <!-- Price Trend Graph Section with Range Filters -->
+                <!-- Price Trend Graph Section -->
                 <div class="mt-8 pt-6 border-t border-stone-200/80 dark:border-slate-800">
                     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
                         <div>
@@ -188,8 +158,8 @@
                             <p class="text-[11px] text-stone-400 dark:text-slate-500 mt-0.5" id="graphDataCount">Loading timeline...</p>
                         </div>
 
-                        <!-- Time Range Buttons (24h, 7d, 1m, 3m) -->
-                        <div class="flex items-center bg-stone-100 dark:bg-slate-950 p-1 rounded-xl border border-stone-200 dark:border-slate-800 text-xs font-bold" id="rangeButtonContainer">
+                        <!-- Time Range Buttons -->
+                        <div class="flex items-center bg-stone-100 dark:bg-slate-950 p-1 rounded-xl border border-stone-200 dark:border-slate-800 text-xs font-bold">
                             <button onclick="changeRange('24h')" id="range-24h" class="px-2.5 py-1 rounded-lg transition bg-white dark:bg-slate-800 text-amber-600 dark:text-amber-400 shadow-sm">24H</button>
                             <button onclick="changeRange('7d')" id="range-7d" class="px-2.5 py-1 rounded-lg transition text-stone-500 dark:text-slate-400 hover:text-stone-900 dark:hover:text-white">7D</button>
                             <button onclick="changeRange('30d')" id="range-30d" class="px-2.5 py-1 rounded-lg transition text-stone-500 dark:text-slate-400 hover:text-stone-900 dark:hover:text-white">1M</button>
@@ -256,363 +226,8 @@
         <p>Market data synced live from <a href="https://sfl.world" target="_blank" class="text-amber-600 dark:text-amber-400 hover:underline font-semibold">sfl.world</a></p>
     </footer>
 
-    <script>
-        let rawItems = [];
-        let autoRefreshTimer = null;
-        let activeItem = null;
-        let chartInstance = null;
-        let lastHistoryData = [];
-        let selectedRange = "24h";
-
-        // Dark Mode Logic
-        function toggleTheme() {
-            const html = document.documentElement;
-            if (html.classList.contains('dark')) {
-                html.classList.remove('dark');
-                localStorage.setItem('theme', 'light');
-            } else {
-                html.classList.add('dark');
-                localStorage.setItem('theme', 'dark');
-            }
-            if (lastHistoryData.length > 0) {
-                renderChart(lastHistoryData);
-            }
-        }
-
-        function changeRange(range) {
-            selectedRange = range;
-            const ranges = ['24h', '7d', '30d', '90d'];
-            ranges.forEach(r => {
-                const btn = document.getElementById(`range-${r}`);
-                if (r === range) {
-                    btn.className = "px-2.5 py-1 rounded-lg transition bg-white dark:bg-slate-800 text-amber-600 dark:text-amber-400 shadow-sm";
-                } else {
-                    btn.className = "px-2.5 py-1 rounded-lg transition text-stone-500 dark:text-slate-400 hover:text-stone-900 dark:hover:text-white";
-                }
-            });
-
-            if (activeItem) {
-                loadItemHistoryGraph(activeItem.name);
-            }
-        }
-
-        async function fetchPrices() {
-            const loadingState = document.getElementById('loadingState');
-            const errorState = document.getElementById('errorState');
-            const refreshIcon = document.getElementById('refreshIcon');
-            const lastUpdatedLabel = document.getElementById('lastUpdatedLabel');
-
-            if (rawItems.length === 0) {
-                loadingState.classList.remove('hidden');
-                document.getElementById('emptyState').classList.add('hidden');
-                document.getElementById('itemDetailsContainer').classList.add('hidden');
-            }
-            errorState.classList.add('hidden');
-            refreshIcon.classList.add('fa-spin');
-
-            const endpoints = [
-                '/api/prices',
-                'https://api.allorigins.win/raw?url=' + encodeURIComponent('https://sfl.world/api/v1/prices'),
-                'https://sfl.world/api/v1/prices'
-            ];
-
-            let result = null;
-            for (const url of endpoints) {
-                try {
-                    const res = await fetch(url);
-                    if (res.ok) {
-                        result = await res.json();
-                        break;
-                    }
-                } catch (e) {}
-            }
-
-            refreshIcon.classList.remove('fa-spin');
-
-            if (!result || !result.data) {
-                if (rawItems.length === 0) {
-                    loadingState.classList.add('hidden');
-                    errorState.classList.remove('hidden');
-                    document.getElementById('errorMessage').innerText = "Unable to reach SFL API. Ensure your backend proxy is active.";
-                }
-                return;
-            }
-
-            try {
-                const timeText = result.updated_text || (result.updatedAt ? new Date(result.updatedAt).toLocaleTimeString() : 'Just now');
-                lastUpdatedLabel.innerText = `Last sync: ${timeText}`;
-
-                const p2pData = result.data.p2p || result.data || {};
-                rawItems = Object.entries(p2pData).map(([name, price]) => ({
-                    name: name,
-                    price: parseFloat(price) || 0
-                }));
-
-                populateItemDropdown();
-                loadingState.classList.add('hidden');
-
-                if (activeItem) {
-                    selectItem(activeItem.name);
-                } else {
-                    document.getElementById('emptyState').classList.remove('hidden');
-                }
-            } catch (err) {
-                console.error("Format parsing error:", err);
-            }
-        }
-
-        function populateItemDropdown() {
-            const dropdown = document.getElementById('itemDropdown');
-            const previousVal = dropdown.value;
-            dropdown.innerHTML = '<option value="">-- Choose an item --</option>';
-
-            const sorted = [...rawItems].sort((a, b) => a.name.localeCompare(b.name));
-            sorted.forEach(item => {
-                const opt = document.createElement('option');
-                opt.value = item.name;
-                opt.textContent = `${item.name} (${formatDisplayPrice(item.price)} SFL)`;
-                if (activeItem && item.name === activeItem.name) opt.selected = true;
-                dropdown.appendChild(opt);
-            });
-        }
-
-        function handleSearchInput(query) {
-            showAutocomplete(query);
-        }
-
-        function showAutocomplete(query = document.getElementById('searchInput').value) {
-            const list = document.getElementById('autocompleteList');
-            const filtered = rawItems.filter(i => i.name.toLowerCase().includes(query.toLowerCase()));
-
-            if (!query || filtered.length === 0) {
-                list.classList.add('hidden');
-                return;
-            }
-
-            list.innerHTML = '';
-            filtered.slice(0, 8).forEach(item => {
-                const div = document.createElement('div');
-                div.className = "px-4 py-3 text-xs text-stone-700 dark:text-slate-200 hover:bg-amber-50 dark:hover:bg-slate-800 cursor-pointer flex justify-between items-center transition font-medium";
-                div.innerHTML = `
-                    <span>${item.name}</span>
-                    <span class="font-mono text-amber-600 dark:text-amber-400 font-bold">${formatDisplayPrice(item.price)} SFL</span>
-                `;
-                div.onclick = () => {
-                    selectItem(item.name);
-                    list.classList.add('hidden');
-                };
-                list.appendChild(div);
-            });
-
-            list.classList.remove('hidden');
-        }
-
-        document.addEventListener('click', (e) => {
-            if (!e.target.closest('#searchInput') && !e.target.closest('#autocompleteList')) {
-                document.getElementById('autocompleteList').classList.add('hidden');
-            }
-        });
-
-        function onDropdownSelect(itemName) {
-            if (itemName) {
-                selectItem(itemName);
-            } else {
-                activeItem = null;
-                document.getElementById('emptyState').classList.remove('hidden');
-                document.getElementById('itemDetailsContainer').classList.add('hidden');
-            }
-        }
-
-        async function selectItem(name) {
-            const item = rawItems.find(i => i.name.toLowerCase() === name.toLowerCase());
-            if (!item) return;
-
-            activeItem = item;
-
-            document.getElementById('searchInput').value = item.name;
-            document.getElementById('itemDropdown').value = item.name;
-
-            document.getElementById('selectedItemName').innerText = item.name;
-            document.getElementById('selectedItemPrice').innerText = formatDisplayPrice(item.price);
-            document.getElementById('stack10Price').innerText = formatDisplayPrice(item.price * 10);
-            document.getElementById('stack100Price').innerText = formatDisplayPrice(item.price * 100);
-            document.getElementById('stack1000Price').innerText = formatDisplayPrice(item.price * 1000);
-
-            calculateCustomStack();
-
-            document.getElementById('emptyState').classList.add('hidden');
-            document.getElementById('itemDetailsContainer').classList.remove('hidden');
-
-            await loadItemHistoryGraph(item.name);
-        }
-
-        async function loadItemHistoryGraph(itemName) {
-            const spinner = document.getElementById('chartSpinner');
-            const countLabel = document.getElementById('graphDataCount');
-            spinner.classList.remove('hidden');
-
-            let historyData = [];
-            try {
-                const res = await fetch(`/api/history?item=${encodeURIComponent(itemName)}&range=${selectedRange}`);
-                if (res.ok) {
-                    historyData = await res.json();
-                }
-            } catch (err) {
-                console.error("Failed to load history:", err);
-            } finally {
-                spinner.classList.add('hidden');
-            }
-
-            if (!historyData || historyData.length === 0) {
-                historyData = [{
-                    price: activeItem.price,
-                    recorded_at: new Date().toISOString()
-                }];
-                countLabel.innerText = "1 data point recorded";
-            } else {
-                countLabel.innerText = `Showing ${historyData.length} snapshots for ${selectedRange.toUpperCase()}`;
-            }
-
-            lastHistoryData = historyData;
-            renderChart(historyData);
-        }
-
-        function renderChart(historyData) {
-            const canvas = document.getElementById('priceHistoryChart');
-            if (!canvas) return;
-            const ctx = canvas.getContext('2d');
-
-            const labels = historyData.map(h => {
-                const rawDate = h.recorded_at ? h.recorded_at.replace(" ", "T") + (h.recorded_at.includes("Z") ? "" : "Z") : new Date().toISOString();
-                const d = new Date(rawDate);
-                if (isNaN(d.getTime())) return "Now";
-
-                if (selectedRange === '24h') {
-                    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                } else if (selectedRange === '7d') {
-                    return `${d.toLocaleDateString([], { month: 'short', day: 'numeric' })}, ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-                } else {
-                    return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
-                }
-            });
-
-            const fullDateTooltips = historyData.map(h => {
-                const rawDate = h.recorded_at ? h.recorded_at.replace(" ", "T") + (h.recorded_at.includes("Z") ? "" : "Z") : new Date().toISOString();
-                const d = new Date(rawDate);
-                return isNaN(d.getTime()) ? "Current" : d.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
-            });
-
-            const prices = historyData.map(h => parseFloat(h.price));
-
-            if (chartInstance) {
-                chartInstance.destroy();
-            }
-
-            const isDark = document.documentElement.classList.contains('dark');
-            const gridColor = isDark ? '#1e293b' : '#f5f5f4';
-            const tickColor = isDark ? '#94a3b8' : '#a8a29e';
-            const tooltipBg = isDark ? '#090d16' : '#292524';
-
-            const gradient = ctx.createLinearGradient(0, 0, 0, 240);
-            gradient.addColorStop(0, 'rgba(245, 158, 11, 0.25)');
-            gradient.addColorStop(1, 'rgba(245, 158, 11, 0.0)');
-
-            // Auto-adjust point radius: hide large dots if viewing 30d/90d dense data
-            const pointRadius = (selectedRange === '30d' || selectedRange === '90d' || historyData.length > 50) ? 0 : 3.5;
-
-            chartInstance = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        label: 'Price (SFL)',
-                        data: prices,
-                        borderColor: '#f59e0b',
-                        borderWidth: 2.5,
-                        backgroundColor: gradient,
-                        fill: true,
-                        tension: 0.35,
-                        pointBackgroundColor: isDark ? '#0f172a' : '#ffffff',
-                        pointBorderColor: '#f59e0b',
-                        pointBorderWidth: 2,
-                        pointRadius: pointRadius,
-                        pointHoverRadius: 6,
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    interaction: {
-                        mode: 'index',
-                        intersect: false,
-                    },
-                    plugins: {
-                        legend: { display: false },
-                        tooltip: {
-                            backgroundColor: tooltipBg,
-                            titleColor: '#fafaf9',
-                            bodyColor: '#f59e0b',
-                            padding: 10,
-                            displayColors: false,
-                            callbacks: {
-                                title: (items) => fullDateTooltips[items[0].dataIndex] || items[0].label,
-                                label: (ctx) => ` Price: ${formatDisplayPrice(ctx.parsed.y)} SFL`
-                            }
-                        }
-                    },
-                    scales: {
-                        x: {
-                            grid: { color: gridColor },
-                            ticks: { 
-                                font: { family: 'Plus Jakarta Sans', size: 10 }, 
-                                color: tickColor,
-                                maxTicksLimit: 8
-                            }
-                        },
-                        y: {
-                            grid: { color: gridColor },
-                            ticks: { 
-                                font: { family: 'Plus Jakarta Sans', size: 10 }, 
-                                color: tickColor,
-                                callback: (val) => formatDisplayPrice(val)
-                            }
-                        }
-                    }
-                }
-            });
-        }
-
-        function calculateCustomStack() {
-            if (!activeItem) return;
-            const qty = parseFloat(document.getElementById('calcQuantity').value) || 0;
-            const total = qty * activeItem.price;
-            document.getElementById('calcResult').innerText = formatDisplayPrice(total);
-        }
-
-        function formatDisplayPrice(price) {
-            if (!price || price === 0) return "0.00";
-            if (price < 0.001) return price.toFixed(8).replace(/\.?0+$/, "");
-            if (price < 1) return price.toFixed(6).replace(/\.?0+$/, "");
-            return price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 });
-        }
-
-        function setupAutoRefresh() {
-            const check = document.getElementById('autoRefreshCheck');
-            if (autoRefreshTimer) clearInterval(autoRefreshTimer);
-
-            if (check.checked) {
-                autoRefreshTimer = setInterval(() => {
-                    fetchPrices();
-                }, 15000);
-            }
-
-            check.addEventListener('change', setupAutoRefresh);
-        }
-
-        document.addEventListener('DOMContentLoaded', () => {
-            fetchPrices();
-            setupAutoRefresh();
-        });
-    </script>
+    <!-- App Scripts -->
+    <script src="js/chart.js"></script>
+    <script src="js/app.js"></script>
 </body>
 </html>
