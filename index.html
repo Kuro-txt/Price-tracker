@@ -4,7 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sunflower Land - Resource Price Tracker</title>
+    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome for Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen font-sans">
@@ -19,8 +21,8 @@
                 <div>
                     <h1 class="text-xl font-bold tracking-wide flex items-center gap-2">
                         SFL Price Tracker
-                        <span id="livePulse" class="inline-flex items-center gap-1 text-[10px] bg-emerald-950 text-emerald-400 font-mono px-2 py-0.5 rounded border border-emerald-800">
-                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span> LIVE
+                        <span class="inline-flex items-center gap-1 text-[10px] bg-emerald-950 text-emerald-400 font-mono px-2 py-0.5 rounded border border-emerald-800">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> LIVE
                         </span>
                     </h1>
                     <p class="text-xs text-slate-400" id="lastUpdatedLabel">Fetching market data...</p>
@@ -28,9 +30,9 @@
             </div>
 
             <div class="flex items-center gap-3 w-full sm:w-auto">
-                <div class="flex items-center gap-2 bg-slate-950 border border-slate-800 px-3 py-1.5 rounded-xl text-xs text-slate-400">
+                <div class="flex items-center gap-2 bg-slate-950 border border-slate-800 px-3 py-2 rounded-xl text-xs text-slate-400">
                     <input type="checkbox" id="autoRefreshCheck" checked class="accent-emerald-500 cursor-pointer">
-                    <label for="autoRefreshCheck" class="cursor-pointer select-none">Auto-Refresh (30s)</label>
+                    <label for="autoRefreshCheck" class="cursor-pointer select-none">Live Auto-Sync (15s)</label>
                 </div>
                 <button id="refreshBtn" onclick="fetchPrices()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl text-sm font-medium transition flex items-center gap-2 justify-center shadow-md">
                     <i class="fa-solid fa-rotate" id="refreshIcon"></i> Refresh
@@ -50,7 +52,7 @@
                 <span class="absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-500">
                     <i class="fa-solid fa-magnifying-glass"></i>
                 </span>
-                <input type="text" id="searchInput" oninput="filterAndSortData()" placeholder="Search item (e.g. Sunflower, Wood, Egg)..." 
+                <input type="text" id="searchInput" oninput="filterAndSortData()" placeholder="Search item (e.g. Sunflower, Wood, Iron, Egg)..." 
                     class="w-full pl-10 pr-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm focus:outline-none focus:border-emerald-500 text-slate-100 placeholder-slate-500 transition">
             </div>
 
@@ -78,7 +80,7 @@
         <!-- Loading State -->
         <div id="loadingState" class="flex flex-col items-center justify-center py-24">
             <i class="fa-solid fa-circle-notch fa-spin text-4xl text-emerald-500 mb-4"></i>
-            <p class="text-slate-400 text-sm">Loading market prices...</p>
+            <p class="text-slate-400 text-sm">Extracting live prices...</p>
         </div>
 
         <!-- Error State -->
@@ -102,6 +104,29 @@
     <script>
         let rawData = [];
         let autoRefreshTimer = null;
+
+        // Universal parser to extract numeric price from whatever shape the API supplies
+        function extractPriceNumber(val) {
+            if (val === null || val === undefined) return 0;
+            if (typeof val === 'number') return val;
+            if (typeof val === 'string') {
+                const parsed = parseFloat(val);
+                return isNaN(parsed) ? 0 : parsed;
+            }
+            if (typeof val === 'object') {
+                // If nested object has price, sfl, floor, val, or amount
+                if (val.price !== undefined) return extractPriceNumber(val.price);
+                if (val.sfl !== undefined) return extractPriceNumber(val.sfl);
+                if (val.floor !== undefined) return extractPriceNumber(val.floor);
+                if (val.value !== undefined) return extractPriceNumber(val.value);
+                // Check first object value
+                const firstVal = Object.values(val)[0];
+                if (typeof firstVal === 'number' || typeof firstVal === 'string') {
+                    return extractPriceNumber(firstVal);
+                }
+            }
+            return 0;
+        }
 
         async function fetchPrices() {
             const loadingState = document.getElementById('loadingState');
@@ -132,7 +157,7 @@
                         break;
                     }
                 } catch (e) {
-                    // Try fallback
+                    // Try next fallback
                 }
             }
 
@@ -148,35 +173,74 @@
             }
 
             try {
-                // Update Timestamp
+                // Update time display
                 if (result.updatedAt || result.updated_text) {
-                    const timeString = result.updatedAt ? new Date(result.updatedAt).toLocaleTimeString() : result.updated_text;
-                    lastUpdatedLabel.innerText = `Last API sync: ${timeString}`;
+                    const t = result.updatedAt ? new Date(result.updatedAt).toLocaleTimeString() : result.updated_text;
+                    lastUpdatedLabel.innerText = `Last API sync: ${t}`;
                 } else {
-                    lastUpdatedLabel.innerText = `Synced at ${new Date().toLocaleTimeString()}`;
+                    lastUpdatedLabel.innerText = `Live at ${new Date().toLocaleTimeString()}`;
                 }
 
-                // Correctly unwrap target dictionary: check if result.data exists
-                const itemsObject = result.data ? result.data : result;
+                // Metadata keys to ignore
+                const ignoredKeys = new Set(['updatedAt', 'updated_text', 'data', 'status', 'success', 'timestamp']);
 
-                rawData = Object.keys(itemsObject)
-                    .filter(key => key !== 'updatedAt' && key !== 'updated_text' && key !== 'data')
-                    .map(name => {
-                        const val = itemsObject[name];
-                        const p2pVal = typeof val === 'object' ? (val.p2p ?? val.price ?? 0) : val;
-                        const seqVal = typeof val === 'object' ? (val.seq ?? 0) : 0;
-                        return {
-                            name: name,
-                            p2p: parseFloat(p2pVal) || 0,
-                            seq: parseFloat(seqVal) || 0
-                        };
+                // Find the dictionary of items (either at top-level or inside result.data)
+                let itemsMap = {};
+                if (result.data && typeof result.data === 'object' && !Array.isArray(result.data)) {
+                    itemsMap = result.data;
+                } else if (typeof result === 'object' && !Array.isArray(result)) {
+                    itemsMap = result;
+                }
+
+                const parsedList = [];
+
+                if (Array.isArray(result)) {
+                    result.forEach(item => {
+                        const name = item.name || item.resource || item.item;
+                        if (name) {
+                            parsedList.push({
+                                name: name,
+                                p2p: extractPriceNumber(item.p2p ?? item.price ?? item.sfl),
+                                seq: extractPriceNumber(item.seq)
+                            });
+                        }
                     });
+                } else {
+                    for (const [key, value] of Object.entries(itemsMap)) {
+                        if (ignoredKeys.has(key)) continue;
+                        
+                        let p2pPrice = 0;
+                        let seqPrice = 0;
 
+                        if (typeof value === 'object' && value !== null) {
+                            if (value.p2p !== undefined) p2pPrice = extractPriceNumber(value.p2p);
+                            if (value.seq !== undefined) seqPrice = extractPriceNumber(value.seq);
+                            
+                            // If neither p2p nor seq is explicitly named, try price/sfl
+                            if (p2pPrice === 0 && seqPrice === 0) {
+                                p2pPrice = extractPriceNumber(value);
+                            }
+                        } else {
+                            p2pPrice = extractPriceNumber(value);
+                        }
+
+                        // Only add items that represent actual game resources
+                        if (key.length > 1) {
+                            parsedList.push({
+                                name: key,
+                                p2p: p2pPrice,
+                                seq: seqPrice
+                            });
+                        }
+                    }
+                }
+
+                rawData = parsedList;
                 filterAndSortData();
                 loadingState.classList.add('hidden');
                 priceGrid.classList.remove('hidden');
             } catch (err) {
-                console.error("Format error:", err);
+                console.error("Format parsing error:", err);
             }
         }
 
@@ -190,8 +254,8 @@
             filtered.sort((a, b) => {
                 const nameA = a.name.toLowerCase();
                 const nameB = b.name.toLowerCase();
-                const priceA = a[marketType];
-                const priceB = b[marketType];
+                const priceA = a[marketType] || 0;
+                const priceB = b[marketType] || 0;
 
                 if (sortOption === 'name-asc') return nameA.localeCompare(nameB);
                 if (sortOption === 'name-desc') return nameB.localeCompare(nameA);
@@ -201,6 +265,13 @@
             });
 
             renderGrid(filtered, marketType);
+        }
+
+        function formatDisplayPrice(price) {
+            if (!price || price === 0) return "-";
+            if (price < 0.001) return price.toFixed(6);
+            if (price < 1) return price.toFixed(4);
+            return price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 });
         }
 
         function renderGrid(data, marketType) {
@@ -238,8 +309,8 @@
                         <div class="flex items-baseline justify-between">
                             <span class="text-[11px] text-slate-500 uppercase font-semibold">Floor</span>
                             <div class="text-right">
-                                <span class="text-lg font-bold font-mono text-emerald-400">
-                                    ${activePrice > 0 ? activePrice.toFixed(4) : '-'}
+                                <span class="text-lg font-bold font-mono ${activePrice > 0 ? 'text-emerald-400' : 'text-slate-600'}">
+                                    ${formatDisplayPrice(activePrice)}
                                 </span>
                                 <span class="text-[11px] text-slate-400 ml-0.5">SFL</span>
                             </div>
@@ -247,7 +318,7 @@
                         ${secondaryPrice > 0 ? `
                         <div class="flex items-center justify-between text-[11px] text-slate-400 mt-2 pt-2 border-t border-slate-800/50">
                             <span>${secondaryLabel} Floor:</span>
-                            <span class="font-mono text-slate-300">${secondaryPrice.toFixed(4)} SFL</span>
+                            <span class="font-mono text-slate-300">${formatDisplayPrice(secondaryPrice)} SFL</span>
                         </div>` : ''}
                     </div>
                 `;
@@ -255,7 +326,7 @@
             });
         }
 
-        // Auto-refresh logic (every 30 seconds)
+        // Live Auto-Refresh every 15s
         function setupAutoRefresh() {
             const check = document.getElementById('autoRefreshCheck');
             if (autoRefreshTimer) clearInterval(autoRefreshTimer);
@@ -263,7 +334,7 @@
             if (check.checked) {
                 autoRefreshTimer = setInterval(() => {
                     fetchPrices();
-                }, 30000);
+                }, 15000);
             }
 
             check.addEventListener('change', () => {
