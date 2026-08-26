@@ -18,10 +18,10 @@ let initialPinchDistance = null;
 
 // SFL 4-Season Cycle (7 Days each = 28-day loop)
 const SEASONS = [
-    { name: 'Spring', icon: '🌱', color: '#10b981', textColor: 'text-emerald-500', bg: 'bg-emerald-100 dark:bg-emerald-950/80', border: 'border-emerald-200 dark:border-emerald-800/60' },
-    { name: 'Summer', icon: '☀️', color: '#f59e0b', textColor: 'text-amber-500', bg: 'bg-amber-100 dark:bg-amber-950/80', border: 'border-amber-200 dark:border-amber-800/60' },
-    { name: 'Autumn', icon: '🍂', color: '#ea580c', textColor: 'text-orange-500', bg: 'bg-orange-100 dark:bg-orange-950/80', border: 'border-orange-200 dark:border-orange-800/60' },
-    { name: 'Winter', icon: '❄️', color: '#38bdf8', textColor: 'text-sky-500', bg: 'bg-sky-100 dark:bg-sky-950/80', border: 'border-sky-200 dark:border-sky-800/60' }
+    { name: 'Spring', icon: '🌱', color: '#059669', textColor: 'text-emerald-800 dark:text-emerald-400', bg: 'bg-emerald-100/90 dark:bg-emerald-950/80', border: 'border-emerald-300 dark:border-emerald-800/60' },
+    { name: 'Summer', icon: '☀️', color: '#d97706', textColor: 'text-amber-800 dark:text-amber-400', bg: 'bg-amber-100/90 dark:bg-amber-950/80', border: 'border-amber-300 dark:border-amber-800/60' },
+    { name: 'Autumn', icon: '🍂', color: '#ea580c', textColor: 'text-orange-800 dark:text-orange-400', bg: 'bg-orange-100/90 dark:bg-orange-950/80', border: 'border-orange-300 dark:border-orange-800/60' },
+    { name: 'Winter', icon: '❄️', color: '#0284c7', textColor: 'text-sky-800 dark:text-sky-400', bg: 'bg-sky-100/90 dark:bg-sky-950/80', border: 'border-sky-300 dark:border-sky-800/60' }
 ];
 
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
@@ -51,7 +51,7 @@ function updateActiveSeasonBadge() {
     if (!badge) return;
 
     const currentSeason = getSeasonForDate(new Date());
-    badge.className = `inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${currentSeason.bg} ${currentSeason.border} ${currentSeason.textColor}`;
+    badge.className = `inline-flex items-center gap-1 text-[10px] font-black px-2.5 py-0.5 rounded-full border ${currentSeason.bg} ${currentSeason.border} ${currentSeason.textColor}`;
     badge.innerHTML = `<span>${currentSeason.icon}</span> <span>${currentSeason.name} (Day ${currentSeason.day}/7)</span>`;
 }
 
@@ -68,13 +68,13 @@ function updatePriceChangeBadge(firstPrice, lastPrice) {
         : diff.toFixed(4).replace(/\.?0+$/, "");
 
     if (diff > 0.000001) {
-        badge.className = "inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/60";
+        badge.className = "inline-flex items-center gap-1 text-[10px] font-black px-2.5 py-0.5 rounded-full border bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-400 border-emerald-300 dark:border-emerald-800/60";
         badge.innerHTML = `<i class="fa-solid fa-arrow-trend-up text-[9px]"></i> +${percent.toFixed(2)}% (+${formattedDiff} SFL)`;
     } else if (diff < -0.000001) {
-        badge.className = "inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border bg-rose-100 dark:bg-rose-950/80 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-800/60";
+        badge.className = "inline-flex items-center gap-1 text-[10px] font-black px-2.5 py-0.5 rounded-full border bg-rose-100 dark:bg-rose-950/80 text-rose-800 dark:text-rose-400 border-rose-300 dark:border-rose-800/60";
         badge.innerHTML = `<i class="fa-solid fa-arrow-trend-down text-[9px]"></i> ${percent.toFixed(2)}% (${formattedDiff} SFL)`;
     } else {
-        badge.className = "inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border bg-stone-100 dark:bg-slate-800 text-stone-600 dark:text-slate-400 border-stone-200 dark:border-slate-700";
+        badge.className = "inline-flex items-center gap-1 text-[10px] font-black px-2.5 py-0.5 rounded-full border bg-[#ede4d4] dark:bg-slate-800 text-[#54483a] dark:text-slate-400 border-[#dccebc] dark:border-slate-700";
         badge.innerHTML = `<i class="fa-solid fa-minus text-[9px]"></i> 0.00% (0.00 SFL)`;
     }
 }
@@ -86,9 +86,9 @@ function changeRange(range) {
         const btn = document.getElementById(`range-${r}`);
         if (!btn) return;
         if (r === range) {
-            btn.className = "px-2.5 py-0.5 rounded-md transition bg-white dark:bg-slate-800 text-amber-600 dark:text-amber-400 shadow-2xs";
+            btn.className = "px-2.5 py-1 rounded-lg transition bg-white dark:bg-slate-800 text-amber-700 dark:text-amber-400 shadow-xs";
         } else {
-            btn.className = "px-2.5 py-0.5 rounded-md transition text-stone-500 dark:text-slate-400 hover:text-stone-900 dark:hover:text-white";
+            btn.className = "px-2.5 py-1 rounded-lg transition text-[#6b5f4f] dark:text-slate-400 hover:text-black dark:hover:text-white";
         }
     });
 
@@ -214,15 +214,17 @@ function renderChart() {
     }
 
     const isDark = document.documentElement.classList.contains('dark');
-    const gridColor = isDark ? '#1e293b' : '#f5f5f4';
-    const tickColor = isDark ? '#94a3b8' : '#a8a29e';
-    const tooltipBg = isDark ? '#090d16' : '#1c1917';
+    
+    // Warm Ivory Grid & Typography for Light Mode
+    const gridColor = isDark ? '#1e293b' : '#e6dcce';
+    const tickColor = isDark ? '#94a3b8' : '#736655';
+    const tooltipBg = isDark ? '#090d16' : '#241b12'; // Deep espresso for contrast in light mode
 
     const pointColors = itemSeasons.map(s => s.color);
 
     const gradient = ctx.createLinearGradient(0, 0, 0, isMobile ? 180 : 240);
-    gradient.addColorStop(0, 'rgba(245, 158, 11, 0.20)');
-    gradient.addColorStop(1, 'rgba(245, 158, 11, 0.0)');
+    gradient.addColorStop(0, isDark ? 'rgba(245, 158, 11, 0.22)' : 'rgba(217, 119, 6, 0.20)');
+    gradient.addColorStop(1, isDark ? 'rgba(245, 158, 11, 0.0)' : 'rgba(217, 119, 6, 0.0)');
 
     const pointRadius = (visibleData.length > 30) ? 0 : (isMobile ? 3 : 4);
 
@@ -233,11 +235,11 @@ function renderChart() {
             datasets: [{
                 label: 'Price (SFL)',
                 data: prices,
-                borderColor: '#f59e0b',
+                borderColor: '#d97706',
                 segment: {
                     borderColor: ctxSeg => {
                         const pIndex = ctxSeg.p1DataIndex;
-                        return itemSeasons[pIndex]?.color || '#f59e0b';
+                        return itemSeasons[pIndex]?.color || '#d97706';
                     }
                 },
                 borderWidth: isMobile ? 2 : 2.5,
@@ -245,7 +247,7 @@ function renderChart() {
                 fill: true,
                 tension: 0.35,
                 pointBackgroundColor: pointColors,
-                pointBorderColor: isDark ? '#0f172a' : '#ffffff',
+                pointBorderColor: isDark ? '#0f172a' : '#f5eee1',
                 pointBorderWidth: 1.5,
                 pointRadius: pointRadius,
                 pointHoverRadius: 6,
@@ -260,8 +262,8 @@ function renderChart() {
                 legend: { display: false },
                 tooltip: {
                     backgroundColor: tooltipBg,
-                    titleColor: '#fafaf9',
-                    bodyColor: '#f59e0b',
+                    titleColor: '#faf7f2',
+                    bodyColor: '#fbbf24',
                     padding: 10,
                     displayColors: false,
                     callbacks: {
@@ -279,7 +281,7 @@ function renderChart() {
                 x: {
                     grid: { color: gridColor },
                     ticks: { 
-                        font: { family: 'Plus Jakarta Sans', size: isMobile ? 9 : 10 }, 
+                        font: { family: 'Plus Jakarta Sans', size: isMobile ? 9 : 10, weight: '600' }, 
                         color: tickColor, 
                         maxTicksLimit: isMobile ? 5 : 8 
                     }
@@ -289,7 +291,7 @@ function renderChart() {
                     max: yMax,
                     grid: { color: gridColor },
                     ticks: { 
-                        font: { family: 'Plus Jakarta Sans', size: isMobile ? 9 : 10 }, 
+                        font: { family: 'Plus Jakarta Sans', size: isMobile ? 9 : 10, weight: '600' }, 
                         color: tickColor, 
                         maxTicksLimit: 5,
                         callback: (val) => window.formatDisplayPrice(val) 
