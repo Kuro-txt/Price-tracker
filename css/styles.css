@@ -1,13 +1,12 @@
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap');
 
-/* Global Reset & Typography Polish */
 *, *::before, *::after {
     box-sizing: border-box;
 }
 
 html {
     scrollbar-width: thin;
-    scrollbar-color: #dcd4c8 transparent;
+    scrollbar-color: #e2d9cc transparent;
 }
 
 html.dark {
@@ -15,14 +14,14 @@ html.dark {
 }
 
 body {
-    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: 'Plus Jakarta Sans', sans-serif;
     -webkit-tap-highlight-color: transparent;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
 }
 
-/* Custom Sleek Scrollbars (WebKit) */
+/* Custom Scrollbars */
 ::-webkit-scrollbar {
     width: 5px;
     height: 5px;
@@ -33,12 +32,12 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-    background: #dcd4c8;
+    background: #e2d9cc;
     border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: #c2b7a6;
+    background: #c8bdae;
 }
 
 html.dark ::-webkit-scrollbar-thumb {
@@ -50,16 +49,6 @@ html.dark ::-webkit-scrollbar-thumb:hover {
     background: #334155;
 }
 
-/* Utility: Hide Scrollbars for Swipeable Panels */
-.no-scrollbar::-webkit-scrollbar {
-    display: none;
-}
-
-.no-scrollbar {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-}
-
 /* Number Input Arrow Cleanup */
 input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button {
@@ -69,4 +58,9 @@ input[type="number"]::-webkit-outer-spin-button {
 
 input[type="number"] {
     -moz-appearance: textfield;
+}
+
+/* Glassmorphic Shadow Helpers */
+.shadow-xs {
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03);
 }
