@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sunflower Land - Resource Price Tracker</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen font-sans">
+
+    <!-- Header -->
+    <header class="bg-slate-800 border-b border-slate-700 sticky top-0 z-50 shadow-md">
+        <div class="max-w-7xl mx-auto px-4 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div class="flex items-center space-x-3">
+                <div class="bg-emerald-600 p-2 rounded-lg text-white">
+                    <i class="fa-solid fa-seedling text-2xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold tracking-wide">SFL Resource Tracker</h1>
+                    <p class="text-xs text-slate-400">Real-time market tracking from sfl.world</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-3 w-full sm:w-auto">
+                <button id="refreshBtn" onclick="fetchPrices()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2 w-full sm:w-auto justify-center">
+                    <i class="fa-solid fa-rotate" id="refreshIcon"></i> Refresh Data
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 py-8">
+        
+        <!-- Controls Bar -->
+        <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 mb-6 flex flex-col md:flex-row gap-4 justify-between items-center">
+            
+            <!-- Search Box -->
+            <div class="relative w-full md:w-96">
+                <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                </span>
+                <input type="text" id="searchInput" oninput="filterAndSortData()" placeholder="Search resources (e.g., Sunflower, Wood)..." 
+                    class="w-full pl-10 pr-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm focus:outline-none focus:border-emerald-500 text-slate-100 placeholder-slate-500">
+            </div>
+
+            <!-- Filters & Sorting -->
+            <div class="flex flex-wrap items-center gap-3 w-full md:w-auto justify-end">
+                <div class="flex items-center gap-2">
+                    <label for="sortSelect" class="text-xs text-slate-400 uppercase font-semibold">Sort By:</label>
+                    <select id="sortSelect" onchange="filterAndSortData()" class="bg-slate-900 border border-slate-700 text-slate-200 text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-emerald-500">
+                        <option value="name-asc">Name (A - Z)</option>
+                        <option value="name-desc">Name (Z - A)</option>
+                        <option value="price-desc">Price (High to Low)</option>
+                        <option value="price-asc">Price (Low to High)</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Status / Loading Indicator -->
+        <div id="loadingState" class="flex flex-col items-center justify-center py-20">
+            <i class="fa-solid fa-circle-notch fa-spin text-4xl text-emerald-500 mb-4"></i>
+            <p class="text-slate-400 text-sm">Fetching latest resource prices...</p>
+        </div>
+
+        <!-- Error State -->
+        <div id="errorState" class="hidden bg-red-900/50 border border-red-700 text-red-200 p-4 rounded-xl text-center my-8">
+            <i class="fa-solid fa-triangle-exclamation text-2xl mb-2"></i>
+            <p id="errorMessage" class="font-medium">Failed to fetch pricing data.</p>
+            <p class="text-xs text-red-300 mt-1">Note: If this is a CORS issue, ensure your browser permits cross-origin requests or run via a local server extension.</p>
+        </div>
+
+        <!-- Prices Grid Container -->
+        <div id="priceGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 hidden">
+            <!-- Dynamically injected cards -->
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-slate-800 text-center py-6 text-xs text-slate-500">
+        <p>Data provided by <a href="https://sfl.world" target="_blank" class="text-emerald-400 hover:underline">sfl.world</a> API.</p>
+    "></footer>
+
+    <!-- Application Script -->
+    <script>
+        const API_URL = 'https://sfl.world/api/v1/prices';
+        let rawData = [];
+
+        async function fetchPrices() {
+            const loadingState = document.getElementById('loadingState');
+            const errorState = document.getElementById('errorState');
+            const priceGrid = document.getElementById('priceGrid');
+            const refreshIcon = document.getElementById('refreshIcon');
+
+            loadingState.classList.remove('hidden');
+            errorState.classList.add('hidden');
+            priceGrid.classList.add('hidden');
+            refreshIcon.classList.add('fa-spin');
+
+            try {
+                const response = await fetch(API_URL);
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                
+                const result = await response.json();
+                
+                // Handle various JSON object structures (adjust if API format changes)
+                // If it returns an array or an object map, normalize it:
+                if (Array.isArray(result)) {
+                    rawData = result;
+                } else if (typeof result === 'object' && result !== null) {
+                    rawData = Object.keys(result).map(key => ({
+                        name: key,
+                        ...(typeof result[key] === 'object' ? result[key] : { price: result[key] })
+                    }));
+                }
+
+                filterAndSortData();
+                loadingState.classList.add('hidden');
+                priceGrid.classList.remove('hidden');
+            } catch (err) {
+                console.error(err);
+                loadingState.classList.add('hidden');
+                errorState.classList.remove('hidden');
+                document.getElementById('errorMessage').innerText = `Error: ${err.message}. (CORS restrictions may apply when testing locally without a proxy).`;
+            } finally {
+                refreshIcon.classList.remove('fa-spin');
+            }
+        }
+
+        function filterAndSortData() {
+            const searchKeyword = document.getElementById('searchInput').value.toLowerCase();
+            const sortOption = document.getElementById('sortSelect').value;
+
+            // 1. Filter
+            let processedData = rawData.filter(item => {
+                const itemName = item.name || item.resource || '';
+                return itemName.toLowerCase().includes(searchKeyword);
+            });
+
+            // 2. Sort
+            processedData.sort((a, b) => {
+                const nameA = (a.name || a.resource || '').toLowerCase();
+                const nameB = (b.name || b.resource || '').toLowerCase();
+                const priceA = parseFloat(a.price || a.sfl || a.value || 0);
+                const priceB = parseFloat(b.price || b.sfl || b.value || 0);
+
+                if (sortOption === 'name-asc') return nameA.localeCompare(nameB);
+                if (sortOption === 'name-desc') return nameB.localeCompare(nameA);
+                if (sortOption === 'price-desc') return priceB - priceA;
+                if (sortOption === 'price-asc') return priceA - priceB;
+                return 0;
+            });
+
+            renderGrid(processedData);
+        }
+
+        function renderGrid(data) {
+            const priceGrid = document.getElementById('priceGrid');
+            priceGrid.innerHTML = '';
+
+            if (data.length === 0) {
+                priceGrid.innerHTML = `
+                    <div class="col-span-full text-center py-12 text-slate-500">
+                        <i class="fa-solid fa-box-open text-3xl mb-2"></i>
+                        <p>No resources found matching your search.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            data.forEach(item => {
+                const name = item.name || item.resource || 'Unknown Resource';
+                const price = item.price !== undefined ? item.price : (item.sfl !== undefined ? item.sfl : 0);
+                
+                // Construct card element
+                const card = document.createElement('div');
+                card.className = "bg-slate-800 border border-slate-700/60 rounded-xl p-4 flex flex-col justify-between hover:border-emerald-500/50 transition shadow-sm hover:shadow-emerald-500/5";
+                
+                card.innerHTML = `
+                    <div>
+                        <div class="flex justify-between items-start gap-2 mb-2">
+                            <h3 class="font-semibold text-slate-200 tracking-wide text-base truncate" title="${name}">${name}</h3>
+                            <span class="bg-emerald-950 text-emerald-400 text-xs px-2 py-0.5 rounded border border-emerald-800/50 whitespace-nowrap">SFL</span>
+                        </div>
+                    </div>
+                    <div class="mt-4 pt-3 border-t border-slate-700/40 flex items-baseline justify-between">
+                        <span class="text-xs text-slate-400 uppercase font-medium">Price</span>
+                        <span class="text-lg font-bold text-emerald-400">${Number(price).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 4})}</span>
+                    </div>
+                `;
+                priceGrid.appendChild(card);
+            });
+        }
+
+        // Initial Load on page startup
+        document.addEventListener('DOMContentLoaded', fetchPrices);
+    </script>
+</body>
+</html>
