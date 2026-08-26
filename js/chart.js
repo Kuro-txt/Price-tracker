@@ -26,6 +26,18 @@ const SEASONS = [
 
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 
+// Format price helper with safe fallback
+function formatPrice(val) {
+    if (typeof window.formatDisplayPrice === 'function') {
+        return window.formatDisplayPrice(val);
+    }
+    const num = parseFloat(val);
+    if (isNaN(num)) return "0.00";
+    if (num < 0.001) return num.toFixed(6).replace(/\.?0+$/, "");
+    if (num < 1) return num.toFixed(4).replace(/\.?0+$/, "");
+    return num.toFixed(2);
+}
+
 function getSeasonForDate(date) {
     const now = new Date();
     const nowDay = now.getUTCDay();
@@ -55,7 +67,7 @@ function updateActiveSeasonBadge() {
     badge.innerHTML = `<span>${currentSeason.icon}</span> <span>${currentSeason.name} (Day ${currentSeason.day}/7)</span>`;
 }
 
-// Update Price Change Delta Badge (First point vs Current Last point)
+// Update Price Change Delta Badge (First visible point vs Last visible point)
 function updatePriceChangeBadge(firstPrice, lastPrice) {
     const badge = document.getElementById('priceChangeBadge');
     if (!badge) return;
@@ -74,7 +86,7 @@ function updatePriceChangeBadge(firstPrice, lastPrice) {
         badge.className = "inline-flex items-center gap-1 text-[10px] font-black px-2.5 py-0.5 rounded-full border bg-rose-100 dark:bg-rose-950/80 text-rose-800 dark:text-rose-400 border-rose-300 dark:border-rose-800/60";
         badge.innerHTML = `<i class="fa-solid fa-arrow-trend-down text-[9px]"></i> ${percent.toFixed(2)}% (${formattedDiff} SFL)`;
     } else {
-        badge.className = "inline-flex items-center gap-1 text-[10px] font-black px-2.5 py-0.5 rounded-full border bg-[#ede4d4] dark:bg-slate-800 text-[#54483a] dark:text-slate-400 border-[#dccebc] dark:border-slate-700";
+        badge.className = "inline-flex items-center gap-1 text-[10px] font-black px-2.5 py-0.5 rounded-full border bg-[#e4d9c6] dark:bg-[#111116] text-[#4c3f30] dark:text-zinc-400 border-[#cbbeaa] dark:border-[#22222e]";
         badge.innerHTML = `<i class="fa-solid fa-minus text-[9px]"></i> 0.00% (0.00 SFL)`;
     }
 }
@@ -86,9 +98,9 @@ function changeRange(range) {
         const btn = document.getElementById(`range-${r}`);
         if (!btn) return;
         if (r === range) {
-            btn.className = "px-2.5 py-1 rounded-lg transition bg-white dark:bg-slate-800 text-amber-700 dark:text-amber-400 shadow-xs";
+            btn.className = "px-2.5 py-1 rounded-lg transition bg-[#f6eee0] dark:bg-[#181820] text-amber-800 dark:text-amber-400 shadow-xs";
         } else {
-            btn.className = "px-2.5 py-1 rounded-lg transition text-[#6b5f4f] dark:text-slate-400 hover:text-black dark:hover:text-white";
+            btn.className = "px-2.5 py-1 rounded-lg transition text-[#635443] dark:text-zinc-400 hover:text-black dark:hover:text-white";
         }
     });
 
@@ -215,16 +227,16 @@ function renderChart() {
 
     const isDark = document.documentElement.classList.contains('dark');
     
-    // Warm Ivory Grid & Typography for Light Mode
-    const gridColor = isDark ? '#1e293b' : '#e6dcce';
-    const tickColor = isDark ? '#94a3b8' : '#736655';
-    const tooltipBg = isDark ? '#090d16' : '#241b12'; // Deep espresso for contrast in light mode
+    // Pitch OLED Black Theme Tuning
+    const gridColor = isDark ? '#14141c' : '#e6dcce';
+    const tickColor = isDark ? '#71717a' : '#736655';
+    const tooltipBg = isDark ? '#000000' : '#241b12';
 
     const pointColors = itemSeasons.map(s => s.color);
 
     const gradient = ctx.createLinearGradient(0, 0, 0, isMobile ? 180 : 240);
-    gradient.addColorStop(0, isDark ? 'rgba(245, 158, 11, 0.22)' : 'rgba(217, 119, 6, 0.20)');
-    gradient.addColorStop(1, isDark ? 'rgba(245, 158, 11, 0.0)' : 'rgba(217, 119, 6, 0.0)');
+    gradient.addColorStop(0, isDark ? 'rgba(245, 158, 11, 0.25)' : 'rgba(217, 119, 6, 0.20)');
+    gradient.addColorStop(1, isDark ? 'rgba(0, 0, 0, 0.0)' : 'rgba(217, 119, 6, 0.0)');
 
     const pointRadius = (visibleData.length > 30) ? 0 : (isMobile ? 3 : 4);
 
@@ -247,7 +259,7 @@ function renderChart() {
                 fill: true,
                 tension: 0.35,
                 pointBackgroundColor: pointColors,
-                pointBorderColor: isDark ? '#0f172a' : '#f5eee1',
+                pointBorderColor: isDark ? '#000000' : '#ede2cf',
                 pointBorderWidth: 1.5,
                 pointRadius: pointRadius,
                 pointHoverRadius: 6,
@@ -273,7 +285,7 @@ function renderChart() {
                             const timeStr = fullDateTooltips[index];
                             return `${season?.icon || '🌱'} ${season?.name || 'Spring'} Season (Day ${season?.day || 1}/7)\n📅 ${timeStr}`;
                         },
-                        label: (ctxLabel) => ` Price: ${window.formatDisplayPrice(ctxLabel.parsed.y)} SFL`
+                        label: (ctxLabel) => ` Price: ${formatPrice(ctxLabel.parsed.y)} SFL`
                     }
                 }
             },
@@ -294,7 +306,7 @@ function renderChart() {
                         font: { family: 'Plus Jakarta Sans', size: isMobile ? 9 : 10, weight: '600' }, 
                         color: tickColor, 
                         maxTicksLimit: 5,
-                        callback: (val) => window.formatDisplayPrice(val) 
+                        callback: (val) => formatPrice(val) 
                     }
                 }
             }
