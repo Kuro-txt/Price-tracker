@@ -23,6 +23,10 @@
     <!-- Styles & Dependencies -->
     <link rel="stylesheet" href="css/style.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Zoom & Gesture Plugins -->
+    <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.2.0/dist/chartjs-plugin-zoom.min.js"></script>
+    
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body class="bg-[#f8f6f0] dark:bg-[#0c111c] text-stone-800 dark:text-slate-100 min-h-screen flex flex-col justify-between selection:bg-amber-200 dark:selection:bg-amber-900 selection:text-amber-900 dark:selection:text-amber-200 transition-colors duration-150">
@@ -73,7 +77,7 @@
     <!-- Main Container -->
     <main class="max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-6 flex-1 w-full space-y-4">
 
-        <!-- Search & Dropdown Control Bar -->
+        <!-- Search & Selection Panel -->
         <div class="bg-white dark:bg-slate-900 border border-stone-200/80 dark:border-slate-800 rounded-2xl p-3.5 sm:p-4 shadow-xs transition-colors duration-150">
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-4">
                 
@@ -124,14 +128,13 @@
             </p>
         </div>
 
-        <!-- Selected Item Details (Wide Balanced 2-Column Grid on PC) -->
+        <!-- Selected Item Details Grid -->
         <div id="itemDetailsContainer" class="hidden">
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
                 
-                <!-- Left Column: Asset Floor, Stacks & Calculator (4.5/12 on desktop) -->
+                <!-- Left Column: Floor, Stacks & Calculator -->
                 <div class="lg:col-span-5 space-y-4">
                     
-                    <!-- Main Asset & Floor Card -->
                     <div class="bg-white dark:bg-slate-900 border border-stone-200/80 dark:border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xs transition-colors duration-150 space-y-4">
                         <div class="flex items-start justify-between gap-3">
                             <div class="min-w-0">
@@ -186,13 +189,13 @@
 
                 </div>
 
-                <!-- Right Column: Interactive Price History Graph & Seasonal Indicators (7/12 on desktop) -->
+                <!-- Right Column: Interactive Price History Graph with Zoom Controls -->
                 <div class="lg:col-span-7 bg-white dark:bg-slate-900 border border-stone-200/80 dark:border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xs transition-colors duration-150 space-y-3">
                     
-                    <div class="flex flex-row justify-between items-center gap-2 pb-1">
+                    <div class="flex flex-wrap items-center justify-between gap-2 pb-1">
                         <div class="flex items-center gap-2 min-w-0">
                             <span class="text-xs font-bold text-stone-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1 shrink-0">
-                                <i class="fa-solid fa-chart-line text-amber-500 text-xs"></i> Price History
+                                <i class="fa-solid fa-chart-line text-amber-500 text-xs"></i> History
                             </span>
                             <!-- Live SFL Season Indicator -->
                             <span id="currentSeasonBadge" class="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/60 truncate">
@@ -200,12 +203,30 @@
                             </span>
                         </div>
 
-                        <!-- Range Filter Controls -->
-                        <div class="flex items-center bg-stone-100 dark:bg-slate-950 p-0.5 rounded-lg border border-stone-200 dark:border-slate-800 text-[10px] font-bold shrink-0">
-                            <button onclick="changeRange('24h')" id="range-24h" class="px-2.5 py-0.5 rounded-md transition bg-white dark:bg-slate-800 text-amber-600 dark:text-amber-400 shadow-2xs">24H</button>
-                            <button onclick="changeRange('7d')" id="range-7d" class="px-2.5 py-0.5 rounded-md transition text-stone-500 dark:text-slate-400 hover:text-stone-900 dark:hover:text-white">7D</button>
-                            <button onclick="changeRange('30d')" id="range-30d" class="px-2.5 py-0.5 rounded-md transition text-stone-500 dark:text-slate-400 hover:text-stone-900 dark:hover:text-white">1M</button>
-                            <button onclick="changeRange('90d')" id="range-90d" class="px-2.5 py-0.5 rounded-md transition text-stone-500 dark:text-slate-400 hover:text-stone-900 dark:hover:text-white">3M</button>
+                        <!-- Combined Time Range & Zoom Action Controls -->
+                        <div class="flex items-center gap-1.5">
+                            
+                            <!-- Range Filters -->
+                            <div class="flex items-center bg-stone-100 dark:bg-slate-950 p-0.5 rounded-lg border border-stone-200 dark:border-slate-800 text-[10px] font-bold shrink-0">
+                                <button onclick="changeRange('24h')" id="range-24h" class="px-2 py-0.5 rounded-md transition bg-white dark:bg-slate-800 text-amber-600 dark:text-amber-400 shadow-2xs">24H</button>
+                                <button onclick="changeRange('7d')" id="range-7d" class="px-2 py-0.5 rounded-md transition text-stone-500 dark:text-slate-400 hover:text-stone-900 dark:hover:text-white">7D</button>
+                                <button onclick="changeRange('30d')" id="range-30d" class="px-2 py-0.5 rounded-md transition text-stone-500 dark:text-slate-400 hover:text-stone-900 dark:hover:text-white">1M</button>
+                                <button onclick="changeRange('90d')" id="range-90d" class="px-2 py-0.5 rounded-md transition text-stone-500 dark:text-slate-400 hover:text-stone-900 dark:hover:text-white">3M</button>
+                            </div>
+
+                            <!-- Zoom +/- & Reset Group -->
+                            <div class="flex items-center bg-stone-100 dark:bg-slate-950 p-0.5 rounded-lg border border-stone-200 dark:border-slate-800 text-[10px] font-bold shrink-0">
+                                <button onclick="zoomIn()" title="Zoom In" class="px-1.5 py-0.5 rounded-md hover:bg-white dark:hover:bg-slate-800 text-stone-600 dark:text-slate-300 transition">
+                                    <i class="fa-solid fa-magnifying-glass-plus text-xs"></i>
+                                </button>
+                                <button onclick="zoomOut()" title="Zoom Out" class="px-1.5 py-0.5 rounded-md hover:bg-white dark:hover:bg-slate-800 text-stone-600 dark:text-slate-300 transition">
+                                    <i class="fa-solid fa-magnifying-glass-minus text-xs"></i>
+                                </button>
+                                <button onclick="resetZoom()" title="Reset Zoom" id="resetZoomBtn" class="hidden px-2 py-0.5 rounded-md bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold transition">
+                                    Reset
+                                </button>
+                            </div>
+
                         </div>
                     </div>
 
@@ -215,7 +236,7 @@
                             <i class="fa-solid fa-circle-notch fa-spin text-lg text-amber-500 mb-1"></i>
                             <span class="text-[10px] text-stone-500 dark:text-slate-400 font-medium">Loading history...</span>
                         </div>
-                        <canvas id="priceHistoryChart" class="w-full h-full"></canvas>
+                        <canvas id="priceHistoryChart" class="w-full h-full cursor-crosshair"></canvas>
                     </div>
 
                     <!-- Season Legend Indicator -->
