@@ -26,7 +26,6 @@ function getSeasonForDate(date) {
     const weekOffset = Math.floor(diffTime / SEVEN_DAYS_MS);
     const seasonIndex = ((weekOffset % 4) + 4) % 4;
     
-    // Calculate which day of the 7-day season (Day 1 to 7)
     const dayInSeason = (Math.floor((targetTime - (currentWeekStart + weekOffset * SEVEN_DAYS_MS)) / (24 * 60 * 60 * 1000)) + 1);
     
     return {
@@ -136,11 +135,14 @@ function renderChart(historyData) {
     const tickColor = isDark ? '#94a3b8' : '#a8a29e';
     const tooltipBg = isDark ? '#090d16' : '#1c1917';
 
+    // Multi-color points matched to each individual point's season
+    const pointColors = itemSeasons.map(s => s.color);
+
     const gradient = ctx.createLinearGradient(0, 0, 0, isMobile ? 180 : 240);
-    gradient.addColorStop(0, 'rgba(245, 158, 11, 0.25)');
+    gradient.addColorStop(0, 'rgba(245, 158, 11, 0.20)');
     gradient.addColorStop(1, 'rgba(245, 158, 11, 0.0)');
 
-    const pointRadius = (selectedRange === '30d' || selectedRange === '90d' || historyData.length > 30) ? 0 : (isMobile ? 2.5 : 3.5);
+    const pointRadius = (selectedRange === '30d' || selectedRange === '90d' || historyData.length > 30) ? 0 : (isMobile ? 3 : 4);
 
     chartInstance = new Chart(ctx, {
         type: 'line',
@@ -150,15 +152,22 @@ function renderChart(historyData) {
                 label: 'Price (SFL)',
                 data: prices,
                 borderColor: '#f59e0b',
+                // Dynamically color line segments based on season
+                segment: {
+                    borderColor: ctx => {
+                        const pIndex = ctx.p1DataIndex;
+                        return itemSeasons[pIndex]?.color || '#f59e0b';
+                    }
+                },
                 borderWidth: isMobile ? 2 : 2.5,
                 backgroundColor: gradient,
                 fill: true,
                 tension: 0.35,
-                pointBackgroundColor: isDark ? '#0f172a' : '#ffffff',
-                pointBorderColor: '#f59e0b',
+                pointBackgroundColor: pointColors,
+                pointBorderColor: isDark ? '#0f172a' : '#ffffff',
                 pointBorderWidth: 1.5,
                 pointRadius: pointRadius,
-                pointHoverRadius: 5,
+                pointHoverRadius: 6,
             }]
         },
         options: {
@@ -178,7 +187,7 @@ function renderChart(historyData) {
                             const index = items[0].dataIndex;
                             const season = itemSeasons[index];
                             const timeStr = fullDateTooltips[index];
-                            return `${season.icon} ${season.name} Season (Day ${season.day}/7)\n📅 ${timeStr}`;
+                            return `${season.icon} Season: ${season.name} (Day ${season.day}/7)\n📅 Date: ${timeStr}`;
                         },
                         label: (ctx) => ` Price: ${window.formatDisplayPrice(ctx.parsed.y)} SFL`
                     }
