@@ -17,7 +17,15 @@ export default async function handler(req, res) {
     let sqlQuery = "";
     let args = [item];
 
-    if (range === "12h") {
+    if (range === "6h") {
+      sqlQuery = `
+        SELECT item_name, price, recorded_at 
+        FROM resource_prices 
+        WHERE item_name = ? COLLATE NOCASE 
+          AND recorded_at >= datetime('now', '-6 hours')
+        ORDER BY recorded_at ASC
+      `;
+    } else if (range === "12h") {
       sqlQuery = `
         SELECT item_name, price, recorded_at 
         FROM resource_prices 
@@ -70,7 +78,6 @@ export default async function handler(req, res) {
     const result = await db.execute({ sql: sqlQuery, args });
     let rows = result.rows;
 
-    // Fallback if data is sparse
     if (rows.length === 0) {
       const fallback = await db.execute({
         sql: `SELECT item_name, price, recorded_at 
