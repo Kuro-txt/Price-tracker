@@ -8,100 +8,144 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- FontAwesome for Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* Custom scrollbars */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+    </style>
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen font-sans">
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans flex flex-col justify-between selection:bg-emerald-500 selection:text-white">
 
-    <!-- Header -->
-    <header class="bg-slate-900 border-b border-slate-800 sticky top-0 z-50 shadow-md">
-        <div class="max-w-7xl mx-auto px-4 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+    <!-- Top Navigation Bar -->
+    <header class="bg-slate-900/90 backdrop-blur border-b border-slate-800 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3.5 flex flex-wrap justify-between items-center gap-4">
+            
             <div class="flex items-center space-x-3">
-                <div class="bg-emerald-600 p-2.5 rounded-xl text-white shadow-lg shadow-emerald-900/30">
-                    <i class="fa-solid fa-seedling text-2xl"></i>
+                <div class="bg-gradient-to-tr from-emerald-600 to-teal-500 p-2.5 rounded-xl text-white shadow-lg shadow-emerald-950">
+                    <i class="fa-solid fa-wheat-awn text-xl"></i>
                 </div>
                 <div>
-                    <h1 class="text-xl font-bold tracking-wide flex items-center gap-2">
-                        SFL Price Tracker
-                        <span class="inline-flex items-center gap-1 text-[10px] bg-emerald-950 text-emerald-400 font-mono px-2 py-0.5 rounded border border-emerald-800">
-                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> LIVE
+                    <h1 class="text-lg font-bold tracking-tight flex items-center gap-2">
+                        SFL Resource Exchange
+                        <span class="inline-flex items-center gap-1.5 text-[10px] bg-emerald-950/80 text-emerald-400 font-mono px-2 py-0.5 rounded-full border border-emerald-800/60">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span> LIVE
                         </span>
                     </h1>
-                    <p class="text-xs text-slate-400" id="lastUpdatedLabel">Fetching market data...</p>
+                    <p class="text-xs text-slate-400 font-medium" id="lastUpdatedLabel">Connecting to market...</p>
                 </div>
             </div>
 
-            <div class="flex items-center gap-3 w-full sm:w-auto">
-                <div class="flex items-center gap-2 bg-slate-950 border border-slate-800 px-3 py-2 rounded-xl text-xs text-slate-400">
+            <!-- Market Selector Tabs -->
+            <div class="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800" id="marketTabs">
+                <button onclick="setMarket('p2p')" id="tab-p2p" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold transition bg-emerald-600 text-white shadow-sm">
+                    Plaza (P2P)
+                </button>
+                <button onclick="setMarket('seq')" id="tab-seq" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-slate-200 transition">
+                    Sequence
+                </button>
+                <button onclick="setMarket('ge')" id="tab-ge" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-slate-200 transition">
+                    Goblin Exchange
+                </button>
+            </div>
+
+            <div class="flex items-center gap-3">
+                <div class="hidden sm:flex items-center gap-2 bg-slate-950 border border-slate-800 px-3 py-1.5 rounded-xl text-xs text-slate-400">
                     <input type="checkbox" id="autoRefreshCheck" checked class="accent-emerald-500 cursor-pointer">
                     <label for="autoRefreshCheck" class="cursor-pointer select-none">Auto-Sync (15s)</label>
                 </div>
-                <button id="refreshBtn" onclick="fetchPrices()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl text-sm font-medium transition flex items-center gap-2 justify-center shadow-md">
+                <button id="refreshBtn" onclick="fetchPrices()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3.5 py-2 rounded-xl text-xs font-semibold transition flex items-center gap-2 border border-slate-700 active:scale-95">
                     <i class="fa-solid fa-rotate" id="refreshIcon"></i> Refresh
                 </button>
             </div>
         </div>
     </header>
 
-    <!-- Main Content -->
-    <main class="max-w-7xl mx-auto px-4 py-8">
-        
-        <!-- Controls Bar -->
-        <div class="bg-slate-900 p-4 rounded-2xl border border-slate-800 mb-6 flex flex-col md:flex-row gap-4 justify-between items-center shadow-sm">
+    <!-- Main Container -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 py-6 flex-1 w-full space-y-6">
+
+        <!-- Spotlight / Featured Item Card -->
+        <div id="spotlightCard" class="bg-gradient-to-r from-slate-900 via-slate-900 to-slate-950 border border-slate-800 rounded-2xl p-6 relative overflow-hidden shadow-xl">
+            <div class="absolute right-0 top-0 translate-x-8 -translate-y-8 text-slate-800/20 text-9xl pointer-events-none">
+                <i class="fa-solid fa-seedling"></i>
+            </div>
+            <div class="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <div>
+                    <span class="text-xs font-mono uppercase tracking-wider text-emerald-400 font-semibold bg-emerald-950/70 border border-emerald-800/40 px-2.5 py-1 rounded-md">
+                        Spotlight Asset
+                    </span>
+                    <h2 class="text-2xl sm:text-3xl font-bold text-white mt-2 flex items-center gap-3" id="spotlightName">
+                        Sunflower
+                    </h2>
+                    <p class="text-xs text-slate-400 mt-1">Calculated floor prices & bulk batch estimates</p>
+                </div>
+
+                <div class="grid grid-cols-3 gap-3 sm:gap-6 bg-slate-950/60 p-4 rounded-xl border border-slate-800/80">
+                    <div>
+                        <span class="text-[11px] text-slate-500 uppercase font-semibold block">Unit Floor</span>
+                        <span class="text-lg sm:text-xl font-bold font-mono text-emerald-400" id="spotlightUnitPrice">-</span>
+                        <span class="text-[10px] text-slate-500">SFL</span>
+                    </div>
+                    <div>
+                        <span class="text-[11px] text-slate-500 uppercase font-semibold block">x100 Stack</span>
+                        <span class="text-lg sm:text-xl font-bold font-mono text-slate-200" id="spotlight100Price">-</span>
+                        <span class="text-[10px] text-slate-500">SFL</span>
+                    </div>
+                    <div>
+                        <span class="text-[11px] text-slate-500 uppercase font-semibold block">x1,000 Stack</span>
+                        <span class="text-lg sm:text-xl font-bold font-mono text-slate-200" id="spotlight1000Price">-</span>
+                        <span class="text-[10px] text-slate-500">SFL</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filter & Search Controls -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col lg:flex-row gap-4 justify-between items-center shadow-sm">
             
-            <!-- Search -->
-            <div class="relative w-full md:w-96">
-                <span class="absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-500">
-                    <i class="fa-solid fa-magnifying-glass"></i>
+            <!-- Search Input with Dropdown / Autocomplete -->
+            <div class="relative w-full lg:w-96">
+                <span class="absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-500 pointer-events-none">
+                    <i class="fa-solid fa-magnifying-glass text-sm"></i>
                 </span>
-                <input type="text" id="searchInput" oninput="filterAndSortData()" placeholder="Search item (e.g. Sunflower, Wood, Obsidian)..." 
+                <input type="text" id="searchInput" oninput="handleSearchInput(this.value)" onfocus="showAutocomplete()" placeholder="Type to search or browse below..." 
                     class="w-full pl-10 pr-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm focus:outline-none focus:border-emerald-500 text-slate-100 placeholder-slate-500 transition">
+                
+                <!-- Autocomplete Dropdown List -->
+                <div id="autocompleteList" class="hidden absolute left-0 right-0 top-full mt-2 bg-slate-900 border border-slate-800 rounded-xl max-h-60 overflow-y-auto z-50 shadow-2xl divide-y divide-slate-800/60">
+                    <!-- Populated dynamically -->
+                </div>
             </div>
 
-            <!-- Market Selector & Sorting -->
-            <div class="flex flex-wrap items-center gap-3 w-full md:w-auto justify-end">
-                <div class="flex items-center gap-2">
-                    <label for="marketType" class="text-xs text-slate-400 uppercase font-semibold">Market:</label>
-                    <select id="marketType" onchange="filterAndSortData()" class="bg-slate-950 border border-slate-800 text-slate-200 text-sm rounded-xl px-3 py-2 focus:outline-none focus:border-emerald-500">
-                        <option value="p2p">Plaza (P2P)</option>
-                        <option value="seq">Sequence (Seq)</option>
-                        <option value="ge">Goblin Exchange (GE)</option>
+            <div class="flex flex-wrap items-center gap-3 w-full lg:w-auto justify-end">
+                
+                <!-- Quick Dropdown Item Selector -->
+                <div class="flex items-center gap-2 w-full sm:w-auto">
+                    <label for="itemDropdown" class="text-xs text-slate-400 uppercase font-semibold whitespace-nowrap">Select Item:</label>
+                    <select id="itemDropdown" onchange="onDropdownSelect(this.value)" class="w-full sm:w-48 bg-slate-950 border border-slate-800 text-slate-200 text-sm rounded-xl px-3 py-2.5 focus:outline-none focus:border-emerald-500">
+                        <option value="">-- All Items --</option>
                     </select>
                 </div>
-                <div class="flex items-center gap-2">
-                    <label for="sortSelect" class="text-xs text-slate-400 uppercase font-semibold">Sort:</label>
-                    <select id="sortSelect" onchange="filterAndSortData()" class="bg-slate-950 border border-slate-800 text-slate-200 text-sm rounded-xl px-3 py-2 focus:outline-none focus:border-emerald-500">
+
+                <!-- Sort Selector -->
+                <div class="flex items-center gap-2 w-full sm:w-auto">
+                    <label for="sortSelect" class="text-xs text-slate-400 uppercase font-semibold whitespace-nowrap">Sort:</label>
+                    <select id="sortSelect" onchange="filterAndSortData()" class="w-full sm:w-44 bg-slate-950 border border-slate-800 text-slate-200 text-sm rounded-xl px-3 py-2.5 focus:outline-none focus:border-emerald-500">
                         <option value="name-asc">Name (A - Z)</option>
                         <option value="name-desc">Name (Z - A)</option>
                         <option value="price-desc">Price (High to Low)</option>
                         <option value="price-asc">Price (Low to High)</option>
                     </select>
                 </div>
-            </div>
-        </div>
 
-        <!-- Quick Stats Banner -->
-        <div id="statsBanner" class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6 hidden">
-            <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl text-center">
-                <span class="text-xs text-slate-500 uppercase font-semibold">Tracked Items</span>
-                <p id="totalItemsCount" class="text-xl font-bold text-slate-200 mt-1">0</p>
-            </div>
-            <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl text-center">
-                <span class="text-xs text-slate-500 uppercase font-semibold">Most Expensive</span>
-                <p id="highestItem" class="text-sm font-bold text-emerald-400 truncate mt-1">-</p>
-            </div>
-            <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl text-center">
-                <span class="text-xs text-slate-500 uppercase font-semibold">Cheapest Crop</span>
-                <p id="lowestItem" class="text-sm font-bold text-emerald-400 truncate mt-1">-</p>
-            </div>
-            <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl text-center">
-                <span class="text-xs text-slate-500 uppercase font-semibold">Status</span>
-                <p class="text-sm font-bold text-emerald-400 mt-1">Connected</p>
             </div>
         </div>
 
         <!-- Loading State -->
         <div id="loadingState" class="flex flex-col items-center justify-center py-24">
             <i class="fa-solid fa-circle-notch fa-spin text-4xl text-emerald-500 mb-4"></i>
-            <p class="text-slate-400 text-sm">Extracting live prices from sfl.world...</p>
+            <p class="text-slate-400 text-sm font-medium">Extracting live prices from sfl.world...</p>
         </div>
 
         <!-- Error State -->
@@ -118,13 +162,30 @@
     </main>
 
     <!-- Footer -->
-    <footer class="border-t border-slate-900 text-center py-6 text-xs text-slate-500">
-        <p>Market floor data from <a href="https://sfl.world" target="_blank" class="text-emerald-400 hover:underline">sfl.world</a></p>
+    <footer class="border-t border-slate-900 bg-slate-950/80 text-center py-6 text-xs text-slate-500">
+        <p>Market data synced live from <a href="https://sfl.world" target="_blank" class="text-emerald-400 hover:underline">sfl.world</a></p>
     </footer>
 
     <script>
+        let currentMarket = 'p2p';
         let fullMarketData = { p2p: [], seq: [], ge: [] };
         let autoRefreshTimer = null;
+        let selectedSpotlight = "Sunflower";
+
+        function setMarket(market) {
+            currentMarket = market;
+            ['p2p', 'seq', 'ge'].forEach(m => {
+                const btn = document.getElementById(`tab-${m}`);
+                if (m === market) {
+                    btn.className = "px-3.5 py-1.5 rounded-lg text-xs font-semibold transition bg-emerald-600 text-white shadow-sm";
+                } else {
+                    btn.className = "px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-slate-200 transition";
+                }
+            });
+            populateItemDropdown();
+            filterAndSortData();
+            updateSpotlight();
+        }
 
         async function fetchPrices() {
             const loadingState = document.getElementById('loadingState');
@@ -132,7 +193,6 @@
             const priceGrid = document.getElementById('priceGrid');
             const refreshIcon = document.getElementById('refreshIcon');
             const lastUpdatedLabel = document.getElementById('lastUpdatedLabel');
-            const statsBanner = document.getElementById('statsBanner');
 
             if (fullMarketData.p2p.length === 0) {
                 loadingState.classList.remove('hidden');
@@ -155,9 +215,7 @@
                         result = await res.json();
                         break;
                     }
-                } catch (e) {
-                    // Try next fallback
-                }
+                } catch (e) {}
             }
 
             refreshIcon.classList.remove('fa-spin');
@@ -166,20 +224,16 @@
                 if (fullMarketData.p2p.length === 0) {
                     loadingState.classList.add('hidden');
                     errorState.classList.remove('hidden');
-                    document.getElementById('errorMessage').innerText = "Unable to reach SFL API. Check your proxy route.";
+                    document.getElementById('errorMessage').innerText = "Unable to reach SFL API. Ensure your backend proxy is active.";
                 }
                 return;
             }
 
             try {
-                // Update timestamp
                 const timeText = result.updated_text || (result.updatedAt ? new Date(result.updatedAt).toLocaleTimeString() : 'Just now');
-                lastUpdatedLabel.innerText = `Last SFL Sync: ${timeText}`;
+                lastUpdatedLabel.innerText = `Last sync: ${timeText}`;
 
-                // Parse nested data { p2p: {...}, seq: {...}, ge: {...} }
-                const markets = ['p2p', 'seq', 'ge'];
-                
-                markets.forEach(m => {
+                ['p2p', 'seq', 'ge'].forEach(m => {
                     const marketObj = result.data[m] || {};
                     fullMarketData[m] = Object.entries(marketObj).map(([name, price]) => ({
                         name: name,
@@ -187,44 +241,112 @@
                     }));
                 });
 
-                updateQuickStats();
+                populateItemDropdown();
                 filterAndSortData();
+                updateSpotlight();
 
                 loadingState.classList.add('hidden');
                 priceGrid.classList.remove('hidden');
-                statsBanner.classList.remove('hidden');
             } catch (err) {
                 console.error("Format parsing error:", err);
             }
         }
 
-        function updateQuickStats() {
-            const items = fullMarketData.p2p;
-            if (!items.length) return;
+        function populateItemDropdown() {
+            const dropdown = document.getElementById('itemDropdown');
+            const currentItems = fullMarketData[currentMarket] || [];
+            
+            // Preserve current selection if possible
+            const previousVal = dropdown.value;
+            dropdown.innerHTML = '<option value="">-- All Items --</option>';
 
-            document.getElementById('totalItemsCount').innerText = items.length;
+            const sorted = [...currentItems].sort((a,b) => a.name.localeCompare(b.name));
+            sorted.forEach(item => {
+                const opt = document.createElement('option');
+                opt.value = item.name;
+                opt.textContent = `${item.name} (${formatDisplayPrice(item.price)} SFL)`;
+                if (item.name === previousVal) opt.selected = true;
+                dropdown.appendChild(opt);
+            });
+        }
 
-            const sortedByPrice = [...items].sort((a, b) => b.price - a.price);
-            const highest = sortedByPrice[0];
-            const lowest = sortedByPrice[sortedByPrice.length - 1];
+        function handleSearchInput(query) {
+            filterAndSortData();
+            showAutocomplete(query);
+        }
 
-            document.getElementById('highestItem').innerText = `${highest.name} (${highest.price} SFL)`;
-            document.getElementById('lowestItem').innerText = `${lowest.name} (${lowest.price} SFL)`;
+        function showAutocomplete(query = document.getElementById('searchInput').value) {
+            const list = document.getElementById('autocompleteList');
+            const items = fullMarketData[currentMarket] || [];
+            const filtered = items.filter(i => i.name.toLowerCase().includes(query.toLowerCase()));
+
+            if (!query || filtered.length === 0) {
+                list.classList.add('hidden');
+                return;
+            }
+
+            list.innerHTML = '';
+            filtered.slice(0, 8).forEach(item => {
+                const div = document.createElement('div');
+                div.className = "px-4 py-2.5 text-xs text-slate-200 hover:bg-slate-800 cursor-pointer flex justify-between items-center transition";
+                div.innerHTML = `
+                    <span class="font-medium">${item.name}</span>
+                    <span class="font-mono text-emerald-400 font-semibold">${formatDisplayPrice(item.price)} SFL</span>
+                `;
+                div.onclick = () => {
+                    document.getElementById('searchInput').value = item.name;
+                    selectSpotlightItem(item.name);
+                    list.classList.add('hidden');
+                    filterAndSortData();
+                };
+                list.appendChild(div);
+            });
+
+            list.classList.remove('hidden');
+        }
+
+        // Close autocomplete when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('#searchInput') && !e.target.closest('#autocompleteList')) {
+                document.getElementById('autocompleteList').classList.add('hidden');
+            }
+        });
+
+        function onDropdownSelect(itemName) {
+            document.getElementById('searchInput').value = itemName;
+            if (itemName) {
+                selectSpotlightItem(itemName);
+            }
+            filterAndSortData();
+        }
+
+        function selectSpotlightItem(name) {
+            selectedSpotlight = name;
+            updateSpotlight();
+        }
+
+        function updateSpotlight() {
+            const items = fullMarketData[currentMarket] || [];
+            const item = items.find(i => i.name.toLowerCase() === selectedSpotlight.toLowerCase()) || items[0];
+            
+            if (!item) return;
+
+            document.getElementById('spotlightName').innerText = item.name;
+            document.getElementById('spotlightUnitPrice').innerText = formatDisplayPrice(item.price);
+            document.getElementById('spotlight100Price').innerText = formatDisplayPrice(item.price * 100);
+            document.getElementById('spotlight1000Price').innerText = formatDisplayPrice(item.price * 1000);
         }
 
         function filterAndSortData() {
             const searchKeyword = document.getElementById('searchInput').value.toLowerCase();
             const sortOption = document.getElementById('sortSelect').value;
-            const marketType = document.getElementById('marketType').value;
-
-            const items = fullMarketData[marketType] || [];
+            const items = fullMarketData[currentMarket] || [];
 
             let filtered = items.filter(item => item.name.toLowerCase().includes(searchKeyword));
 
             filtered.sort((a, b) => {
                 const nameA = a.name.toLowerCase();
                 const nameB = b.name.toLowerCase();
-
                 if (sortOption === 'name-asc') return nameA.localeCompare(nameB);
                 if (sortOption === 'name-desc') return nameB.localeCompare(nameA);
                 if (sortOption === 'price-desc') return b.price - a.price;
@@ -232,7 +354,7 @@
                 return 0;
             });
 
-            renderGrid(filtered, marketType);
+            renderGrid(filtered);
         }
 
         function formatDisplayPrice(price) {
@@ -242,15 +364,15 @@
             return price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 });
         }
 
-        function renderGrid(data, marketType) {
+        function renderGrid(data) {
             const priceGrid = document.getElementById('priceGrid');
             priceGrid.innerHTML = '';
 
             if (data.length === 0) {
                 priceGrid.innerHTML = `
-                    <div class="col-span-full text-center py-16 text-slate-500">
+                    <div class="col-span-full text-center py-16 text-slate-500 bg-slate-900 border border-slate-800 rounded-2xl">
                         <i class="fa-solid fa-box-open text-3xl mb-2"></i>
-                        <p class="text-sm">No items found in <strong>${marketType.toUpperCase()}</strong> market matching your search.</p>
+                        <p class="text-sm">No items found in <strong>${currentMarket.toUpperCase()}</strong> matching your criteria.</p>
                     </div>
                 `;
                 return;
@@ -258,20 +380,21 @@
 
             data.forEach(item => {
                 const card = document.createElement('div');
-                card.className = "bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col justify-between hover:border-emerald-500/40 transition shadow-sm hover:scale-[1.01]";
-                
+                card.className = "bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col justify-between hover:border-emerald-500/40 transition shadow-sm hover:scale-[1.01] cursor-pointer group";
+                card.onclick = () => selectSpotlightItem(item.name);
+
                 card.innerHTML = `
                     <div>
                         <div class="flex justify-between items-start gap-2 mb-3">
-                            <h3 class="font-semibold text-slate-100 text-sm truncate" title="${item.name}">${item.name}</h3>
-                            <span class="bg-emerald-950 text-emerald-400 text-[10px] font-medium px-2 py-0.5 rounded border border-emerald-800/50 uppercase">
-                                ${marketType}
+                            <h3 class="font-semibold text-slate-100 text-sm truncate group-hover:text-emerald-400 transition" title="${item.name}">${item.name}</h3>
+                            <span class="bg-emerald-950/80 text-emerald-400 text-[10px] font-mono px-2 py-0.5 rounded border border-emerald-800/40 uppercase">
+                                ${currentMarket}
                             </span>
                         </div>
                     </div>
                     <div class="pt-3 border-t border-slate-800">
                         <div class="flex items-baseline justify-between">
-                            <span class="text-[11px] text-slate-500 uppercase font-semibold">Floor Price</span>
+                            <span class="text-[11px] text-slate-500 uppercase font-semibold">Floor</span>
                             <div class="text-right">
                                 <span class="text-lg font-bold font-mono ${item.price > 0 ? 'text-emerald-400' : 'text-slate-600'}">
                                     ${formatDisplayPrice(item.price)}
@@ -285,7 +408,6 @@
             });
         }
 
-        // Live Auto-Refresh every 15s
         function setupAutoRefresh() {
             const check = document.getElementById('autoRefreshCheck');
             if (autoRefreshTimer) clearInterval(autoRefreshTimer);
@@ -296,9 +418,7 @@
                 }, 15000);
             }
 
-            check.addEventListener('change', () => {
-                setupAutoRefresh();
-            });
+            check.addEventListener('change', setupAutoRefresh);
         }
 
         document.addEventListener('DOMContentLoaded', () => {
