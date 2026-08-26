@@ -9,22 +9,25 @@
     <!-- FontAwesome for Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
-<body class="bg-slate-900 text-slate-100 min-h-screen font-sans">
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans">
 
     <!-- Header -->
-    <header class="bg-slate-800 border-b border-slate-700 sticky top-0 z-50 shadow-md">
+    <header class="bg-slate-900 border-b border-slate-800 sticky top-0 z-50 shadow-md">
         <div class="max-w-7xl mx-auto px-4 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
             <div class="flex items-center space-x-3">
-                <div class="bg-emerald-600 p-2 rounded-lg text-white">
+                <div class="bg-emerald-600 p-2.5 rounded-xl text-white shadow-lg shadow-emerald-900/30">
                     <i class="fa-solid fa-seedling text-2xl"></i>
                 </div>
                 <div>
-                    <h1 class="text-xl font-bold tracking-wide">SFL Resource Tracker</h1>
-                    <p class="text-xs text-slate-400">Real-time market tracking from sfl.world</p>
+                    <h1 class="text-xl font-bold tracking-wide flex items-center gap-2">
+                        SFL Resource Tracker
+                        <span id="updateBadge" class="hidden text-[10px] bg-slate-800 text-slate-400 font-mono px-2 py-0.5 rounded border border-slate-700"></span>
+                    </h1>
+                    <p class="text-xs text-slate-400">Live market floor prices & tracking</p>
                 </div>
             </div>
             <div class="flex items-center gap-3 w-full sm:w-auto">
-                <button id="refreshBtn" onclick="fetchPrices()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2 w-full sm:w-auto justify-center">
+                <button id="refreshBtn" onclick="fetchPrices()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl text-sm font-medium transition flex items-center gap-2 w-full sm:w-auto justify-center shadow-md">
                     <i class="fa-solid fa-rotate" id="refreshIcon"></i> Refresh Data
                 </button>
             </div>
@@ -35,22 +38,29 @@
     <main class="max-w-7xl mx-auto px-4 py-8">
         
         <!-- Controls Bar -->
-        <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 mb-6 flex flex-col md:flex-row gap-4 justify-between items-center">
+        <div class="bg-slate-900 p-4 rounded-2xl border border-slate-800 mb-6 flex flex-col md:flex-row gap-4 justify-between items-center shadow-sm">
             
             <!-- Search Box -->
             <div class="relative w-full md:w-96">
-                <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                <span class="absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-500">
                     <i class="fa-solid fa-magnifying-glass"></i>
                 </span>
-                <input type="text" id="searchInput" oninput="filterAndSortData()" placeholder="Search resources (e.g., Sunflower, Wood)..." 
-                    class="w-full pl-10 pr-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm focus:outline-none focus:border-emerald-500 text-slate-100 placeholder-slate-500">
+                <input type="text" id="searchInput" oninput="filterAndSortData()" placeholder="Search resources (e.g. Sunflower, Wood, Iron)..." 
+                    class="w-full pl-10 pr-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm focus:outline-none focus:border-emerald-500 text-slate-100 placeholder-slate-500 transition">
             </div>
 
             <!-- Filters & Sorting -->
             <div class="flex flex-wrap items-center gap-3 w-full md:w-auto justify-end">
                 <div class="flex items-center gap-2">
-                    <label for="sortSelect" class="text-xs text-slate-400 uppercase font-semibold">Sort By:</label>
-                    <select id="sortSelect" onchange="filterAndSortData()" class="bg-slate-900 border border-slate-700 text-slate-200 text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-emerald-500">
+                    <label for="marketType" class="text-xs text-slate-400 uppercase font-semibold">Market:</label>
+                    <select id="marketType" onchange="filterAndSortData()" class="bg-slate-950 border border-slate-800 text-slate-200 text-sm rounded-xl px-3 py-2 focus:outline-none focus:border-emerald-500">
+                        <option value="p2p">Plaza (P2P)</option>
+                        <option value="seq">Sequence (Seq)</option>
+                    </select>
+                </div>
+                <div class="flex items-center gap-2">
+                    <label for="sortSelect" class="text-xs text-slate-400 uppercase font-semibold">Sort:</label>
+                    <select id="sortSelect" onchange="filterAndSortData()" class="bg-slate-950 border border-slate-800 text-slate-200 text-sm rounded-xl px-3 py-2 focus:outline-none focus:border-emerald-500">
                         <option value="name-asc">Name (A - Z)</option>
                         <option value="name-desc">Name (Z - A)</option>
                         <option value="price-desc">Price (High to Low)</option>
@@ -61,16 +71,16 @@
         </div>
 
         <!-- Status / Loading Indicator -->
-        <div id="loadingState" class="flex flex-col items-center justify-center py-20">
+        <div id="loadingState" class="flex flex-col items-center justify-center py-24">
             <i class="fa-solid fa-circle-notch fa-spin text-4xl text-emerald-500 mb-4"></i>
-            <p class="text-slate-400 text-sm">Fetching latest resource prices...</p>
+            <p class="text-slate-400 text-sm">Fetching live market data...</p>
         </div>
 
         <!-- Error State -->
-        <div id="errorState" class="hidden bg-red-900/50 border border-red-700 text-red-200 p-4 rounded-xl text-center my-8">
-            <i class="fa-solid fa-triangle-exclamation text-2xl mb-2"></i>
+        <div id="errorState" class="hidden bg-rose-950/40 border border-rose-800/80 text-rose-200 p-5 rounded-2xl text-center my-8">
+            <i class="fa-solid fa-triangle-exclamation text-2xl mb-2 text-rose-400"></i>
             <p id="errorMessage" class="font-medium">Failed to fetch pricing data.</p>
-            <p class="text-xs text-red-300 mt-1">Note: If this is a CORS issue, ensure your browser permits cross-origin requests or run via a local server extension.</p>
+            <p class="text-xs text-rose-300/80 mt-1">Check network connection or ensure your backend proxy endpoint is active.</p>
         </div>
 
         <!-- Prices Grid Container -->
@@ -81,13 +91,12 @@
     </main>
 
     <!-- Footer -->
-    <footer class="border-t border-slate-800 text-center py-6 text-xs text-slate-500">
-        <p>Data provided by <a href="https://sfl.world" target="_blank" class="text-emerald-400 hover:underline">sfl.world</a> API.</p>
-    "></footer>
+    <footer class="border-t border-slate-900 text-center py-6 text-xs text-slate-500">
+        <p>Market data synced from <a href="https://sfl.world" target="_blank" class="text-emerald-400 hover:underline font-medium">sfl.world</a></p>
+    </footer>
 
     <!-- Application Script -->
     <script>
-        const API_URL = 'https://sfl.world/api/v1/prices';
         let rawData = [];
 
         async function fetchPrices() {
@@ -95,27 +104,67 @@
             const errorState = document.getElementById('errorState');
             const priceGrid = document.getElementById('priceGrid');
             const refreshIcon = document.getElementById('refreshIcon');
+            const updateBadge = document.getElementById('updateBadge');
 
             loadingState.classList.remove('hidden');
             errorState.classList.add('hidden');
             priceGrid.classList.add('hidden');
             refreshIcon.classList.add('fa-spin');
 
+            // 1. Try local serverless proxy route first, fallback to CORS proxy for browser/local testing
+            const endpoints = [
+                '/api/prices',
+                'https://api.allorigins.win/raw?url=' + encodeURIComponent('https://sfl.world/api/v1/prices'),
+                'https://sfl.world/api/v1/prices'
+            ];
+
+            let result = null;
+            let success = false;
+
+            for (const url of endpoints) {
+                try {
+                    const res = await fetch(url);
+                    if (res.ok) {
+                        result = await res.json();
+                        success = true;
+                        break;
+                    }
+                } catch (e) {
+                    // Try next endpoint
+                }
+            }
+
+            refreshIcon.classList.remove('fa-spin');
+
+            if (!success || !result) {
+                loadingState.classList.add('hidden');
+                errorState.classList.remove('hidden');
+                document.getElementById('errorMessage').innerText = "Unable to reach SFL Pricing API. Please check your proxy route.";
+                return;
+            }
+
             try {
-                const response = await fetch(API_URL);
-                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-                
-                const result = await response.json();
-                
-                // Handle various JSON object structures (adjust if API format changes)
-                // If it returns an array or an object map, normalize it:
+                // Show update time if provided by API
+                if (result.updatedAt) {
+                    updateBadge.innerText = `Updated: ${new Date(result.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+                    updateBadge.classList.remove('hidden');
+                }
+
+                // Parse standard sfl.world dictionary: { "Sunflower": { p2p: 0.0002, seq: 0.0002 }, ... }
                 if (Array.isArray(result)) {
                     rawData = result;
                 } else if (typeof result === 'object' && result !== null) {
-                    rawData = Object.keys(result).map(key => ({
-                        name: key,
-                        ...(typeof result[key] === 'object' ? result[key] : { price: result[key] })
-                    }));
+                    rawData = Object.keys(result)
+                        .filter(key => key !== 'updatedAt')
+                        .map(key => {
+                            const val = result[key];
+                            return {
+                                name: key,
+                                p2p: typeof val === 'object' ? (val.p2p ?? val.price ?? 0) : val,
+                                seq: typeof val === 'object' ? (val.seq ?? 0) : 0,
+                                raw: val
+                            };
+                        });
                 }
 
                 filterAndSortData();
@@ -125,28 +174,27 @@
                 console.error(err);
                 loadingState.classList.add('hidden');
                 errorState.classList.remove('hidden');
-                document.getElementById('errorMessage').innerText = `Error: ${err.message}. (CORS restrictions may apply when testing locally without a proxy).`;
-            } finally {
-                refreshIcon.classList.remove('fa-spin');
+                document.getElementById('errorMessage').innerText = `Data formatting error: ${err.message}`;
             }
         }
 
         function filterAndSortData() {
             const searchKeyword = document.getElementById('searchInput').value.toLowerCase();
             const sortOption = document.getElementById('sortSelect').value;
+            const marketType = document.getElementById('marketType').value;
 
             // 1. Filter
             let processedData = rawData.filter(item => {
-                const itemName = item.name || item.resource || '';
+                const itemName = item.name || '';
                 return itemName.toLowerCase().includes(searchKeyword);
             });
 
             // 2. Sort
             processedData.sort((a, b) => {
-                const nameA = (a.name || a.resource || '').toLowerCase();
-                const nameB = (b.name || b.resource || '').toLowerCase();
-                const priceA = parseFloat(a.price || a.sfl || a.value || 0);
-                const priceB = parseFloat(b.price || b.sfl || b.value || 0);
+                const nameA = (a.name || '').toLowerCase();
+                const nameB = (b.name || '').toLowerCase();
+                const priceA = parseFloat(a[marketType] ?? a.price ?? 0);
+                const priceB = parseFloat(b[marketType] ?? b.price ?? 0);
 
                 if (sortOption === 'name-asc') return nameA.localeCompare(nameB);
                 if (sortOption === 'name-desc') return nameB.localeCompare(nameA);
@@ -155,48 +203,63 @@
                 return 0;
             });
 
-            renderGrid(processedData);
+            renderGrid(processedData, marketType);
         }
 
-        function renderGrid(data) {
+        function renderGrid(data, marketType) {
             const priceGrid = document.getElementById('priceGrid');
             priceGrid.innerHTML = '';
 
             if (data.length === 0) {
                 priceGrid.innerHTML = `
-                    <div class="col-span-full text-center py-12 text-slate-500">
+                    <div class="col-span-full text-center py-16 text-slate-500">
                         <i class="fa-solid fa-box-open text-3xl mb-2"></i>
-                        <p>No resources found matching your search.</p>
+                        <p class="text-sm">No resources found matching your search.</p>
                     </div>
                 `;
                 return;
             }
 
             data.forEach(item => {
-                const name = item.name || item.resource || 'Unknown Resource';
-                const price = item.price !== undefined ? item.price : (item.sfl !== undefined ? item.sfl : 0);
-                
-                // Construct card element
+                const name = item.name || 'Unknown Item';
+                const mainPrice = item[marketType] !== undefined ? item[marketType] : (item.price ?? 0);
+                const secondaryPrice = marketType === 'p2p' ? item.seq : item.p2p;
+                const secondaryLabel = marketType === 'p2p' ? 'Seq' : 'P2P';
+
                 const card = document.createElement('div');
-                card.className = "bg-slate-800 border border-slate-700/60 rounded-xl p-4 flex flex-col justify-between hover:border-emerald-500/50 transition shadow-sm hover:shadow-emerald-500/5";
+                card.className = "bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col justify-between hover:border-emerald-500/40 transition shadow-sm hover:shadow-emerald-900/10";
                 
                 card.innerHTML = `
                     <div>
-                        <div class="flex justify-between items-start gap-2 mb-2">
-                            <h3 class="font-semibold text-slate-200 tracking-wide text-base truncate" title="${name}">${name}</h3>
-                            <span class="bg-emerald-950 text-emerald-400 text-xs px-2 py-0.5 rounded border border-emerald-800/50 whitespace-nowrap">SFL</span>
+                        <div class="flex justify-between items-start gap-2 mb-3">
+                            <h3 class="font-semibold text-slate-100 tracking-wide text-sm truncate" title="${name}">${name}</h3>
+                            <span class="bg-emerald-950/80 text-emerald-400 text-[11px] font-medium px-2 py-0.5 rounded-lg border border-emerald-800/40 uppercase">
+                                ${marketType}
+                            </span>
                         </div>
                     </div>
-                    <div class="mt-4 pt-3 border-t border-slate-700/40 flex items-baseline justify-between">
-                        <span class="text-xs text-slate-400 uppercase font-medium">Price</span>
-                        <span class="text-lg font-bold text-emerald-400">${Number(price).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 4})}</span>
+                    <div class="pt-3 border-t border-slate-800/80">
+                        <div class="flex items-baseline justify-between">
+                            <span class="text-[11px] text-slate-500 uppercase font-semibold">Price</span>
+                            <div class="text-right">
+                                <span class="text-lg font-bold font-mono text-emerald-400">
+                                    ${Number(mainPrice).toFixed(4)}
+                                </span>
+                                <span class="text-[11px] text-slate-400 ml-0.5">SFL</span>
+                            </div>
+                        </div>
+                        ${secondaryPrice ? `
+                        <div class="flex items-center justify-between text-[11px] text-slate-400 mt-1.5 pt-1.5 border-t border-slate-800/40">
+                            <span>${secondaryLabel} Floor:</span>
+                            <span class="font-mono text-slate-300">${Number(secondaryPrice).toFixed(4)} SFL</span>
+                        </div>` : ''}
                     </div>
                 `;
                 priceGrid.appendChild(card);
             });
         }
 
-        // Initial Load on page startup
+        // Run on start
         document.addEventListener('DOMContentLoaded', fetchPrices);
     </script>
 </body>
