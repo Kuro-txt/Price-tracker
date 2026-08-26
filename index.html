@@ -6,9 +6,11 @@
     <title>Sunflower Land - Resource Price Tracker</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js for Historical Graph -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- FontAwesome for Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Google Font: Plus Jakarta Sans for a friendly, modern look -->
+    <!-- Google Font: Plus Jakarta Sans -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -28,7 +30,7 @@
             
             <div class="flex items-center space-x-3">
                 <div class="bg-amber-400 text-stone-900 p-2.5 rounded-2xl shadow-md shadow-amber-200 flex items-center justify-center">
-                    <i class="fa-solid fa-sun text-2xl animate-spin-slow"></i>
+                    <i class="fa-solid fa-sun text-2xl"></i>
                 </div>
                 <div>
                     <h1 class="text-xl font-extrabold text-stone-900 tracking-tight flex items-center gap-2">
@@ -117,7 +119,7 @@
             </div>
             <h3 class="text-lg font-bold text-stone-800">No Item Selected</h3>
             <p class="text-stone-500 text-sm max-w-sm mx-auto">
-                Pick a crop or resource using the search box or dropdown above to view its live market floor price and stack calculations.
+                Pick a crop or resource using the search box or dropdown above to view its live market floor price and cloud price graph.
             </p>
         </div>
 
@@ -129,7 +131,7 @@
                 <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                     <div>
                         <div class="inline-flex items-center gap-2 bg-amber-100 text-amber-900 text-xs font-bold px-3 py-1 rounded-full border border-amber-200 mb-3">
-                            <i class="fa-solid fa-tag text-[10px]"></i> Plaza Market Item
+                            <i class="fa-solid fa-tag text-[10px]"></i> Plaza Market Asset
                         </div>
                         <h2 id="selectedItemName" class="text-3xl sm:text-4xl font-extrabold text-stone-900 tracking-tight">
                             -
@@ -139,7 +141,7 @@
 
                     <!-- Main Floor Badge -->
                     <div class="bg-amber-500 text-stone-950 p-5 rounded-2xl shadow-lg shadow-amber-500/20 text-right min-w-[180px] w-full md:w-auto">
-                        <span class="text-xs font-bold uppercase tracking-wider block opacity-90">Unit Floor</span>
+                        <span class="text-xs font-bold uppercase tracking-wider block opacity-90">Current Floor</span>
                         <div class="text-3xl font-extrabold font-mono tracking-tight mt-1" id="selectedItemPrice">
                             0.00
                         </div>
@@ -147,8 +149,28 @@
                     </div>
                 </div>
 
+                <!-- Price Trend Graph Section -->
+                <div class="mt-8 pt-6 border-t border-stone-200/80">
+                    <div class="flex justify-between items-center mb-4">
+                        <div>
+                            <h4 class="text-xs font-bold text-stone-700 uppercase tracking-wider flex items-center gap-2">
+                                <i class="fa-solid fa-chart-line text-amber-500"></i> Price History (Cloud Records)
+                            </h4>
+                            <p class="text-[11px] text-stone-400 mt-0.5" id="graphDataCount">Loading timeline...</p>
+                        </div>
+                    </div>
+
+                    <div class="bg-white border border-stone-200 rounded-2xl p-4 sm:p-5 relative min-h-[260px] flex items-center justify-center">
+                        <div id="chartSpinner" class="hidden absolute inset-0 bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center z-10 rounded-2xl">
+                            <i class="fa-solid fa-circle-notch fa-spin text-2xl text-amber-500 mb-2"></i>
+                            <span class="text-xs text-stone-500 font-medium">Fetching history from Turso...</span>
+                        </div>
+                        <canvas id="priceHistoryChart" class="w-full h-64 max-h-64"></canvas>
+                    </div>
+                </div>
+
                 <!-- Stacks Breakdown -->
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-8 pt-6 border-t border-stone-100">
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6">
                     <div class="bg-stone-50/80 border border-stone-200/70 p-4 rounded-2xl">
                         <span class="text-xs font-bold text-stone-500 uppercase tracking-wider block">x10 Stack</span>
                         <span class="text-xl font-bold font-mono text-stone-800 mt-1 block" id="stack10Price">-</span>
@@ -166,7 +188,7 @@
                     </div>
                 </div>
 
-                <!-- Interactive Quantity Calculator -->
+                <!-- Calculator -->
                 <div class="mt-6 bg-white border border-stone-200 p-5 rounded-2xl">
                     <h4 class="text-xs font-bold text-stone-600 uppercase tracking-wider mb-3 flex items-center gap-2">
                         <i class="fa-solid fa-calculator text-amber-500"></i> Quick Total Calculator
@@ -201,6 +223,7 @@
         let rawItems = [];
         let autoRefreshTimer = null;
         let activeItem = null;
+        let chartInstance = null;
 
         async function fetchPrices() {
             const loadingState = document.getElementById('loadingState');
@@ -248,7 +271,6 @@
                 const timeText = result.updated_text || (result.updatedAt ? new Date(result.updatedAt).toLocaleTimeString() : 'Just now');
                 lastUpdatedLabel.innerText = `Last sync: ${timeText}`;
 
-                // Extract P2P items
                 const p2pData = result.data.p2p || result.data || {};
                 rawItems = Object.entries(p2pData).map(([name, price]) => ({
                     name: name,
@@ -330,17 +352,17 @@
             }
         }
 
-        function selectItem(name) {
+        async function selectItem(name) {
             const item = rawItems.find(i => i.name.toLowerCase() === name.toLowerCase());
             if (!item) return;
 
             activeItem = item;
 
-            // Sync inputs
+            // Sync input bars
             document.getElementById('searchInput').value = item.name;
             document.getElementById('itemDropdown').value = item.name;
 
-            // Update UI elements
+            // Update stats
             document.getElementById('selectedItemName').innerText = item.name;
             document.getElementById('selectedItemPrice').innerText = formatDisplayPrice(item.price);
             document.getElementById('stack10Price').innerText = formatDisplayPrice(item.price * 10);
@@ -349,9 +371,115 @@
 
             calculateCustomStack();
 
-            // Reveal item details & hide empty state
+            // Reveal container
             document.getElementById('emptyState').classList.add('hidden');
             document.getElementById('itemDetailsContainer').classList.remove('hidden');
+
+            // Load Historical Graph from Cloud (Turso)
+            await loadItemHistoryGraph(item.name);
+        }
+
+        async function loadItemHistoryGraph(itemName) {
+            const spinner = document.getElementById('chartSpinner');
+            const countLabel = document.getElementById('graphDataCount');
+            spinner.classList.remove('hidden');
+
+            let historyData = [];
+            try {
+                const res = await fetch(`/api/history?item=${encodeURIComponent(itemName)}&limit=60`);
+                if (res.ok) {
+                    historyData = await res.json();
+                }
+            } catch (err) {
+                console.error("Failed to load history:", err);
+            } finally {
+                spinner.classList.add('hidden');
+            }
+
+            // Fallback: If no DB entries exist yet, plot current price
+            if (!historyData || historyData.length === 0) {
+                historyData = [{
+                    price: activeItem.price,
+                    recorded_at: new Date().toISOString()
+                }];
+                countLabel.innerText = "1 data point recorded (First snapshot)";
+            } else {
+                countLabel.innerText = `Showing last ${historyData.length} recorded snapshots`;
+            }
+
+            renderChart(historyData);
+        }
+
+        function renderChart(historyData) {
+            const ctx = document.getElementById('priceHistoryChart').getContext('2d');
+
+            const labels = historyData.map(h => {
+                const d = new Date(h.recorded_at);
+                return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            });
+
+            const prices = historyData.map(h => parseFloat(h.price));
+
+            if (chartInstance) {
+                chartInstance.destroy();
+            }
+
+            // Friendly Gradient Fill
+            const gradient = ctx.createLinearGradient(0, 0, 0, 240);
+            gradient.addColorStop(0, 'rgba(245, 158, 11, 0.25)'); // amber-500
+            gradient.addColorStop(1, 'rgba(245, 158, 11, 0.0)');
+
+            chartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Price (SFL)',
+                        data: prices,
+                        borderColor: '#f59e0b',
+                        borderWidth: 2.5,
+                        backgroundColor: gradient,
+                        fill: true,
+                        tension: 0.35,
+                        pointBackgroundColor: '#ffffff',
+                        pointBorderColor: '#f59e0b',
+                        pointBorderWidth: 2,
+                        pointRadius: historyData.length > 30 ? 2 : 4,
+                        pointHoverRadius: 6,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: '#292524',
+                            titleColor: '#fafaf9',
+                            bodyColor: '#f59e0b',
+                            padding: 10,
+                            displayColors: false,
+                            callbacks: {
+                                label: (ctx) => ` Price: ${formatDisplayPrice(ctx.parsed.y)} SFL`
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { color: '#f5f5f4' },
+                            ticks: { font: { family: 'Plus Jakarta Sans', size: 10 }, color: '#a8a29e' }
+                        },
+                        y: {
+                            grid: { color: '#f5f5f4' },
+                            ticks: { 
+                                font: { family: 'Plus Jakarta Sans', size: 10 }, 
+                                color: '#a8a29e',
+                                callback: (val) => formatDisplayPrice(val)
+                            }
+                        }
+                    }
+                }
+            });
         }
 
         function calculateCustomStack() {
