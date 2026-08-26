@@ -55,9 +55,33 @@ function updateActiveSeasonBadge() {
     badge.innerHTML = `<span>${currentSeason.icon}</span> <span>${currentSeason.name} (Day ${currentSeason.day}/7)</span>`;
 }
 
+// Update Price Change Delta Badge (First point vs Current Last point)
+function updatePriceChangeBadge(firstPrice, lastPrice) {
+    const badge = document.getElementById('priceChangeBadge');
+    if (!badge) return;
+
+    const diff = lastPrice - firstPrice;
+    const percent = firstPrice > 0 ? (diff / firstPrice) * 100 : 0;
+
+    const formattedDiff = Math.abs(diff) < 0.001 
+        ? diff.toFixed(6).replace(/\.?0+$/, "") 
+        : diff.toFixed(4).replace(/\.?0+$/, "");
+
+    if (diff > 0.000001) {
+        badge.className = "inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/60";
+        badge.innerHTML = `<i class="fa-solid fa-arrow-trend-up text-[9px]"></i> +${percent.toFixed(2)}% (+${formattedDiff} SFL)`;
+    } else if (diff < -0.000001) {
+        badge.className = "inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border bg-rose-100 dark:bg-rose-950/80 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-800/60";
+        badge.innerHTML = `<i class="fa-solid fa-arrow-trend-down text-[9px]"></i> ${percent.toFixed(2)}% (${formattedDiff} SFL)`;
+    } else {
+        badge.className = "inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border bg-stone-100 dark:bg-slate-800 text-stone-600 dark:text-slate-400 border-stone-200 dark:border-slate-700";
+        badge.innerHTML = `<i class="fa-solid fa-minus text-[9px]"></i> 0.00% (0.00 SFL)`;
+    }
+}
+
 function changeRange(range) {
     selectedRange = range;
-    const ranges = ['24h', '7d', '30d', '90d'];
+    const ranges = ['12h', '24h', '7d', '30d', '90d'];
     ranges.forEach(r => {
         const btn = document.getElementById(`range-${r}`);
         if (!btn) return;
@@ -156,7 +180,7 @@ function renderChart() {
         const season = getSeasonForDate(validDate);
         itemSeasons.push(season);
 
-        if (selectedRange === '24h') {
+        if (selectedRange === '12h' || selectedRange === '24h') {
             labels.push(validDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
         } else if (selectedRange === '7d') {
             labels.push(isMobile 
@@ -170,6 +194,11 @@ function renderChart() {
     });
 
     const prices = visibleData.map(h => parseFloat(h.price));
+
+    // Update Price Change Delta Badge using visible endpoints
+    if (prices.length > 0) {
+        updatePriceChangeBadge(prices[0], prices[prices.length - 1]);
+    }
 
     // Responsive Y-Axis Scale Bounds
     const minPrice = Math.min(...prices);
@@ -271,7 +300,6 @@ function renderChart() {
     });
 }
 
-// Attach High-Velocity Gesture Handlers
 function attachDirectGestures() {
     const canvas = document.getElementById('priceHistoryChart');
     if (!canvas || canvas.dataset.gesturesAttached) return;
@@ -294,7 +322,6 @@ function attachDirectGestures() {
         const deltaX = e.clientX - startPointerX;
         const deltaY = e.clientY - startPointerY;
 
-        // Boosted Horizontal Velocity (Slide Time)
         const visibleSpan = Math.max(1, dragStartViewEnd - dragStartViewStart);
         const velocityMultiplier = 2.8; 
         const pixelsPerItem = (canvas.clientWidth / visibleSpan) / velocityMultiplier;
@@ -318,9 +345,8 @@ function attachDirectGestures() {
             showResetButton();
         }
 
-        // Boosted Vertical Velocity (Stretch / Compress Price Height)
         if (Math.abs(deltaY) > 2) {
-            const ySensitivity = 0.02; // 4x sensitivity increase
+            const ySensitivity = 0.02;
             const newYPadding = Math.max(0.05, Math.min(5.0, dragStartYPadding + (deltaY * ySensitivity)));
             if (Math.abs(newYPadding - yPaddingMultiplier) > 0.01) {
                 yPaddingMultiplier = newYPadding;
@@ -341,7 +367,6 @@ function attachDirectGestures() {
     canvas.addEventListener('pointerup', stopDragging);
     canvas.addEventListener('pointercancel', stopDragging);
 
-    // Mouse Wheel Zoom
     canvas.addEventListener('wheel', (e) => {
         if (fullHistoryData.length < 2) return;
         e.preventDefault();
@@ -361,7 +386,6 @@ function attachDirectGestures() {
         }
     }, { passive: false });
 
-    // Touch Pinch Zoom
     canvas.addEventListener('touchmove', (e) => {
         if (e.touches.length === 2 && fullHistoryData.length >= 2) {
             e.preventDefault();
