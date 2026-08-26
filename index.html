@@ -141,7 +141,7 @@
             <p id="errorMessage" class="font-bold text-sm">Failed to fetch pricing data.</p>
         </div>
 
-        <!-- Empty State (When no item is selected) -->
+        <!-- Empty State -->
         <div id="emptyState" class="bg-white dark:bg-slate-900 border-2 border-dashed border-stone-200 dark:border-slate-800 rounded-3xl p-12 text-center space-y-3">
             <div class="w-16 h-16 bg-amber-100 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 rounded-full flex items-center justify-center mx-auto text-2xl">
                 <i class="fa-solid fa-basket-shopping"></i>
@@ -152,7 +152,7 @@
             </p>
         </div>
 
-        <!-- Selected Item Display Card (Shown ONLY when an item is selected) -->
+        <!-- Selected Item Display Card -->
         <div id="itemDetailsContainer" class="hidden space-y-6">
             
             <!-- Main Hero Item Card -->
@@ -178,21 +178,29 @@
                     </div>
                 </div>
 
-                <!-- Price Trend Graph Section -->
+                <!-- Price Trend Graph Section with Range Filters -->
                 <div class="mt-8 pt-6 border-t border-stone-200/80 dark:border-slate-800">
-                    <div class="flex justify-between items-center mb-4">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
                         <div>
                             <h4 class="text-xs font-bold text-stone-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-2">
-                                <i class="fa-solid fa-chart-line text-amber-500"></i> Price History (Cloud Records)
+                                <i class="fa-solid fa-chart-line text-amber-500"></i> Price History
                             </h4>
                             <p class="text-[11px] text-stone-400 dark:text-slate-500 mt-0.5" id="graphDataCount">Loading timeline...</p>
+                        </div>
+
+                        <!-- Time Range Buttons (24h, 7d, 1m, 3m) -->
+                        <div class="flex items-center bg-stone-100 dark:bg-slate-950 p-1 rounded-xl border border-stone-200 dark:border-slate-800 text-xs font-bold" id="rangeButtonContainer">
+                            <button onclick="changeRange('24h')" id="range-24h" class="px-2.5 py-1 rounded-lg transition bg-white dark:bg-slate-800 text-amber-600 dark:text-amber-400 shadow-sm">24H</button>
+                            <button onclick="changeRange('7d')" id="range-7d" class="px-2.5 py-1 rounded-lg transition text-stone-500 dark:text-slate-400 hover:text-stone-900 dark:hover:text-white">7D</button>
+                            <button onclick="changeRange('30d')" id="range-30d" class="px-2.5 py-1 rounded-lg transition text-stone-500 dark:text-slate-400 hover:text-stone-900 dark:hover:text-white">1M</button>
+                            <button onclick="changeRange('90d')" id="range-90d" class="px-2.5 py-1 rounded-lg transition text-stone-500 dark:text-slate-400 hover:text-stone-900 dark:hover:text-white">3M</button>
                         </div>
                     </div>
 
                     <div class="bg-white dark:bg-slate-950 border border-stone-200 dark:border-slate-800/80 rounded-2xl p-4 sm:p-5 relative min-h-[260px] flex items-center justify-center transition-colors duration-200">
                         <div id="chartSpinner" class="hidden absolute inset-0 bg-white/80 dark:bg-slate-950/80 backdrop-blur-sm flex flex-col items-center justify-center z-10 rounded-2xl">
                             <i class="fa-solid fa-circle-notch fa-spin text-2xl text-amber-500 mb-2"></i>
-                            <span class="text-xs text-stone-500 dark:text-slate-400 font-medium">Fetching history from Turso...</span>
+                            <span class="text-xs text-stone-500 dark:text-slate-400 font-medium">Fetching historical records...</span>
                         </div>
                         <canvas id="priceHistoryChart" class="w-full h-64 max-h-64"></canvas>
                     </div>
@@ -254,6 +262,7 @@
         let activeItem = null;
         let chartInstance = null;
         let lastHistoryData = [];
+        let selectedRange = "24h";
 
         // Dark Mode Logic
         function toggleTheme() {
@@ -265,9 +274,25 @@
                 html.classList.add('dark');
                 localStorage.setItem('theme', 'dark');
             }
-            // Re-render chart with new theme colors if active
             if (lastHistoryData.length > 0) {
                 renderChart(lastHistoryData);
+            }
+        }
+
+        function changeRange(range) {
+            selectedRange = range;
+            const ranges = ['24h', '7d', '30d', '90d'];
+            ranges.forEach(r => {
+                const btn = document.getElementById(`range-${r}`);
+                if (r === range) {
+                    btn.className = "px-2.5 py-1 rounded-lg transition bg-white dark:bg-slate-800 text-amber-600 dark:text-amber-400 shadow-sm";
+                } else {
+                    btn.className = "px-2.5 py-1 rounded-lg transition text-stone-500 dark:text-slate-400 hover:text-stone-900 dark:hover:text-white";
+                }
+            });
+
+            if (activeItem) {
+                loadItemHistoryGraph(activeItem.name);
             }
         }
 
@@ -428,7 +453,7 @@
 
             let historyData = [];
             try {
-                const res = await fetch(`/api/history?item=${encodeURIComponent(itemName)}&limit=60`);
+                const res = await fetch(`/api/history?item=${encodeURIComponent(itemName)}&range=${selectedRange}`);
                 if (res.ok) {
                     historyData = await res.json();
                 }
@@ -443,9 +468,9 @@
                     price: activeItem.price,
                     recorded_at: new Date().toISOString()
                 }];
-                countLabel.innerText = "1 data point recorded (First snapshot)";
+                countLabel.innerText = "1 data point recorded";
             } else {
-                countLabel.innerText = `Showing last ${historyData.length} recorded snapshots`;
+                countLabel.innerText = `Showing ${historyData.length} snapshots for ${selectedRange.toUpperCase()}`;
             }
 
             lastHistoryData = historyData;
@@ -460,7 +485,21 @@
             const labels = historyData.map(h => {
                 const rawDate = h.recorded_at ? h.recorded_at.replace(" ", "T") + (h.recorded_at.includes("Z") ? "" : "Z") : new Date().toISOString();
                 const d = new Date(rawDate);
-                return isNaN(d.getTime()) ? "Now" : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                if (isNaN(d.getTime())) return "Now";
+
+                if (selectedRange === '24h') {
+                    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                } else if (selectedRange === '7d') {
+                    return `${d.toLocaleDateString([], { month: 'short', day: 'numeric' })}, ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+                } else {
+                    return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+                }
+            });
+
+            const fullDateTooltips = historyData.map(h => {
+                const rawDate = h.recorded_at ? h.recorded_at.replace(" ", "T") + (h.recorded_at.includes("Z") ? "" : "Z") : new Date().toISOString();
+                const d = new Date(rawDate);
+                return isNaN(d.getTime()) ? "Current" : d.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
             });
 
             const prices = historyData.map(h => parseFloat(h.price));
@@ -478,6 +517,9 @@
             gradient.addColorStop(0, 'rgba(245, 158, 11, 0.25)');
             gradient.addColorStop(1, 'rgba(245, 158, 11, 0.0)');
 
+            // Auto-adjust point radius: hide large dots if viewing 30d/90d dense data
+            const pointRadius = (selectedRange === '30d' || selectedRange === '90d' || historyData.length > 50) ? 0 : 3.5;
+
             chartInstance = new Chart(ctx, {
                 type: 'line',
                 data: {
@@ -493,13 +535,17 @@
                         pointBackgroundColor: isDark ? '#0f172a' : '#ffffff',
                         pointBorderColor: '#f59e0b',
                         pointBorderWidth: 2,
-                        pointRadius: historyData.length > 30 ? 2 : 4,
+                        pointRadius: pointRadius,
                         pointHoverRadius: 6,
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false,
+                    },
                     plugins: {
                         legend: { display: false },
                         tooltip: {
@@ -509,6 +555,7 @@
                             padding: 10,
                             displayColors: false,
                             callbacks: {
+                                title: (items) => fullDateTooltips[items[0].dataIndex] || items[0].label,
                                 label: (ctx) => ` Price: ${formatDisplayPrice(ctx.parsed.y)} SFL`
                             }
                         }
@@ -516,7 +563,11 @@
                     scales: {
                         x: {
                             grid: { color: gridColor },
-                            ticks: { font: { family: 'Plus Jakarta Sans', size: 10 }, color: tickColor }
+                            ticks: { 
+                                font: { family: 'Plus Jakarta Sans', size: 10 }, 
+                                color: tickColor,
+                                maxTicksLimit: 8
+                            }
                         },
                         y: {
                             grid: { color: gridColor },
