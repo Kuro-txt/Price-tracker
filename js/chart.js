@@ -26,7 +26,6 @@ const SEASONS = [
 
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 
-// Format price helper with safe fallback
 function formatPrice(val) {
     if (typeof window.formatDisplayPrice === 'function') {
         return window.formatDisplayPrice(val);
@@ -67,7 +66,6 @@ function updateActiveSeasonBadge() {
     badge.innerHTML = `<span>${currentSeason.icon}</span> <span>${currentSeason.name} (Day ${currentSeason.day}/7)</span>`;
 }
 
-// Update Price Change Delta Badge (First visible point vs Last visible point)
 function updatePriceChangeBadge(firstPrice, lastPrice) {
     const badge = document.getElementById('priceChangeBadge');
     if (!badge) return;
@@ -175,7 +173,6 @@ function renderChart() {
     const ctx = canvas.getContext('2d');
     const isMobile = window.innerWidth < 640;
 
-    // Active Visible Window
     const clampedStart = Math.max(0, Math.min(Math.round(viewStart), fullHistoryData.length - 2));
     const clampedEnd = Math.max(clampedStart + 1, Math.min(Math.round(viewEnd), fullHistoryData.length - 1));
     const visibleData = fullHistoryData.slice(clampedStart, clampedEnd + 1);
@@ -207,12 +204,10 @@ function renderChart() {
 
     const prices = visibleData.map(h => parseFloat(h.price));
 
-    // Update Price Change Delta Badge using visible endpoints
     if (prices.length > 0) {
         updatePriceChangeBadge(prices[0], prices[prices.length - 1]);
     }
 
-    // Responsive Y-Axis Scale Bounds
     const minPrice = Math.min(...prices);
     const maxPrice = Math.max(...prices);
     const priceRange = Math.max(maxPrice - minPrice, 0.0001);
@@ -236,7 +231,7 @@ function renderChart() {
 
     const gradient = ctx.createLinearGradient(0, 0, 0, isMobile ? 180 : 240);
     gradient.addColorStop(0, isDark ? 'rgba(245, 158, 11, 0.25)' : 'rgba(217, 119, 6, 0.20)');
-    gradient.addColorStop(1, isDark ? 'rgba(0, 0, 0, 0.0)' : 'rgba(217, 119, 6, 0.0)');
+    gradient.addColorStop(1, 'rgba(0, 0, 0, 0.0)');
 
     const pointRadius = (visibleData.length > 30) ? 0 : (isMobile ? 3 : 4);
 
@@ -442,6 +437,7 @@ window.addEventListener('resize', () => {
 });
 
 // Expose globals
+window.fullHistoryData = fullHistoryData;
 window.changeRange = changeRange;
 window.resetSlideView = resetSlideView;
 window.loadItemHistoryGraph = loadItemHistoryGraph;
