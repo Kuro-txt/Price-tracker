@@ -2,6 +2,7 @@
 
 body {
     font-family: 'Plus Jakarta Sans', sans-serif;
+    -webkit-tap-highlight-color: transparent;
 }
 
 /* Custom Scrollbars */
@@ -13,3 +14,12 @@ body {
 html.dark ::-webkit-scrollbar-track { background: #090d16; }
 html.dark ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
 html.dark ::-webkit-scrollbar-thumb:hover { background: #334155; }
+
+/* Hide Scrollbar for Horizontal Chip Swiping */
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+.no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
