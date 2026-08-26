@@ -27,9 +27,9 @@
 </head>
 <body class="bg-[#f8f6f0] dark:bg-[#0c111c] text-stone-800 dark:text-slate-100 min-h-screen flex flex-col justify-between selection:bg-amber-200 dark:selection:bg-amber-900 selection:text-amber-900 dark:selection:text-amber-200 transition-colors duration-150">
 
-    <!-- Compact Navigation Header -->
+    <!-- Header Navigation -->
     <header class="bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-stone-200/70 dark:border-slate-800/80 sticky top-0 z-50 shadow-xs transition-colors duration-150">
-        <div class="max-w-3xl mx-auto px-4 py-2.5 flex items-center justify-between gap-3">
+        <div class="max-w-6xl mx-auto px-4 sm:px-6 py-2.5 sm:py-3.5 flex items-center justify-between gap-3">
             
             <!-- Branding -->
             <div class="flex items-center space-x-2.5 min-w-0">
@@ -71,11 +71,11 @@
     </header>
 
     <!-- Main Container -->
-    <main class="max-w-3xl mx-auto px-4 py-4 sm:py-6 flex-1 w-full space-y-4">
+    <main class="max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-6 flex-1 w-full space-y-4">
 
-        <!-- Search & Selection Panel -->
+        <!-- Search & Dropdown Control Bar -->
         <div class="bg-white dark:bg-slate-900 border border-stone-200/80 dark:border-slate-800 rounded-2xl p-3.5 sm:p-4 shadow-xs transition-colors duration-150">
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-4">
                 
                 <!-- Autocomplete Search -->
                 <div class="relative">
@@ -84,7 +84,7 @@
                         <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-stone-400 dark:text-slate-500 pointer-events-none">
                             <i class="fa-solid fa-magnifying-glass text-xs"></i>
                         </span>
-                        <input type="text" id="searchInput" oninput="handleSearchInput(this.value)" onfocus="showAutocomplete()" placeholder="Search item (e.g. Sunflower)..." 
+                        <input type="text" id="searchInput" oninput="handleSearchInput(this.value)" onfocus="showAutocomplete()" placeholder="Type to search (e.g. Sunflower, Wood)..." 
                             class="w-full pl-8 pr-3 py-2 bg-stone-50 dark:bg-slate-950 border border-stone-200 dark:border-slate-800 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 focus:bg-white dark:focus:bg-slate-900 text-stone-800 dark:text-slate-100 placeholder-stone-400 dark:placeholder-slate-500 transition font-medium">
                     </div>
                     <div id="autocompleteList" class="hidden absolute left-0 right-0 top-full mt-1.5 bg-white dark:bg-slate-900 border border-stone-200 dark:border-slate-800 rounded-xl max-h-52 overflow-y-auto z-50 shadow-xl divide-y divide-stone-100 dark:divide-slate-800"></div>
@@ -102,7 +102,7 @@
         </div>
 
         <!-- Loading State -->
-        <div id="loadingState" class="flex flex-col items-center justify-center py-14 bg-white dark:bg-slate-900 border border-stone-200/80 dark:border-slate-800 rounded-2xl shadow-xs">
+        <div id="loadingState" class="flex flex-col items-center justify-center py-16 bg-white dark:bg-slate-900 border border-stone-200/80 dark:border-slate-800 rounded-2xl shadow-xs">
             <i class="fa-solid fa-seedling fa-bounce text-2xl sm:text-3xl text-amber-500 mb-2.5"></i>
             <p class="text-stone-500 dark:text-slate-400 text-xs font-medium">Loading Sunflower Land market prices...</p>
         </div>
@@ -114,45 +114,85 @@
         </div>
 
         <!-- Empty State -->
-        <div id="emptyState" class="bg-white dark:bg-slate-900 border border-dashed border-stone-300 dark:border-slate-800 rounded-2xl p-8 sm:p-10 text-center space-y-2 shadow-xs">
+        <div id="emptyState" class="bg-white dark:bg-slate-900 border border-dashed border-stone-300 dark:border-slate-800 rounded-2xl p-10 text-center space-y-2 shadow-xs">
             <div class="w-12 h-12 bg-amber-100 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 rounded-full flex items-center justify-center mx-auto text-lg">
                 <i class="fa-solid fa-basket-shopping"></i>
             </div>
             <h3 class="text-sm sm:text-base font-bold text-stone-800 dark:text-slate-100">No Item Selected</h3>
             <p class="text-stone-500 dark:text-slate-400 text-xs max-w-xs mx-auto">
-                Pick a crop or resource using the search box or dropdown above to view live prices and price history.
+                Pick a crop or resource using the search box or dropdown above to view live market prices.
             </p>
         </div>
 
-        <!-- Selected Item Details -->
-        <div id="itemDetailsContainer" class="hidden space-y-3.5">
-            <div class="bg-white dark:bg-slate-900 border border-stone-200/80 dark:border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xs transition-colors duration-150 space-y-4">
+        <!-- Selected Item Details (Wide Balanced 2-Column Grid on PC) -->
+        <div id="itemDetailsContainer" class="hidden">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
                 
-                <!-- Main Header & Floor Price -->
-                <div class="flex flex-row justify-between items-center gap-3">
-                    <div class="min-w-0">
-                        <div class="inline-flex items-center gap-1 bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-300 text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber-200 dark:border-amber-800/50 mb-1">
-                            <i class="fa-solid fa-tag text-[8px]"></i> Plaza Asset
+                <!-- Left Column: Asset Floor, Stacks & Calculator (4.5/12 on desktop) -->
+                <div class="lg:col-span-5 space-y-4">
+                    
+                    <!-- Main Asset & Floor Card -->
+                    <div class="bg-white dark:bg-slate-900 border border-stone-200/80 dark:border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xs transition-colors duration-150 space-y-4">
+                        <div class="flex items-start justify-between gap-3">
+                            <div class="min-w-0">
+                                <span class="inline-flex items-center gap-1 bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-300 text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber-200 dark:border-amber-800/50 mb-1">
+                                    <i class="fa-solid fa-tag text-[8px]"></i> Plaza Asset
+                                </span>
+                                <h2 id="selectedItemName" class="text-2xl sm:text-3xl font-extrabold text-stone-900 dark:text-white tracking-tight truncate">-</h2>
+                            </div>
+
+                            <div class="bg-gradient-to-br from-amber-400 to-amber-500 text-stone-950 px-4 py-2 rounded-xl shadow-xs text-right shrink-0">
+                                <span class="text-[9px] font-extrabold uppercase tracking-wider block opacity-85">Floor</span>
+                                <div class="flex items-baseline justify-end gap-1">
+                                    <span class="text-xl font-black font-mono tracking-tight" id="selectedItemPrice">0.00</span>
+                                    <span class="text-[10px] font-bold">SFL</span>
+                                </div>
+                            </div>
                         </div>
-                        <h2 id="selectedItemName" class="text-xl sm:text-2xl font-extrabold text-stone-900 dark:text-white tracking-tight truncate">-</h2>
+
+                        <!-- 3-Column Stacks Breakdown -->
+                        <div class="grid grid-cols-3 gap-2 pt-1 border-t border-stone-100 dark:border-slate-800/80">
+                            <div class="bg-stone-50 dark:bg-slate-950 border border-stone-200/70 dark:border-slate-800/80 p-2.5 rounded-xl text-center">
+                                <span class="text-[9px] font-bold text-stone-500 dark:text-slate-400 uppercase tracking-wider block">x10 Stack</span>
+                                <span class="text-xs sm:text-sm font-bold font-mono text-stone-800 dark:text-slate-100 mt-0.5 block truncate" id="stack10Price">-</span>
+                                <span class="text-[9px] text-stone-400 dark:text-slate-500 font-medium">SFL</span>
+                            </div>
+                            <div class="bg-stone-50 dark:bg-slate-950 border border-stone-200/70 dark:border-slate-800/80 p-2.5 rounded-xl text-center">
+                                <span class="text-[9px] font-bold text-stone-500 dark:text-slate-400 uppercase tracking-wider block">x100 Stack</span>
+                                <span class="text-xs sm:text-sm font-bold font-mono text-stone-800 dark:text-slate-100 mt-0.5 block truncate" id="stack100Price">-</span>
+                                <span class="text-[9px] text-stone-400 dark:text-slate-500 font-medium">SFL</span>
+                            </div>
+                            <div class="bg-stone-50 dark:bg-slate-950 border border-stone-200/70 dark:border-slate-800/80 p-2.5 rounded-xl text-center">
+                                <span class="text-[9px] font-bold text-stone-500 dark:text-slate-400 uppercase tracking-wider block">x1k Stack</span>
+                                <span class="text-xs sm:text-sm font-bold font-mono text-stone-800 dark:text-slate-100 mt-0.5 block truncate" id="stack1000Price">-</span>
+                                <span class="text-[9px] text-stone-400 dark:text-slate-500 font-medium">SFL</span>
+                            </div>
+                        </div>
+
+                        <!-- Quick Inline Calculator -->
+                        <div class="bg-stone-50 dark:bg-slate-950 border border-stone-200/70 dark:border-slate-800/80 p-3 rounded-xl flex items-center justify-between gap-3">
+                            <div class="flex items-center gap-2 min-w-0 flex-1">
+                                <label class="text-[10px] font-bold text-stone-500 dark:text-slate-400 uppercase tracking-wider shrink-0">Qty:</label>
+                                <input type="number" id="calcQuantity" value="50" min="1" oninput="calculateCustomStack()" 
+                                    class="w-20 sm:w-28 bg-white dark:bg-slate-900 border border-stone-200 dark:border-slate-700 rounded-lg px-2.5 py-1 text-xs font-bold text-stone-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-amber-400">
+                            </div>
+                            <div class="text-right shrink-0">
+                                <span class="text-[10px] font-bold text-stone-400 dark:text-slate-500 uppercase mr-1">Total:</span>
+                                <span class="text-sm sm:text-base font-extrabold font-mono text-amber-800 dark:text-amber-300" id="calcResult">0.00</span>
+                                <span class="text-[10px] font-bold text-amber-700 dark:text-amber-400 ml-0.5">SFL</span>
+                            </div>
+                        </div>
                     </div>
 
-                    <!-- Compact Floor Badge -->
-                    <div class="bg-gradient-to-br from-amber-400 to-amber-500 text-stone-950 px-4 py-2 rounded-xl shadow-xs text-right shrink-0">
-                        <span class="text-[9px] font-extrabold uppercase tracking-wider block opacity-85">Floor</span>
-                        <div class="flex items-baseline justify-end gap-1">
-                            <span class="text-lg sm:text-xl font-black font-mono tracking-tight" id="selectedItemPrice">0.00</span>
-                            <span class="text-[10px] font-bold">SFL</span>
-                        </div>
-                    </div>
                 </div>
 
-                <!-- Price Trend Graph Section -->
-                <div class="pt-3 border-t border-stone-100 dark:border-slate-800/80">
-                    <div class="flex flex-row justify-between items-center gap-2 mb-2.5">
-                        <div class="flex items-center gap-1.5 min-w-0">
+                <!-- Right Column: Interactive Price History Graph & Seasonal Indicators (7/12 on desktop) -->
+                <div class="lg:col-span-7 bg-white dark:bg-slate-900 border border-stone-200/80 dark:border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xs transition-colors duration-150 space-y-3">
+                    
+                    <div class="flex flex-row justify-between items-center gap-2 pb-1">
+                        <div class="flex items-center gap-2 min-w-0">
                             <span class="text-xs font-bold text-stone-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1 shrink-0">
-                                <i class="fa-solid fa-chart-line text-amber-500 text-xs"></i> History
+                                <i class="fa-solid fa-chart-line text-amber-500 text-xs"></i> Price History
                             </span>
                             <!-- Live SFL Season Indicator -->
                             <span id="currentSeasonBadge" class="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/60 truncate">
@@ -162,15 +202,15 @@
 
                         <!-- Range Filter Controls -->
                         <div class="flex items-center bg-stone-100 dark:bg-slate-950 p-0.5 rounded-lg border border-stone-200 dark:border-slate-800 text-[10px] font-bold shrink-0">
-                            <button onclick="changeRange('24h')" id="range-24h" class="px-2 py-0.5 rounded-md transition bg-white dark:bg-slate-800 text-amber-600 dark:text-amber-400 shadow-2xs">24H</button>
-                            <button onclick="changeRange('7d')" id="range-7d" class="px-2 py-0.5 rounded-md transition text-stone-500 dark:text-slate-400 hover:text-stone-900 dark:hover:text-white">7D</button>
-                            <button onclick="changeRange('30d')" id="range-30d" class="px-2 py-0.5 rounded-md transition text-stone-500 dark:text-slate-400 hover:text-stone-900 dark:hover:text-white">1M</button>
-                            <button onclick="changeRange('90d')" id="range-90d" class="px-2 py-0.5 rounded-md transition text-stone-500 dark:text-slate-400 hover:text-stone-900 dark:hover:text-white">3M</button>
+                            <button onclick="changeRange('24h')" id="range-24h" class="px-2.5 py-0.5 rounded-md transition bg-white dark:bg-slate-800 text-amber-600 dark:text-amber-400 shadow-2xs">24H</button>
+                            <button onclick="changeRange('7d')" id="range-7d" class="px-2.5 py-0.5 rounded-md transition text-stone-500 dark:text-slate-400 hover:text-stone-900 dark:hover:text-white">7D</button>
+                            <button onclick="changeRange('30d')" id="range-30d" class="px-2.5 py-0.5 rounded-md transition text-stone-500 dark:text-slate-400 hover:text-stone-900 dark:hover:text-white">1M</button>
+                            <button onclick="changeRange('90d')" id="range-90d" class="px-2.5 py-0.5 rounded-md transition text-stone-500 dark:text-slate-400 hover:text-stone-900 dark:hover:text-white">3M</button>
                         </div>
                     </div>
 
                     <!-- Canvas Container -->
-                    <div class="bg-stone-50 dark:bg-slate-950 border border-stone-200/80 dark:border-slate-800 rounded-xl p-2 sm:p-3 relative h-48 sm:h-56 flex items-center justify-center transition-colors duration-150">
+                    <div class="bg-stone-50 dark:bg-slate-950 border border-stone-200/80 dark:border-slate-800 rounded-xl p-2.5 sm:p-3 relative h-60 sm:h-72 flex items-center justify-center transition-colors duration-150">
                         <div id="chartSpinner" class="hidden absolute inset-0 bg-white/80 dark:bg-slate-950/80 backdrop-blur-xs flex flex-col items-center justify-center z-10 rounded-xl">
                             <i class="fa-solid fa-circle-notch fa-spin text-lg text-amber-500 mb-1"></i>
                             <span class="text-[10px] text-stone-500 dark:text-slate-400 font-medium">Loading history...</span>
@@ -179,44 +219,11 @@
                     </div>
 
                     <!-- Season Legend Indicator -->
-                    <div class="flex items-center justify-center gap-3 sm:gap-4 mt-2 text-[10px] font-semibold text-stone-500 dark:text-slate-400">
+                    <div class="flex items-center justify-between pt-1 text-[10px] font-semibold text-stone-500 dark:text-slate-400 px-1">
                         <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span> 🌱 Spring</span>
                         <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-amber-500 inline-block"></span> ☀️ Summer</span>
                         <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-orange-500 inline-block"></span> 🍂 Autumn</span>
                         <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-sky-400 inline-block"></span> ❄️ Winter</span>
-                    </div>
-                </div>
-
-                <!-- 3-Column Compact Stacks Breakdown -->
-                <div class="grid grid-cols-3 gap-2 pt-1">
-                    <div class="bg-stone-50 dark:bg-slate-950 border border-stone-200/70 dark:border-slate-800/80 p-2 rounded-xl text-center">
-                        <span class="text-[9px] font-bold text-stone-500 dark:text-slate-400 uppercase tracking-wider block">x10 Stack</span>
-                        <span class="text-xs sm:text-sm font-bold font-mono text-stone-800 dark:text-slate-100 mt-0.5 block truncate" id="stack10Price">-</span>
-                        <span class="text-[9px] text-stone-400 dark:text-slate-500 font-medium">SFL</span>
-                    </div>
-                    <div class="bg-stone-50 dark:bg-slate-950 border border-stone-200/70 dark:border-slate-800/80 p-2 rounded-xl text-center">
-                        <span class="text-[9px] font-bold text-stone-500 dark:text-slate-400 uppercase tracking-wider block">x100 Stack</span>
-                        <span class="text-xs sm:text-sm font-bold font-mono text-stone-800 dark:text-slate-100 mt-0.5 block truncate" id="stack100Price">-</span>
-                        <span class="text-[9px] text-stone-400 dark:text-slate-500 font-medium">SFL</span>
-                    </div>
-                    <div class="bg-stone-50 dark:bg-slate-950 border border-stone-200/70 dark:border-slate-800/80 p-2 rounded-xl text-center">
-                        <span class="text-[9px] font-bold text-stone-500 dark:text-slate-400 uppercase tracking-wider block">x1k Stack</span>
-                        <span class="text-xs sm:text-sm font-bold font-mono text-stone-800 dark:text-slate-100 mt-0.5 block truncate" id="stack1000Price">-</span>
-                        <span class="text-[9px] text-stone-400 dark:text-slate-500 font-medium">SFL</span>
-                    </div>
-                </div>
-
-                <!-- Quick Inline Calculator -->
-                <div class="bg-stone-50 dark:bg-slate-950 border border-stone-200/70 dark:border-slate-800/80 p-2.5 rounded-xl flex items-center justify-between gap-3">
-                    <div class="flex items-center gap-2 min-w-0 flex-1">
-                        <label class="text-[10px] font-bold text-stone-500 dark:text-slate-400 uppercase tracking-wider shrink-0">Qty:</label>
-                        <input type="number" id="calcQuantity" value="50" min="1" oninput="calculateCustomStack()" 
-                            class="w-20 sm:w-28 bg-white dark:bg-slate-900 border border-stone-200 dark:border-slate-700 rounded-lg px-2.5 py-1 text-xs font-bold text-stone-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-amber-400">
-                    </div>
-                    <div class="text-right shrink-0">
-                        <span class="text-[10px] font-bold text-stone-400 dark:text-slate-500 uppercase mr-1">Total:</span>
-                        <span class="text-sm font-extrabold font-mono text-amber-800 dark:text-amber-300" id="calcResult">0.00</span>
-                        <span class="text-[10px] font-bold text-amber-700 dark:text-amber-400 ml-0.5">SFL</span>
                     </div>
                 </div>
 
