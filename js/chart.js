@@ -12,10 +12,8 @@ const SEASONS = [
 
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 
-// Deterministic season calculator anchored to current week being Spring (Index 0)
 function getSeasonForDate(date) {
     const now = new Date();
-    // Align with Monday 00:00 UTC weekly reset
     const nowDay = now.getUTCDay();
     const diffToMon = (nowDay + 6) % 7;
     const currentWeekStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - diffToMon)).getTime();
@@ -50,15 +48,49 @@ function changeRange(range) {
         const btn = document.getElementById(`range-${r}`);
         if (!btn) return;
         if (r === range) {
-            btn.className = "flex-1 sm:flex-initial px-3 py-1 rounded-lg transition bg-white dark:bg-slate-800 text-amber-600 dark:text-amber-400 shadow-sm text-center";
+            btn.className = "px-2 py-0.5 rounded-md transition bg-white dark:bg-slate-800 text-amber-600 dark:text-amber-400 shadow-2xs";
         } else {
-            btn.className = "flex-1 sm:flex-initial px-3 py-1 rounded-lg transition text-stone-500 dark:text-slate-400 hover:text-stone-900 dark:hover:text-white text-center";
+            btn.className = "px-2 py-0.5 rounded-md transition text-stone-500 dark:text-slate-400 hover:text-stone-900 dark:hover:text-white";
         }
     });
+
+    hideResetButton();
 
     if (window.activeItem) {
         loadItemHistoryGraph(window.activeItem.name);
     }
+}
+
+// Zoom Controls
+function zoomIn() {
+    if (chartInstance) {
+        chartInstance.zoom(1.25);
+        showResetButton();
+    }
+}
+
+function zoomOut() {
+    if (chartInstance) {
+        chartInstance.zoom(0.8);
+        showResetButton();
+    }
+}
+
+function resetZoom() {
+    if (chartInstance) {
+        chartInstance.resetZoom();
+        hideResetButton();
+    }
+}
+
+function showResetButton() {
+    const btn = document.getElementById('resetZoomBtn');
+    if (btn) btn.classList.remove('hidden');
+}
+
+function hideResetButton() {
+    const btn = document.getElementById('resetZoomBtn');
+    if (btn) btn.classList.add('hidden');
 }
 
 async function loadItemHistoryGraph(itemName) {
@@ -90,6 +122,7 @@ async function loadItemHistoryGraph(itemName) {
 
     lastHistoryData = historyData;
     updateActiveSeasonBadge();
+    hideResetButton();
     renderChart(historyData);
 }
 
@@ -135,7 +168,6 @@ function renderChart(historyData) {
     const tickColor = isDark ? '#94a3b8' : '#a8a29e';
     const tooltipBg = isDark ? '#090d16' : '#1c1917';
 
-    // Multi-color points matched to each individual point's season
     const pointColors = itemSeasons.map(s => s.color);
 
     const gradient = ctx.createLinearGradient(0, 0, 0, isMobile ? 180 : 240);
@@ -152,7 +184,6 @@ function renderChart(historyData) {
                 label: 'Price (SFL)',
                 data: prices,
                 borderColor: '#f59e0b',
-                // Dynamically color line segments based on season
                 segment: {
                     borderColor: ctx => {
                         const pIndex = ctx.p1DataIndex;
@@ -187,9 +218,28 @@ function renderChart(historyData) {
                             const index = items[0].dataIndex;
                             const season = itemSeasons[index];
                             const timeStr = fullDateTooltips[index];
-                            return `${season.icon} Season: ${season.name} (Day ${season.day}/7)\n📅 Date: ${timeStr}`;
+                            return `${season?.icon || '🌱'} ${season?.name || 'Spring'} Season (Day ${season?.day || 1}/7)\n📅 ${timeStr}`;
                         },
                         label: (ctx) => ` Price: ${window.formatDisplayPrice(ctx.parsed.y)} SFL`
+                    }
+                },
+                // Zoom & Pan Configuration
+                zoom: {
+                    pan: {
+                        enabled: true,
+                        mode: 'x',
+                        onPanStart: () => showResetButton()
+                    },
+                    zoom: {
+                        wheel: {
+                            enabled: true,
+                            speed: 0.08
+                        },
+                        pinch: {
+                            enabled: true
+                        },
+                        mode: 'x',
+                        onZoomStart: () => showResetButton()
                     }
                 }
             },
@@ -224,6 +274,9 @@ window.addEventListener('resize', () => {
 
 // Expose globals
 window.changeRange = changeRange;
+window.zoomIn = zoomIn;
+window.zoomOut = zoomOut;
+window.resetZoom = resetZoom;
 window.loadItemHistoryGraph = loadItemHistoryGraph;
 window.renderChart = renderChart;
 window.getSeasonForDate = getSeasonForDate;
