@@ -5,7 +5,7 @@ let currentTab = 'movers';
 let currentTaxRate = 10.0;
 let movers12hMap = {};
 
-// Load Settings from LocalStorage
+// 1. Persistent Storage Initializers
 try {
     const savedTax = localStorage.getItem('sunchart_tax_rate');
     if (savedTax) currentTaxRate = parseFloat(savedTax) || 10.0;
@@ -27,6 +27,26 @@ function formatDisplayPrice(price) {
     return num.toFixed(2);
 }
 window.formatDisplayPrice = formatDisplayPrice;
+
+// --- Calculator & Tax Storage Helpers ---
+function saveItemCalcState(itemName, qty, buyPrice) {
+    if (!itemName) return;
+    try {
+        const map = JSON.parse(localStorage.getItem('sunchart_calc_map') || '{}');
+        map[itemName.toLowerCase()] = { qty, buyPrice };
+        localStorage.setItem('sunchart_calc_map', JSON.stringify(map));
+    } catch (_) {}
+}
+
+function loadItemCalcState(itemName) {
+    if (!itemName) return { qty: 50, buyPrice: '' };
+    try {
+        const map = JSON.parse(localStorage.getItem('sunchart_calc_map') || '{}');
+        return map[itemName.toLowerCase()] || { qty: 50, buyPrice: '' };
+    } catch (_) {
+        return { qty: 50, buyPrice: '' };
+    }
+}
 
 // Tax Rate Controller
 function onTaxRateChange(val) {
@@ -263,8 +283,12 @@ async function fetchPrices() {
             const fresh = allItems.find(i => i.name.toLowerCase() === window.activeItem.name.toLowerCase());
             if (fresh) selectItem(fresh, false);
         } else if (allItems.length > 0) {
-            const sunflower = allItems.find(i => i.name.toLowerCase() === 'sunflower') || allItems[0];
-            selectItem(sunflower, true);
+            // Restore last active item from local storage, or default to Sunflower
+            const savedItemName = localStorage.getItem('sunchart_last_selected_item');
+            const targetItem = (savedItemName && allItems.find(i => i.name.toLowerCase() === savedItemName.toLowerCase()))
+                || allItems.find(i => i.name.toLowerCase() === 'sunflower') 
+                || allItems[0];
+            selectItem(targetItem, true);
         }
     } catch (err) {
         console.error("Fetch prices failed:", err);
@@ -451,8 +475,12 @@ document.addEventListener('click', (e) => {
     }
 });
 
+// Select Item & Restore its Specific Calculator Inputs
 function selectItem(item, loadGraph = true) {
     window.activeItem = item;
+    try {
+        localStorage.setItem('sunchart_last_selected_item', item.name);
+    } catch (_) {}
 
     const emptyState = document.getElementById('emptyState');
     const detailsContainer = document.getElementById('itemDetailsContainer');
@@ -478,8 +506,15 @@ function selectItem(item, loadGraph = true) {
     if (target5El) target5El.innerText = `${formatDisplayPrice(price * 1.05)} SFL`;
     if (target10El) target10El.innerText = `${formatDisplayPrice(price * 1.10)} SFL`;
 
+    // Restore saved item-specific Qty and Buy Price
+    const savedState = loadItemCalcState(item.name);
+    const qtyInput = document.getElementById('calcQuantity');
+    const buyInput = document.getElementById('calcBuyPrice');
+    if (qtyInput) qtyInput.value = savedState.qty || 50;
+    if (buyInput) buyInput.value = savedState.buyPrice !== undefined && savedState.buyPrice !== null ? savedState.buyPrice : '';
+
     updateActiveItemStar();
-    calculateCustomStack();
+    calculateCustomStack(false); // Calculate without re-saving initial state
 
     if (loadGraph && typeof window.loadItemHistoryGraph === 'function') {
         window.loadItemHistoryGraph(item.name);
@@ -503,8 +538,8 @@ function addQuantity(amount) {
 }
 window.addQuantity = addQuantity;
 
-// Net Profit & Plaza Fee Engine
-function calculateCustomStack() {
+// Net Profit, Plaza Tax & Persistent Calculator Engine
+function calculateCustomStack(shouldSave = true) {
     const qtyInput = document.getElementById('calcQuantity');
     const buyInput = document.getElementById('calcBuyPrice');
     const grossEl = document.getElementById('calcGross');
@@ -519,7 +554,13 @@ function calculateCustomStack() {
 
     const qty = Math.max(1, parseFloat(qtyInput.value) || 1);
     const currentPrice = parseFloat(window.activeItem.price) || 0;
-    const buyPrice = buyInput && buyInput.value !== '' ? Math.max(0, parseFloat(buyInput.value) || 0) : 0;
+    const buyPriceRaw = buyInput ? buyInput.value : '';
+    const buyPrice = buyPriceRaw !== '' ? Math.max(0, parseFloat(buyPriceRaw) || 0) : 0;
+
+    // Save state to LocalStorage for this specific item
+    if (shouldSave && window.activeItem) {
+        saveItemCalcState(window.activeItem.name, qty, buyPriceRaw);
+    }
 
     const gross = qty * currentPrice;
     const fee = gross * (currentTaxRate / 100.0);
@@ -562,6 +603,7 @@ function calculateCustomStack() {
     }
 }
 
+// App Boot
 document.addEventListener('DOMContentLoaded', () => {
     syncTaxSelectorUI();
     switchTab('movers');
