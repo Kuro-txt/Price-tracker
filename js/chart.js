@@ -14,11 +14,44 @@ let dragStartViewEnd = 0;
 let dragStartYPadding = 1.0;
 let initialPinchDistance = null;
 
+// SFL 4-Season Cycle Palette (Spring, Summer, Autumn, Winter)
 const SEASONS = [
-    { name: 'Spring', icon: '🌱', color: '#047857' },
-    { name: 'Summer', icon: '☀️', color: '#b45309' },
-    { name: 'Autumn', icon: '🍂', color: '#c2410c' },
-    { name: 'Winter', icon: '❄️', color: '#0369a1' }
+    { 
+        name: 'Spring', 
+        icon: '🌱', 
+        color: '#10b981', 
+        lightColor: '#047857', 
+        bg: 'bg-emerald-500/15 dark:bg-emerald-950/40', 
+        border: 'border-emerald-600/30 dark:border-emerald-500/30', 
+        text: 'text-emerald-900 dark:text-emerald-400' 
+    },
+    { 
+        name: 'Summer', 
+        icon: '☀️', 
+        color: '#f59e0b', 
+        lightColor: '#b45309', 
+        bg: 'bg-amber-500/15 dark:bg-amber-950/40', 
+        border: 'border-amber-600/30 dark:border-amber-500/30', 
+        text: 'text-amber-900 dark:text-amber-400' 
+    },
+    { 
+        name: 'Autumn', 
+        icon: '🍂', 
+        color: '#f97316', 
+        lightColor: '#c2410c', 
+        bg: 'bg-orange-500/15 dark:bg-orange-950/40', 
+        border: 'border-orange-600/30 dark:border-orange-500/30', 
+        text: 'text-orange-900 dark:text-orange-400' 
+    },
+    { 
+        name: 'Winter', 
+        icon: '❄️', 
+        color: '#38bdf8', 
+        lightColor: '#0284c7', 
+        bg: 'bg-sky-500/15 dark:bg-sky-950/40', 
+        border: 'border-sky-600/30 dark:border-sky-500/30', 
+        text: 'text-sky-900 dark:text-sky-400' 
+    }
 ];
 
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
@@ -34,6 +67,7 @@ function formatPrice(val) {
     return num.toFixed(2);
 }
 
+// Calculate SFL Season and Season Day (1-7) for any given timestamp
 function getSeasonForDate(date) {
     const now = new Date();
     const nowDay = now.getUTCDay();
@@ -57,7 +91,8 @@ function updateActiveSeasonBadge() {
     const badge = document.getElementById('currentSeasonBadge');
     if (!badge) return;
     const currentSeason = getSeasonForDate(new Date());
-    badge.innerText = `${currentSeason.icon} ${currentSeason.name} (Day ${currentSeason.day}/7)`;
+    badge.className = `text-[9px] font-black px-2 py-0.5 rounded-full border ${currentSeason.bg} ${currentSeason.border} ${currentSeason.text}`;
+    badge.innerHTML = `${currentSeason.icon} ${currentSeason.name} (Day ${currentSeason.day}/7)`;
 }
 
 function updatePriceChangeBadge(startPrice, currentPrice) {
@@ -146,6 +181,8 @@ function renderChart() {
     const canvas = document.getElementById('priceHistoryChart');
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
+    const isDark = document.documentElement.classList.contains('dark');
+    const isMobile = window.innerWidth < 640;
 
     const clampedStart = Math.max(0, Math.min(Math.round(viewStart), fullHistoryData.length - 2));
     const clampedEnd = Math.max(clampedStart + 1, Math.min(Math.round(viewEnd), fullHistoryData.length - 1));
@@ -160,14 +197,16 @@ function renderChart() {
         const d = new Date(rawDate);
         const validDate = isNaN(d.getTime()) ? new Date() : d;
 
-        itemSeasons.push(getSeasonForDate(validDate));
+        const season = getSeasonForDate(validDate);
+        itemSeasons.push(season);
 
+        // Include Season Icons on Longer Timeframes
         if (['6h', '12h', '24h'].includes(selectedRange)) {
             labels.push(validDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
         } else if (selectedRange === '7d') {
-            labels.push(`${validDate.getDate()}/${validDate.getMonth()+1} ${validDate.getHours()}:00`);
+            labels.push(`${season.icon} ${validDate.getDate()}/${validDate.getMonth()+1} ${validDate.getHours()}:00`);
         } else {
-            labels.push(`${validDate.getDate()}/${validDate.getMonth()+1}`);
+            labels.push(`${season.icon} ${validDate.getDate()}/${validDate.getMonth()+1}`);
         }
 
         fullDateTooltips.push(validDate.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }));
@@ -191,9 +230,6 @@ function renderChart() {
 
     if (chartInstance) chartInstance.destroy();
 
-    const isDark = document.documentElement.classList.contains('dark');
-    
-    // High contrast tick & grid colors for light mode
     const gridColor = isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(100, 75, 45, 0.12)';
     const tickColor = isDark ? '#71717a' : '#45382b';
 
@@ -206,16 +242,26 @@ function renderChart() {
         data: {
             labels: labels,
             datasets: [{
+                label: 'Price (SFL)',
                 data: prices,
                 borderColor: isDark ? '#f59e0b' : '#b45309',
-                borderWidth: 2.5,
+                // Multi-colored Season Line Segments
+                segment: {
+                    borderColor: ctxSeg => {
+                        const pIndex = ctxSeg.p1DataIndex;
+                        const season = itemSeasons[pIndex];
+                        return isDark ? (season?.color || '#f59e0b') : (season?.lightColor || '#b45309');
+                    }
+                },
+                borderWidth: isMobile ? 2 : 2.5,
                 backgroundColor: gradient,
                 fill: true,
                 tension: 0.35,
-                pointRadius: 0,
-                pointHoverRadius: 5.5,
-                pointHoverBackgroundColor: isDark ? '#f59e0b' : '#b45309',
-                pointHoverBorderColor: isDark ? '#000' : '#fff',
+                pointBackgroundColor: itemSeasons.map(s => isDark ? s.color : s.lightColor),
+                pointBorderColor: isDark ? '#000000' : '#fbf8f2',
+                pointBorderWidth: 1.5,
+                pointRadius: visibleData.length > 25 ? 0 : 3.5,
+                pointHoverRadius: 6,
                 pointHoverBorderWidth: 2
             }]
         },
@@ -236,7 +282,12 @@ function renderChart() {
                     cornerRadius: 12,
                     displayColors: false,
                     callbacks: {
-                        title: (items) => fullDateTooltips[items[0].dataIndex],
+                        title: (items) => {
+                            const index = items[0].dataIndex;
+                            const season = itemSeasons[index];
+                            const timeStr = fullDateTooltips[index];
+                            return `${season?.icon || '🌱'} ${season?.name || 'Spring'} Season (Day ${season?.day || 1}/7)\n📅 ${timeStr}`;
+                        },
                         label: (ctxLabel) => `Price: ${formatPrice(ctxLabel.parsed.y)} SFL`
                     }
                 }
@@ -244,7 +295,7 @@ function renderChart() {
             scales: {
                 x: {
                     grid: { color: gridColor, borderDash: [2, 2] },
-                    ticks: { font: { size: 9, weight: '700' }, color: tickColor, maxTicksLimit: 5 },
+                    ticks: { font: { size: 9, weight: '700' }, color: tickColor, maxTicksLimit: 5, maxRotation: 0 },
                     border: { display: false }
                 },
                 y: {
@@ -322,3 +373,5 @@ window.changeRange = changeRange;
 window.resetSlideView = resetSlideView;
 window.loadItemHistoryGraph = loadItemHistoryGraph;
 window.renderChart = renderChart;
+window.getSeasonForDate = getSeasonForDate;
+window.updateActiveSeasonBadge = updateActiveSeasonBadge;
