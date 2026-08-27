@@ -71,13 +71,13 @@
 
             <!-- View Switcher & Action Controls -->
             <div class="flex items-center gap-1.5">
-                <!-- Segmented Tab Pills -->
+                <!-- Segmented Tab Pills (Movers Active by Default) -->
                 <div class="flex items-center bg-black/5 dark:bg-white/5 p-0.5 rounded-xl border border-black/5 dark:border-white/10 text-[10px] font-black">
-                    <button onclick="switchTab('chart')" id="tabBtn-chart" class="px-2.5 py-1 rounded-lg transition bg-white dark:bg-zinc-800 text-amber-600 dark:text-amber-400 shadow-xs flex items-center gap-1">
-                        <i class="fa-solid fa-chart-line text-[9px]"></i> Chart
-                    </button>
-                    <button onclick="switchTab('movers')" id="tabBtn-movers" class="px-2.5 py-1 rounded-lg transition text-zinc-500 hover:text-black dark:hover:text-white flex items-center gap-1">
+                    <button onclick="switchTab('movers')" id="tabBtn-movers" class="px-2.5 py-1 rounded-lg transition bg-white dark:bg-zinc-800 text-amber-600 dark:text-amber-400 shadow-xs flex items-center gap-1">
                         <i class="fa-solid fa-bolt text-[9px]"></i> Movers <span id="moversCountBadge" class="hidden px-1 py-0.2 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-400 text-[8px]">0</span>
+                    </button>
+                    <button onclick="switchTab('chart')" id="tabBtn-chart" class="px-2.5 py-1 rounded-lg transition text-zinc-500 hover:text-black dark:hover:text-white flex items-center gap-1">
+                        <i class="fa-solid fa-chart-line text-[9px]"></i> Chart
                     </button>
                 </div>
 
@@ -95,19 +95,19 @@
     <!-- Main Workspace -->
     <main class="max-w-3xl mx-auto px-3 sm:px-4 py-2.5 flex-1 w-full space-y-2.5">
 
-        <!-- Compact Search & Dropdown Bar -->
+        <!-- Search Bar & Dark-Mode Safe Catalog Dropdown -->
         <div class="relative">
             <div class="glass-panel rounded-2xl p-1.5 flex items-center gap-2">
                 <div class="relative flex-1">
                     <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-zinc-400 pointer-events-none">
                         <i class="fa-solid fa-magnifying-glass text-xs"></i>
                     </span>
-                    <input type="text" id="searchInput" oninput="handleSearchInput(this.value)" onfocus="showAutocomplete()" placeholder="Search crop or resource..." 
-                        class="w-full pl-8 pr-3 py-1 bg-transparent text-xs sm:text-sm font-semibold text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none">
+                    <input type="text" id="searchInput" oninput="handleSearchInput(this.value)" onfocus="showAutocomplete()" placeholder="Search crop, mineral, resource..." 
+                        class="w-full pl-8 pr-3 py-1.5 bg-transparent text-xs sm:text-sm font-semibold text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none">
                 </div>
 
-                <div class="w-32 sm:w-40 shrink-0">
-                    <select id="itemDropdown" onchange="onDropdownSelect(this.value)" class="w-full bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10 text-zinc-900 dark:text-white text-xs font-bold rounded-xl px-2 py-1 focus:outline-none cursor-pointer">
+                <div class="w-32 sm:w-44 shrink-0">
+                    <select id="itemDropdown" onchange="onDropdownSelect(this.value)" class="w-full bg-[#eae0cf] dark:bg-[#111116] border border-[#cbbeaa] dark:border-white/10 text-zinc-900 dark:text-white text-xs font-bold rounded-xl px-2.5 py-1.5 focus:outline-none cursor-pointer">
                         <option value="">Catalog ▾</option>
                     </select>
                 </div>
@@ -127,15 +127,51 @@
             <p id="errorMessage">Failed to load market data.</p>
         </div>
 
-        <!-- ================= VIEW TAB 1: CHART & ACTIVE ASSET (ZERO SCROLL) ================= -->
-        <div id="chartTabContent" class="space-y-2.5">
+        <!-- ================= VIEW TAB 1: 12H MOVERS (DEFAULT VIEW) ================= -->
+        <div id="moversTabContent" class="space-y-2.5">
+            <div class="glass-panel rounded-2xl p-3 space-y-2.5">
+                <div class="flex items-center justify-between pb-1 border-b border-black/5 dark:border-white/5">
+                    <span class="text-[11px] font-black uppercase tracking-wider text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
+                        <i class="fa-solid fa-bolt text-amber-500 text-xs"></i> 12H Market Movers (±5%)
+                    </span>
+                    <span class="text-[9px] text-zinc-400 italic">Tap any asset to open chart</span>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <!-- Gainers Column -->
+                    <div class="bg-emerald-500/5 dark:bg-emerald-950/20 border border-emerald-500/15 dark:border-emerald-500/20 rounded-xl p-2.5 space-y-1.5">
+                        <div class="text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-wide flex items-center justify-between">
+                            <span>🌱 Surging Assets</span>
+                            <span class="text-[9px] font-mono">+5% & Up</span>
+                        </div>
+                        <div id="gainersList" class="space-y-1">
+                            <span class="text-[11px] text-zinc-400 italic py-1">Scanning market...</span>
+                        </div>
+                    </div>
+
+                    <!-- Losers Column -->
+                    <div class="bg-rose-500/5 dark:bg-rose-950/20 border border-rose-500/15 dark:border-rose-500/20 rounded-xl p-2.5 space-y-1.5">
+                        <div class="text-[10px] font-black text-rose-600 dark:text-rose-400 uppercase tracking-wide flex items-center justify-between">
+                            <span>🍂 Dipping Assets</span>
+                            <span class="text-[9px] font-mono">-5% & Down</span>
+                        </div>
+                        <div id="losersList" class="space-y-1">
+                            <span class="text-[11px] text-zinc-400 italic py-1">Scanning market...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= VIEW TAB 2: CHART & ACTIVE ASSET ================= -->
+        <div id="chartTabContent" class="hidden space-y-2.5">
             
             <div id="emptyState" class="glass-panel rounded-3xl p-8 text-center space-y-1.5">
                 <div class="w-8 h-8 rounded-2xl bg-amber-500/10 text-amber-500 flex items-center justify-center mx-auto text-sm">
                     <i class="fa-solid fa-chart-line"></i>
                 </div>
                 <h3 class="text-xs font-bold text-zinc-900 dark:text-white">Select a Resource</h3>
-                <p class="text-[11px] text-zinc-500 max-w-xs mx-auto">Choose an asset above to inspect pricing and chart trends.</p>
+                <p class="text-[11px] text-zinc-500 max-w-xs mx-auto">Choose an asset above or tap a mover to view history.</p>
             </div>
 
             <div id="itemDetailsContainer" class="hidden space-y-2.5">
@@ -184,7 +220,7 @@
                             </button>
                         </div>
 
-                        <!-- Canvas Box (Optimal Screen-Fitting Height: 190px on Mobile) -->
+                        <!-- Canvas Box -->
                         <div class="relative h-44 sm:h-56 md:h-64 w-full">
                             <div id="chartSpinner" class="hidden absolute inset-0 bg-transparent backdrop-blur-xs flex items-center justify-center z-10">
                                 <i class="fa-solid fa-circle-notch fa-spin text-amber-500"></i>
@@ -225,42 +261,6 @@
                     </div>
                 </div>
 
-            </div>
-        </div>
-
-        <!-- ================= VIEW TAB 2: 12H MOVERS FULL FEED ================= -->
-        <div id="moversTabContent" class="hidden space-y-2.5">
-            <div class="glass-panel rounded-2xl p-3 space-y-2.5">
-                <div class="flex items-center justify-between pb-1 border-b border-black/5 dark:border-white/5">
-                    <span class="text-[11px] font-black uppercase tracking-wider text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
-                        <i class="fa-solid fa-bolt text-amber-500 text-xs"></i> 12H Market Movers (±5%)
-                    </span>
-                    <span class="text-[9px] text-zinc-400 italic">Tap any asset to open chart</span>
-                </div>
-
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                    <!-- Gainers Column -->
-                    <div class="bg-emerald-500/5 dark:bg-emerald-950/20 border border-emerald-500/15 dark:border-emerald-500/20 rounded-xl p-2.5 space-y-1.5">
-                        <div class="text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-wide flex items-center justify-between">
-                            <span>🌱 Surging Assets</span>
-                            <span class="text-[9px] font-mono">+5% & Up</span>
-                        </div>
-                        <div id="gainersList" class="space-y-1">
-                            <span class="text-[11px] text-zinc-400 italic py-1">Scanning market...</span>
-                        </div>
-                    </div>
-
-                    <!-- Losers Column -->
-                    <div class="bg-rose-500/5 dark:bg-rose-950/20 border border-rose-500/15 dark:border-rose-500/20 rounded-xl p-2.5 space-y-1.5">
-                        <div class="text-[10px] font-black text-rose-600 dark:text-rose-400 uppercase tracking-wide flex items-center justify-between">
-                            <span>🍂 Dipping Assets</span>
-                            <span class="text-[9px] font-mono">-5% & Down</span>
-                        </div>
-                        <div id="losersList" class="space-y-1">
-                            <span class="text-[11px] text-zinc-400 italic py-1">Scanning market...</span>
-                        </div>
-                    </div>
-                </div>
             </div>
         </div>
 
