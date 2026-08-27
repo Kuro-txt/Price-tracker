@@ -15,10 +15,10 @@ let dragStartYPadding = 1.0;
 let initialPinchDistance = null;
 
 const SEASONS = [
-    { name: 'Spring', icon: '🌱', color: '#10b981' },
-    { name: 'Summer', icon: '☀️', color: '#f59e0b' },
-    { name: 'Autumn', icon: '🍂', color: '#f97316' },
-    { name: 'Winter', icon: '❄️', color: '#38bdf8' }
+    { name: 'Spring', icon: '🌱', color: '#047857' },
+    { name: 'Summer', icon: '☀️', color: '#b45309' },
+    { name: 'Autumn', icon: '🍂', color: '#c2410c' },
+    { name: 'Winter', icon: '❄️', color: '#0369a1' }
 ];
 
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
@@ -69,13 +69,13 @@ function updatePriceChangeBadge(startPrice, currentPrice) {
     const rangeLabel = selectedRange.toUpperCase();
 
     if (diff > 0.000001) {
-        badge.className = "text-[10px] font-black px-2 py-0.5 rounded-full border bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20";
+        badge.className = "text-[9px] font-black px-2 py-0.5 rounded-full border bg-emerald-500/15 dark:bg-emerald-500/10 text-emerald-900 dark:text-emerald-400 border-emerald-600/30 dark:border-emerald-500/20";
         badge.innerHTML = `+${percent.toFixed(2)}% (${rangeLabel})`;
     } else if (diff < -0.000001) {
-        badge.className = "text-[10px] font-black px-2 py-0.5 rounded-full border bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20";
+        badge.className = "text-[9px] font-black px-2 py-0.5 rounded-full border bg-rose-500/15 dark:bg-rose-500/10 text-rose-900 dark:text-rose-400 border-rose-600/30 dark:border-rose-500/20";
         badge.innerHTML = `${percent.toFixed(2)}% (${rangeLabel})`;
     } else {
-        badge.className = "text-[10px] font-black px-2 py-0.5 rounded-full border bg-zinc-500/10 text-zinc-500 border-zinc-500/20";
+        badge.className = "text-[9px] font-black px-2 py-0.5 rounded-full border bg-[#ede3d1] dark:bg-zinc-800 text-[#544535] dark:text-zinc-400 border-[#cbbeaa] dark:border-zinc-700";
         badge.innerHTML = `0.00% (${rangeLabel})`;
     }
 }
@@ -87,9 +87,9 @@ function changeRange(range) {
         const btn = document.getElementById(`range-${r}`);
         if (!btn) return;
         if (r === range) {
-            btn.className = "px-2 py-0.5 rounded-lg transition bg-white dark:bg-zinc-800 text-amber-600 dark:text-amber-400 shadow-xs";
+            btn.className = "px-2 py-0.5 rounded-lg transition bg-[#fbf8f2] dark:bg-zinc-800 text-amber-900 dark:text-amber-400 shadow-xs";
         } else {
-            btn.className = "px-2 py-0.5 rounded-lg transition text-zinc-500 hover:text-black dark:hover:text-white";
+            btn.className = "px-2 py-0.5 rounded-lg transition text-[#6d5e4d] dark:text-zinc-400 hover:text-black dark:hover:text-white";
         }
     });
 
@@ -192,11 +192,13 @@ function renderChart() {
     if (chartInstance) chartInstance.destroy();
 
     const isDark = document.documentElement.classList.contains('dark');
-    const gridColor = isDark ? 'rgba(255, 255, 255, 0.04)' : 'rgba(0, 0, 0, 0.04)';
-    const tickColor = isDark ? '#71717a' : '#a1a1aa';
+    
+    // High contrast tick & grid colors for light mode
+    const gridColor = isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(100, 75, 45, 0.12)';
+    const tickColor = isDark ? '#71717a' : '#45382b';
 
     const gradient = ctx.createLinearGradient(0, 0, 0, 180);
-    gradient.addColorStop(0, 'rgba(245, 158, 11, 0.18)');
+    gradient.addColorStop(0, isDark ? 'rgba(245, 158, 11, 0.22)' : 'rgba(217, 119, 6, 0.25)');
     gradient.addColorStop(1, 'rgba(245, 158, 11, 0.0)');
 
     chartInstance = new Chart(ctx, {
@@ -205,14 +207,14 @@ function renderChart() {
             labels: labels,
             datasets: [{
                 data: prices,
-                borderColor: '#f59e0b',
-                borderWidth: 2,
+                borderColor: isDark ? '#f59e0b' : '#b45309',
+                borderWidth: 2.5,
                 backgroundColor: gradient,
                 fill: true,
                 tension: 0.35,
                 pointRadius: 0,
-                pointHoverRadius: 5,
-                pointHoverBackgroundColor: '#f59e0b',
+                pointHoverRadius: 5.5,
+                pointHoverBackgroundColor: isDark ? '#f59e0b' : '#b45309',
                 pointHoverBorderColor: isDark ? '#000' : '#fff',
                 pointHoverBorderWidth: 2
             }]
@@ -225,10 +227,10 @@ function renderChart() {
             plugins: {
                 legend: { display: false },
                 tooltip: {
-                    backgroundColor: isDark ? '#18181b' : '#ffffff',
-                    titleColor: isDark ? '#f4f4f5' : '#18181b',
-                    bodyColor: '#f59e0b',
-                    borderColor: isDark ? '#27272a' : '#e4e4e7',
+                    backgroundColor: isDark ? '#18181b' : '#221911',
+                    titleColor: '#faf7f2',
+                    bodyColor: '#fbbf24',
+                    borderColor: isDark ? '#27272a' : '#cbbeaa',
                     borderWidth: 1,
                     padding: 8,
                     cornerRadius: 12,
@@ -242,14 +244,14 @@ function renderChart() {
             scales: {
                 x: {
                     grid: { color: gridColor, borderDash: [2, 2] },
-                    ticks: { font: { size: 9, weight: '600' }, color: tickColor, maxTicksLimit: 5 },
+                    ticks: { font: { size: 9, weight: '700' }, color: tickColor, maxTicksLimit: 5 },
                     border: { display: false }
                 },
                 y: {
                     min: yMin,
                     max: yMax,
                     grid: { color: gridColor, borderDash: [2, 2] },
-                    ticks: { font: { size: 9, weight: '600' }, color: tickColor, maxTicksLimit: 4, callback: (val) => formatPrice(val) },
+                    ticks: { font: { size: 9, weight: '700' }, color: tickColor, maxTicksLimit: 4, callback: (val) => formatPrice(val) },
                     border: { display: false }
                 }
             }
