@@ -7,7 +7,7 @@ const db = createClient({
 
 let cachedMovers = null;
 let lastFetchTime = 0;
-const CACHE_TTL_MS = 60 * 1000;
+const CACHE_TTL_MS = 60 * 1000; // 60s memory cache
 
 export default async function handler(req, res) {
   try {
@@ -18,24 +18,25 @@ export default async function handler(req, res) {
       return res.status(200).json(cachedMovers);
     }
 
-    // Both CTEs are strictly bounded by timestamps
+    // Scans only the last 14 hours using idx_time_only (~1k-2k rows per min total)
     const query = `
       WITH LatestPrices AS (
         SELECT 
           item_name, 
-          price AS current_price,
-          ROW_NUMBER() OVER (PARTITION BY item_name ORDER BY recorded_at DESC) as rn
+          price AS current_price
         FROM resource_prices
-        WHERE recorded_at >= datetime('now', '-45 minutes')
+        WHERE recorded_at >= datetime('now', '-3 hours')
+        GROUP BY item_name
+        HAVING recorded_at = MAX(recorded_at)
       ),
       PastPrices AS (
         SELECT 
           item_name, 
-          price AS past_price,
-          ROW_NUMBER() OVER (PARTITION BY item_name ORDER BY recorded_at ASC) as rn
+          price AS past_price
         FROM resource_prices
-        WHERE recorded_at >= datetime('now', '-13 hours') 
-          AND recorded_at <= datetime('now', '-11 hours')
+        WHERE recorded_at >= datetime('now', '-14 hours')
+        GROUP BY item_name
+        HAVING recorded_at = MIN(recorded_at)
       )
       SELECT 
         l.item_name,
@@ -44,8 +45,8 @@ export default async function handler(req, res) {
         ROUND(((l.current_price - p.past_price) / p.past_price) * 100, 2) AS change_pct,
         ROUND(l.current_price - p.past_price, 6) AS change_amt
       FROM LatestPrices l
-      JOIN PastPrices p ON l.item_name = p.item_name AND p.rn = 1
-      WHERE l.rn = 1 AND p.past_price > 0
+      JOIN PastPrices p ON LOWER(l.item_name) = LOWER(p.item_name)
+      WHERE p.past_price > 0
       ORDER BY change_pct DESC;
     `;
 
@@ -64,14 +65,19 @@ export default async function handler(req, res) {
         changeAmt: parseFloat(row.change_amt)
       };
 
+      // Store in map for Watchlist lookup
       changesMap[row.item_name.toLowerCase()] = item;
 
-      if (item.changePct >= 5) {
+      // Group into Gainers and Dippers
+      if (item.changePct > 0) {
         gainers.push(item);
-      } else if (item.changePct <= -5) {
+      } else if (item.changePct < 0) {
         losers.push(item);
       }
     });
+
+    // Sort losers from most negative to least negative
+    losers.sort((a, b) => a.changePct - b.changePct);
 
     cachedMovers = { gainers, losers, changesMap };
     lastFetchTime = now;
