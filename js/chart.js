@@ -63,26 +63,29 @@ function updateActiveSeasonBadge() {
     badge.innerHTML = `<span>${currentSeason.icon}</span> <span>${currentSeason.name} (Day ${currentSeason.day}/7)</span>`;
 }
 
-function updatePriceChangeBadge(firstPrice, lastPrice) {
+// Compare Starting Point of Timeframe against Current Live Price
+function updatePriceChangeBadge(startPrice, currentPrice) {
     const badge = document.getElementById('priceChangeBadge');
     if (!badge) return;
 
-    const diff = lastPrice - firstPrice;
-    const percent = firstPrice > 0 ? (diff / firstPrice) * 100 : 0;
+    const diff = currentPrice - startPrice;
+    const percent = startPrice > 0 ? (diff / startPrice) * 100 : 0;
 
     const formattedDiff = Math.abs(diff) < 0.001 
         ? diff.toFixed(6).replace(/\.?0+$/, "") 
         : diff.toFixed(4).replace(/\.?0+$/, "");
 
+    const rangeLabel = selectedRange.toUpperCase();
+
     if (diff > 0.000001) {
         badge.className = "inline-flex items-center gap-1 text-[10px] font-black px-2.5 py-0.5 rounded-full border bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-400 border-emerald-300 dark:border-emerald-800/60";
-        badge.innerHTML = `<i class="fa-solid fa-arrow-trend-up text-[9px]"></i> +${percent.toFixed(2)}% (+${formattedDiff} SFL)`;
+        badge.innerHTML = `<i class="fa-solid fa-arrow-trend-up text-[9px]"></i> +${percent.toFixed(2)}% (${rangeLabel})`;
     } else if (diff < -0.000001) {
         badge.className = "inline-flex items-center gap-1 text-[10px] font-black px-2.5 py-0.5 rounded-full border bg-rose-100 dark:bg-rose-950/80 text-rose-800 dark:text-rose-400 border-rose-300 dark:border-rose-800/60";
-        badge.innerHTML = `<i class="fa-solid fa-arrow-trend-down text-[9px]"></i> ${percent.toFixed(2)}% (${formattedDiff} SFL)`;
+        badge.innerHTML = `<i class="fa-solid fa-arrow-trend-down text-[9px]"></i> ${percent.toFixed(2)}% (${rangeLabel})`;
     } else {
         badge.className = "inline-flex items-center gap-1 text-[10px] font-black px-2.5 py-0.5 rounded-full border bg-[#e4d9c6] dark:bg-[#111116] text-[#4c3f30] dark:text-zinc-400 border-[#cbbeaa] dark:border-[#22222e]";
-        badge.innerHTML = `<i class="fa-solid fa-minus text-[9px]"></i> 0.00% (0.00 SFL)`;
+        badge.innerHTML = `<i class="fa-solid fa-minus text-[9px]"></i> 0.00% (${rangeLabel})`;
     }
 }
 
@@ -202,8 +205,11 @@ function renderChart() {
 
     const prices = visibleData.map(h => parseFloat(h.price));
 
-    if (prices.length > 0) {
-        updatePriceChangeBadge(prices[0], prices[prices.length - 1]);
+    // First point of selected timeframe vs Current Live Price
+    if (fullHistoryData.length > 0) {
+        const startPrice = parseFloat(fullHistoryData[0].price);
+        const currentPrice = parseFloat(window.activeItem?.price ?? fullHistoryData[fullHistoryData.length - 1].price);
+        updatePriceChangeBadge(startPrice, currentPrice);
     }
 
     const minPrice = Math.min(...prices);
