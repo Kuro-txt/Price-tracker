@@ -5,9 +5,9 @@
 }
 
 html {
-    background-color: #faf8f5;
+    background-color: #dfd5c2;
     scrollbar-width: thin;
-    scrollbar-color: #d6d3cd transparent;
+    scrollbar-color: #baa992 transparent;
 }
 
 html.dark {
@@ -16,7 +16,7 @@ html.dark {
     scrollbar-color: #27272a transparent;
 }
 
-/* Subtle Modern Grid Canvas */
+/* Grounded Warm Canvas with Subtle Contrast Grid (Light Mode) */
 body {
     font-family: 'Plus Jakarta Sans', sans-serif;
     -webkit-tap-highlight-color: transparent;
@@ -24,12 +24,13 @@ body {
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
     
-    background-color: #f7f5f0;
-    background-image: radial-gradient(rgba(0, 0, 0, 0.06) 1px, transparent 1px);
+    background-color: #dfd5c2;
+    background-image: radial-gradient(rgba(120, 95, 65, 0.18) 1.2px, transparent 1.2px);
     background-size: 16px 16px;
+    color: #1f1710;
 }
 
-/* OLED Deep Pitch Black */
+/* OLED Deep Pitch Black Canvas (Dark Mode) */
 html.dark body {
     background-color: #000000 !important;
     color: #f4f4f5 !important;
@@ -37,22 +38,20 @@ html.dark body {
     background-size: 16px 16px;
 }
 
-/* Sleek Minimalist Glass Panels */
+/* Solid, High-Contrast Structured Cards */
 .glass-panel {
-    background: rgba(255, 255, 255, 0.85);
-    backdrop-filter: blur(16px);
-    border: 1px solid rgba(0, 0, 0, 0.06);
-    box-shadow: 0 4px 20px -4px rgba(0, 0, 0, 0.03), 0 1px 2px rgba(0, 0, 0, 0.02);
+    background: #fbf8f2;
+    border: 1px solid #cbbeaa;
+    box-shadow: 0 4px 16px -2px rgba(90, 70, 40, 0.08), 0 1px 3px rgba(90, 70, 40, 0.04);
 }
 
 html.dark .glass-panel {
-    background: rgba(10, 10, 12, 0.75);
-    backdrop-filter: blur(16px);
-    border: 1px solid rgba(255, 255, 255, 0.07);
+    background: rgba(10, 10, 12, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.08);
     box-shadow: 0 4px 30px -4px rgba(0, 0, 0, 0.8);
 }
 
-/* Native Select & Option Dark Fix */
+/* Select & Option Colors */
 select {
     color-scheme: light;
 }
@@ -62,8 +61,8 @@ html.dark select {
 }
 
 select option {
-    background-color: #f7f5f0;
-    color: #18181b;
+    background-color: #fbf8f2;
+    color: #1f1710;
 }
 
 html.dark select option {
@@ -71,7 +70,7 @@ html.dark select option {
     color: #ffffff !important;
 }
 
-/* Hide Horizontal Scrollbars */
+/* Scrollbars & Input Cleanup */
 .no-scrollbar::-webkit-scrollbar {
     display: none;
 }
@@ -80,7 +79,6 @@ html.dark select option {
     scrollbar-width: none;
 }
 
-/* Input number arrows cleanup */
 input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button {
     -webkit-appearance: none;
