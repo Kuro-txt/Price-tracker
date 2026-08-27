@@ -12,11 +12,10 @@ function formatDisplayPrice(price) {
 }
 window.formatDisplayPrice = formatDisplayPrice;
 
-// Universal Array Normalizer (Handles direct arrays, dictionary objects, and wrapper keys)
+// Universal Array Normalizer
 function parseResourceItems(data) {
     if (!data) return [];
 
-    // Case 1: Direct Array
     if (Array.isArray(data)) {
         return data.map(item => ({
             name: item.name || item.item_name || "Unknown",
@@ -24,7 +23,6 @@ function parseResourceItems(data) {
         }));
     }
 
-    // Case 2: Wrapped array ({ prices: [...] } or { data: [...] } or { items: [...] })
     const arrayKey = Object.keys(data).find(k => Array.isArray(data[k]));
     if (arrayKey) {
         return data[arrayKey].map(item => ({
@@ -33,7 +31,6 @@ function parseResourceItems(data) {
         }));
     }
 
-    // Case 3: Key-Value Dictionary ({ "Sunflower": 0.002, "Iron": 0.15 } or { "Sunflower": { price: 0.002 } })
     if (typeof data === 'object') {
         return Object.entries(data)
             .filter(([key]) => key !== 'error' && key !== 'status' && key !== 'message')
@@ -51,7 +48,6 @@ async function fetchPrices() {
     const refreshIcon = document.getElementById('refreshIcon');
     const loadingState = document.getElementById('loadingState');
     const errorState = document.getElementById('errorState');
-    const lastUpdatedLabel = document.getElementById('lastUpdatedLabel');
 
     if (refreshIcon) refreshIcon.classList.add('fa-spin');
 
@@ -68,10 +64,6 @@ async function fetchPrices() {
 
         if (loadingState) loadingState.classList.add('hidden');
         if (errorState) errorState.classList.add('hidden');
-        
-        if (lastUpdatedLabel) {
-            lastUpdatedLabel.innerText = `Updated ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`;
-        }
 
         populateDropdown();
 
@@ -94,10 +86,9 @@ async function fetchPrices() {
     }
 }
 
-// Fetch 12H Movers (>= +5% or <= -5%)
+// Fetch 12H Movers (Horizontal Pill Rendering)
 async function fetchMovers() {
-    const gainersContainer = document.getElementById('gainersContainer');
-    const losersContainer = document.getElementById('losersContainer');
+    const strip = document.getElementById('moversStripContainer');
 
     try {
         const res = await fetch('/api/movers');
@@ -107,41 +98,33 @@ async function fetchMovers() {
         const gainers = Array.isArray(data?.gainers) ? data.gainers : [];
         const losers = Array.isArray(data?.losers) ? data.losers : [];
 
-        // Render Gainers (+5%)
-        if (gainersContainer) {
-            if (gainers.length === 0) {
-                gainersContainer.innerHTML = `<span class="text-[11px] text-[#7a6d5c] dark:text-zinc-500 font-semibold italic">No assets up $\\ge$5% in 12h</span>`;
-            } else {
-                gainersContainer.innerHTML = gainers.map(item => `
-                    <button onclick="onMoverSelect('${item.name.replace(/'/g, "\\'")}')" 
-                        class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-emerald-100/90 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800/80 hover:scale-105 active:scale-95 transition shadow-2xs cursor-pointer text-left">
-                        <span class="text-xs font-black text-[#221a12] dark:text-zinc-100">${item.name}</span>
-                        <span class="text-[10px] font-mono font-black text-emerald-800 dark:text-emerald-400">+${parseFloat(item.changePct).toFixed(1)}%</span>
-                        <span class="text-[9px] font-mono text-[#7a6d5c] dark:text-zinc-400">(${formatDisplayPrice(item.price)} SFL)</span>
-                    </button>
-                `).join('');
-            }
+        if (!strip) return;
+
+        if (gainers.length === 0 && losers.length === 0) {
+            strip.innerHTML = `<span class="text-[10px] text-[#7a6d5c] dark:text-zinc-500 font-semibold italic shrink-0">No assets moved $\\pm$5% in 12h</span>`;
+            return;
         }
 
-        // Render Losers (-5%)
-        if (losersContainer) {
-            if (losers.length === 0) {
-                losersContainer.innerHTML = `<span class="text-[11px] text-[#7a6d5c] dark:text-zinc-500 font-semibold italic">No assets down $\\le$-5% in 12h</span>`;
-            } else {
-                losersContainer.innerHTML = losers.map(item => `
-                    <button onclick="onMoverSelect('${item.name.replace(/'/g, "\\'")}')" 
-                        class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-rose-100/90 dark:bg-rose-950/60 border border-rose-300 dark:border-rose-800/80 hover:scale-105 active:scale-95 transition shadow-2xs cursor-pointer text-left">
-                        <span class="text-xs font-black text-[#221a12] dark:text-zinc-100">${item.name}</span>
-                        <span class="text-[10px] font-mono font-black text-rose-800 dark:text-rose-400">${parseFloat(item.changePct).toFixed(1)}%</span>
-                        <span class="text-[9px] font-mono text-[#7a6d5c] dark:text-zinc-400">(${formatDisplayPrice(item.price)} SFL)</span>
-                    </button>
-                `).join('');
-            }
-        }
+        const gainersHtml = gainers.map(item => `
+            <button onclick="onMoverSelect('${item.name.replace(/'/g, "\\'")}')" 
+                class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-100/90 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800/80 hover:scale-105 active:scale-95 transition shadow-2xs shrink-0 cursor-pointer">
+                <span class="text-[10px] font-black text-[#221a12] dark:text-zinc-100">${item.name}</span>
+                <span class="text-[9px] font-mono font-black text-emerald-800 dark:text-emerald-400">+${parseFloat(item.changePct).toFixed(1)}%</span>
+            </button>
+        `).join('');
+
+        const losersHtml = losers.map(item => `
+            <button onclick="onMoverSelect('${item.name.replace(/'/g, "\\'")}')" 
+                class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-rose-100/90 dark:bg-rose-950/60 border border-rose-300 dark:border-rose-800/80 hover:scale-105 active:scale-95 transition shadow-2xs shrink-0 cursor-pointer">
+                <span class="text-[10px] font-black text-[#221a12] dark:text-zinc-100">${item.name}</span>
+                <span class="text-[9px] font-mono font-black text-rose-800 dark:text-rose-400">${parseFloat(item.changePct).toFixed(1)}%</span>
+            </button>
+        `).join('');
+
+        strip.innerHTML = gainersHtml + losersHtml;
     } catch (err) {
         console.error("Movers fetch error:", err);
-        if (gainersContainer) gainersContainer.innerHTML = `<span class="text-[10px] text-[#7a6d5c] dark:text-zinc-500 font-semibold">Movers unavailable</span>`;
-        if (losersContainer) losersContainer.innerHTML = `<span class="text-[10px] text-[#7a6d5c] dark:text-zinc-500 font-semibold">Movers unavailable</span>`;
+        if (strip) strip.innerHTML = `<span class="text-[10px] text-[#7a6d5c] dark:text-zinc-500 font-semibold shrink-0">Movers offline</span>`;
     }
 }
 
@@ -155,11 +138,6 @@ function onMoverSelect(itemName) {
     if (searchInput) searchInput.value = itemName;
 
     selectItem(item, true);
-    
-    const detailsContainer = document.getElementById('itemDetailsContainer');
-    if (detailsContainer) {
-        detailsContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
 }
 
 // Populate Dropdown Select
@@ -168,7 +146,7 @@ function populateDropdown() {
     if (!dropdown || !Array.isArray(allItems)) return;
 
     const currentVal = dropdown.value;
-    dropdown.innerHTML = '<option value="">-- Choose an item --</option>';
+    dropdown.innerHTML = '<option value="">-- Choose from Catalog --</option>';
 
     const sorted = [...allItems].sort((a, b) => a.name.localeCompare(b.name));
     sorted.forEach(item => {
@@ -206,13 +184,13 @@ function handleSearchInput(query) {
     const matches = allItems.filter(i => i.name.toLowerCase().includes(q)).slice(0, 8);
 
     if (matches.length === 0) {
-        list.innerHTML = '<div class="p-3 text-xs text-[#7a6d5c] dark:text-zinc-500 text-center font-bold">No matching resources found</div>';
+        list.innerHTML = '<div class="p-2 text-xs text-[#7a6d5c] dark:text-zinc-500 text-center font-bold">No matching items</div>';
         list.classList.remove('hidden');
         return;
     }
 
     list.innerHTML = matches.map(m => `
-        <div onclick="selectFromAutocomplete('${m.name.replace(/'/g, "\\'")}')" class="px-3.5 py-2.5 text-xs font-bold hover:bg-[#eae0cf] dark:hover:bg-[#1a1a24] cursor-pointer flex items-center justify-between transition">
+        <div onclick="selectFromAutocomplete('${m.name.replace(/'/g, "\\'")}')" class="px-3 py-2 text-xs font-bold hover:bg-[#eae0cf] dark:hover:bg-[#1a1a24] cursor-pointer flex items-center justify-between transition">
             <span class="text-[#2b2219] dark:text-white font-extrabold">${m.name}</span>
             <span class="font-mono font-bold text-amber-800 dark:text-amber-400">${formatDisplayPrice(m.price)} SFL</span>
         </div>
