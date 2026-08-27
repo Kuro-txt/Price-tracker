@@ -59,6 +59,16 @@ html.dark .warm-surface {
     box-shadow: 0 4px 24px -2px rgba(0, 0, 0, 0.95);
 }
 
+/* Hide Horizontal Scrollbars for Clean Chips */
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+.no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+/* Global Custom Scrollbars */
 ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
