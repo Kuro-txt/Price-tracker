@@ -2,7 +2,7 @@ let allItems = [];
 window.activeItem = null;
 let autoRefreshTimer = null;
 let currentTab = 'movers';
-let currentTaxRate = 10.0; // Default 10%
+let currentTaxRate = 10.0;
 let movers12hMap = {};
 
 // Load Settings from LocalStorage
@@ -134,7 +134,7 @@ function updateActiveItemStar() {
     }
 }
 
-// Smooth Watchlist Renderer with 12H % Shift
+// Watchlist Renderer with 12H % Shifts
 function renderWatchlist() {
     const grid = document.getElementById('watchlistGrid');
     if (!grid) return;
@@ -503,27 +503,63 @@ function addQuantity(amount) {
 }
 window.addQuantity = addQuantity;
 
-// Dynamic Tax Applied to Calculator
+// Net Profit & Plaza Fee Engine
 function calculateCustomStack() {
     const qtyInput = document.getElementById('calcQuantity');
+    const buyInput = document.getElementById('calcBuyPrice');
     const grossEl = document.getElementById('calcGross');
     const feeLabelEl = document.getElementById('calcFeeLabel');
     const feeEl = document.getElementById('calcFee');
-    const netEl = document.getElementById('calcNet');
+    const costEl = document.getElementById('calcCost');
+    const profitEl = document.getElementById('calcProfit');
+    const profitLabelEl = document.getElementById('calcProfitLabel');
+    const profitUnitEl = document.getElementById('calcProfitUnit');
 
     if (!qtyInput || !grossEl || !window.activeItem) return;
 
     const qty = Math.max(1, parseFloat(qtyInput.value) || 1);
-    const price = parseFloat(window.activeItem.price) || 0;
+    const currentPrice = parseFloat(window.activeItem.price) || 0;
+    const buyPrice = buyInput && buyInput.value !== '' ? Math.max(0, parseFloat(buyInput.value) || 0) : 0;
 
-    const gross = qty * price;
+    const gross = qty * currentPrice;
     const fee = gross * (currentTaxRate / 100.0);
-    const net = gross - fee;
+    const netYield = gross - fee;
+    const totalCost = qty * buyPrice;
+    const profit = netYield - totalCost;
 
     grossEl.innerText = formatDisplayPrice(gross);
     if (feeLabelEl) feeLabelEl.innerText = `Plaza Tax (-${currentTaxRate}%)`;
     if (feeEl) feeEl.innerText = `-${formatDisplayPrice(fee)}`;
-    if (netEl) netEl.innerText = formatDisplayPrice(net);
+    if (costEl) costEl.innerText = formatDisplayPrice(totalCost);
+
+    if (profitEl) {
+        profitEl.innerText = `${profit >= 0 ? '+' : ''}${formatDisplayPrice(profit)}`;
+        
+        if (profit > 0.000001) {
+            profitEl.className = "font-mono font-black text-xs sm:text-sm text-emerald-600 dark:text-emerald-400";
+            if (profitLabelEl) {
+                const roi = totalCost > 0 ? ((profit / totalCost) * 100).toFixed(1) : 0;
+                profitLabelEl.className = "block font-extrabold text-[8px] uppercase text-emerald-600 dark:text-emerald-400";
+                profitLabelEl.innerText = totalCost > 0 ? `Net Profit (+${roi}%)` : `Net Yield`;
+            }
+            if (profitUnitEl) profitUnitEl.className = "text-[8px] font-bold text-emerald-600/70 dark:text-emerald-400/70";
+        } else if (profit < -0.000001) {
+            profitEl.className = "font-mono font-black text-xs sm:text-sm text-rose-600 dark:text-rose-400";
+            if (profitLabelEl) {
+                const roi = totalCost > 0 ? ((profit / totalCost) * 100).toFixed(1) : 0;
+                profitLabelEl.className = "block font-extrabold text-[8px] uppercase text-rose-600 dark:text-rose-400";
+                profitLabelEl.innerText = `Net Loss (${roi}%)`;
+            }
+            if (profitUnitEl) profitUnitEl.className = "text-[8px] font-bold text-rose-600/70 dark:text-rose-400/70";
+        } else {
+            profitEl.className = "font-mono font-black text-xs sm:text-sm text-zinc-500";
+            if (profitLabelEl) {
+                profitLabelEl.className = "block font-extrabold text-[8px] uppercase text-zinc-400";
+                profitLabelEl.innerText = `Net Yield`;
+            }
+            if (profitUnitEl) profitUnitEl.className = "text-[8px] font-bold text-zinc-400";
+        }
+    }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
