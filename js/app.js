@@ -74,8 +74,8 @@ function switchTab(tab) {
     const btnMovers = document.getElementById('tabBtn-movers');
     const btnWatchlist = document.getElementById('tabBtn-watchlist');
 
-    const inactiveClass = "py-1 rounded-lg transition text-zinc-500 hover:text-black dark:hover:text-white flex items-center justify-center gap-1";
-    const activeClass = "py-1 rounded-lg transition bg-white dark:bg-zinc-800 text-amber-600 dark:text-amber-400 shadow-xs flex items-center justify-center gap-1";
+    const inactiveClass = "py-1 rounded-lg transition text-[#6d5e4d] dark:text-zinc-400 hover:text-black dark:hover:text-white flex items-center justify-center gap-1";
+    const activeClass = "py-1 rounded-lg transition bg-[#fbf8f2] dark:bg-zinc-800 text-amber-900 dark:text-amber-400 shadow-xs flex items-center justify-center gap-1";
 
     if (chartTab) chartTab.classList.add('hidden');
     if (moversTab) moversTab.classList.add('hidden');
@@ -146,15 +146,15 @@ function updateActiveItemStar() {
     const isWatched = watchlist.some(name => name.toLowerCase() === window.activeItem.name.toLowerCase());
 
     if (isWatched) {
-        starBtn.className = "w-7 h-7 rounded-xl flex items-center justify-center transition active:scale-90 bg-amber-500/20 text-amber-500 border border-amber-500/30";
-        starIcon.className = "fa-solid fa-star text-xs text-amber-500";
+        starBtn.className = "w-7 h-7 rounded-xl flex items-center justify-center transition active:scale-90 bg-amber-500/20 text-amber-800 dark:text-amber-500 border border-amber-600/30";
+        starIcon.className = "fa-solid fa-star text-xs text-amber-800 dark:text-amber-500";
     } else {
-        starBtn.className = "w-7 h-7 rounded-xl flex items-center justify-center transition active:scale-90 bg-black/5 dark:bg-white/5 hover:bg-amber-500/20 text-zinc-400 hover:text-amber-500";
+        starBtn.className = "w-7 h-7 rounded-xl flex items-center justify-center transition active:scale-90 bg-[#ede3d1] dark:bg-white/5 hover:bg-amber-500/20 border border-[#cbbeaa] dark:border-transparent text-[#6d5e4d] dark:text-zinc-400 hover:text-amber-800";
         starIcon.className = "fa-regular fa-star text-xs";
     }
 }
 
-// Watchlist Renderer with 12H % Shifts
+// Watchlist Renderer with High-Contrast Light Mode Elements
 function renderWatchlist() {
     const grid = document.getElementById('watchlistGrid');
     if (!grid) return;
@@ -162,11 +162,11 @@ function renderWatchlist() {
     if (watchlist.length === 0) {
         grid.innerHTML = `
             <div class="text-center py-8 space-y-1.5">
-                <div class="w-8 h-8 rounded-full bg-amber-500/10 text-amber-500 flex items-center justify-center mx-auto text-xs">
+                <div class="w-8 h-8 rounded-full bg-amber-500/20 text-amber-800 dark:text-amber-500 flex items-center justify-center mx-auto text-xs">
                     <i class="fa-regular fa-star"></i>
                 </div>
-                <p class="text-xs font-bold text-zinc-600 dark:text-zinc-300">Watchlist is Empty</p>
-                <p class="text-[10px] text-zinc-400 max-w-xs mx-auto">Tap the star icon on any resource to track its floor and 12h price movement here.</p>
+                <p class="text-xs font-black text-[#1f1710] dark:text-zinc-300">Watchlist is Empty</p>
+                <p class="text-[10px] text-[#6d5e4d] dark:text-zinc-400 font-medium max-w-xs mx-auto">Tap the star icon on any resource to track its floor and 12h price movement here.</p>
             </div>
         `;
         return;
@@ -181,48 +181,48 @@ function renderWatchlist() {
             const pct = moverData.changePct;
             if (pct > 0.001) {
                 changeBadgeHtml = `
-                    <span class="text-[9px] font-mono font-black text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded-md border border-emerald-500/20">
+                    <span class="text-[9px] font-mono font-black text-emerald-900 dark:text-emerald-400 bg-emerald-500/15 dark:bg-emerald-500/10 px-1.5 py-0.5 rounded-md border border-emerald-600/30 dark:border-emerald-500/20">
                         +${pct.toFixed(1)}% (12H)
                     </span>
                 `;
             } else if (pct < -0.001) {
                 changeBadgeHtml = `
-                    <span class="text-[9px] font-mono font-black text-rose-600 dark:text-rose-400 bg-rose-500/10 px-1.5 py-0.5 rounded-md border border-rose-500/20">
+                    <span class="text-[9px] font-mono font-black text-rose-900 dark:text-rose-400 bg-rose-500/15 dark:bg-rose-500/10 px-1.5 py-0.5 rounded-md border border-rose-600/30 dark:border-rose-500/20">
                         ${pct.toFixed(1)}% (12H)
                     </span>
                 `;
             } else {
                 changeBadgeHtml = `
-                    <span class="text-[9px] font-mono font-bold text-zinc-400 bg-black/5 dark:bg-white/5 px-1.5 py-0.5 rounded-md">
+                    <span class="text-[9px] font-mono font-bold text-[#5c4d3d] dark:text-zinc-400 bg-[#ede3d1] dark:bg-white/5 border border-[#cbbeaa] dark:border-transparent px-1.5 py-0.5 rounded-md">
                         0.0% (12H)
                     </span>
                 `;
             }
         } else {
             changeBadgeHtml = `
-                <span class="text-[9px] font-mono font-bold text-zinc-400 bg-black/5 dark:bg-white/5 px-1.5 py-0.5 rounded-md">
+                <span class="text-[9px] font-mono font-bold text-[#5c4d3d] dark:text-zinc-400 bg-[#ede3d1] dark:bg-white/5 border border-[#cbbeaa] dark:border-transparent px-1.5 py-0.5 rounded-md">
                     -- (12H)
                 </span>
             `;
         }
 
         return `
-            <div class="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-white/70 dark:bg-black/40 hover:bg-white dark:hover:bg-zinc-900 border border-black/5 dark:border-white/10 transition shadow-2xs group">
+            <div class="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-[#ede3d1] dark:bg-black/40 hover:bg-[#e4d8c2] dark:hover:bg-zinc-900 border border-[#cbbeaa] dark:border-white/10 transition shadow-2xs group">
                 <div onclick="onMoverSelect('${item.name.replace(/'/g, "\\'")}')" class="flex-1 min-w-0 flex items-center gap-2 cursor-pointer">
-                    <span class="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0"></span>
-                    <span class="text-xs font-black text-zinc-800 dark:text-zinc-100 truncate">${item.name}</span>
+                    <span class="w-1.5 h-1.5 rounded-full bg-amber-600 dark:bg-amber-500 shrink-0"></span>
+                    <span class="text-xs font-black text-[#1f1710] dark:text-zinc-100 truncate">${item.name}</span>
                 </div>
 
                 <div class="flex items-center gap-2.5 shrink-0 ml-2">
                     ${changeBadgeHtml}
 
                     <div onclick="onMoverSelect('${item.name.replace(/'/g, "\\'")}')" class="text-right cursor-pointer min-w-[55px]">
-                        <span class="text-xs font-mono font-black text-amber-600 dark:text-amber-400">${formatDisplayPrice(item.price)}</span>
-                        <span class="text-[8px] font-bold text-zinc-400">SFL</span>
+                        <span class="text-xs font-mono font-black text-amber-900 dark:text-amber-400">${formatDisplayPrice(item.price)}</span>
+                        <span class="text-[8px] font-bold text-[#6d5e4d] dark:text-zinc-400">SFL</span>
                     </div>
 
                     <button onclick="toggleWatchlist('${item.name.replace(/'/g, "\\'")}')" title="Remove from Watchlist" 
-                        class="w-6 h-6 rounded-lg flex items-center justify-center bg-black/5 dark:bg-white/5 hover:bg-rose-500/20 text-zinc-400 hover:text-rose-500 transition active:scale-90">
+                        class="w-6 h-6 rounded-lg flex items-center justify-center bg-[#fbf8f2] dark:bg-white/5 hover:bg-rose-500/20 text-[#6d5e4d] hover:text-rose-700 border border-[#cbbeaa] dark:border-transparent transition active:scale-90">
                         <i class="fa-solid fa-xmark text-[11px]"></i>
                     </button>
                 </div>
@@ -327,18 +327,18 @@ async function fetchMovers() {
         // Render Gainers
         if (gainersList) {
             if (gainers.length === 0) {
-                gainersList.innerHTML = `<span class="text-[11px] text-zinc-400 italic py-1">No items up ≥5% in 12h</span>`;
+                gainersList.innerHTML = `<span class="text-[11px] text-[#6d5e4d] dark:text-zinc-400 font-bold italic py-1">No items up ≥5% in 12h</span>`;
             } else {
                 gainersList.innerHTML = gainers.map(item => `
                     <button onclick="onMoverSelect('${item.name.replace(/'/g, "\\'")}')" 
-                        class="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-white/70 dark:bg-black/40 hover:bg-white dark:hover:bg-zinc-900 border border-emerald-500/20 transition shadow-2xs active:scale-[0.98] cursor-pointer text-left">
+                        class="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-[#fbf8f2] dark:bg-black/40 hover:bg-[#ede3d1] dark:hover:bg-zinc-900 border border-emerald-600/30 dark:border-emerald-500/20 transition shadow-2xs active:scale-[0.98] cursor-pointer text-left">
                         <div class="min-w-0 flex items-center gap-1.5">
-                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
-                            <span class="text-xs font-black text-zinc-800 dark:text-zinc-100 truncate">${item.name}</span>
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-600 dark:bg-emerald-500 shrink-0"></span>
+                            <span class="text-xs font-black text-[#1f1710] dark:text-zinc-100 truncate">${item.name}</span>
                         </div>
                         <div class="flex items-center gap-2 shrink-0 ml-2">
-                            <span class="text-[10px] font-mono font-bold text-zinc-500 dark:text-zinc-400">${formatDisplayPrice(item.price)} SFL</span>
-                            <span class="text-[10px] font-mono font-black text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded-md border border-emerald-500/20">
+                            <span class="text-[10px] font-mono font-bold text-[#423425] dark:text-zinc-400">${formatDisplayPrice(item.price)} SFL</span>
+                            <span class="text-[10px] font-mono font-black text-emerald-900 dark:text-emerald-400 bg-emerald-500/15 dark:bg-emerald-500/10 px-1.5 py-0.5 rounded-md border border-emerald-600/30 dark:border-emerald-500/20">
                                 +${parseFloat(item.changePct).toFixed(1)}%
                             </span>
                         </div>
@@ -350,18 +350,18 @@ async function fetchMovers() {
         // Render Losers
         if (losersList) {
             if (losers.length === 0) {
-                losersList.innerHTML = `<span class="text-[11px] text-zinc-400 italic py-1">No items down ≤-5% in 12h</span>`;
+                losersList.innerHTML = `<span class="text-[11px] text-[#6d5e4d] dark:text-zinc-400 font-bold italic py-1">No items down ≤-5% in 12h</span>`;
             } else {
                 losersList.innerHTML = losers.map(item => `
                     <button onclick="onMoverSelect('${item.name.replace(/'/g, "\\'")}')" 
-                        class="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-white/70 dark:bg-black/40 hover:bg-white dark:hover:bg-zinc-900 border border-rose-500/20 transition shadow-2xs active:scale-[0.98] cursor-pointer text-left">
+                        class="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-[#fbf8f2] dark:bg-black/40 hover:bg-[#ede3d1] dark:hover:bg-zinc-900 border border-rose-600/30 dark:border-rose-500/20 transition shadow-2xs active:scale-[0.98] cursor-pointer text-left">
                         <div class="min-w-0 flex items-center gap-1.5">
-                            <span class="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0"></span>
-                            <span class="text-xs font-black text-zinc-800 dark:text-zinc-100 truncate">${item.name}</span>
+                            <span class="w-1.5 h-1.5 rounded-full bg-rose-600 dark:bg-rose-500 shrink-0"></span>
+                            <span class="text-xs font-black text-[#1f1710] dark:text-zinc-100 truncate">${item.name}</span>
                         </div>
                         <div class="flex items-center gap-2 shrink-0 ml-2">
-                            <span class="text-[10px] font-mono font-bold text-zinc-500 dark:text-zinc-400">${formatDisplayPrice(item.price)} SFL</span>
-                            <span class="text-[10px] font-mono font-black text-rose-600 dark:text-rose-400 bg-rose-500/10 px-1.5 py-0.5 rounded-md border border-rose-500/20">
+                            <span class="text-[10px] font-mono font-bold text-[#423425] dark:text-zinc-400">${formatDisplayPrice(item.price)} SFL</span>
+                            <span class="text-[10px] font-mono font-black text-rose-900 dark:text-rose-400 bg-rose-500/15 dark:bg-rose-500/10 px-1.5 py-0.5 rounded-md border border-rose-600/30 dark:border-rose-500/20">
                                 ${parseFloat(item.changePct).toFixed(1)}%
                             </span>
                         </div>
@@ -372,8 +372,8 @@ async function fetchMovers() {
 
         renderWatchlist();
     } catch (err) {
-        if (gainersList) gainersList.innerHTML = `<span class="text-[10px] text-zinc-500">Unavailable</span>`;
-        if (losersList) losersList.innerHTML = `<span class="text-[10px] text-zinc-500">Unavailable</span>`;
+        if (gainersList) gainersList.innerHTML = `<span class="text-[10px] text-[#6d5e4d]">Unavailable</span>`;
+        if (losersList) losersList.innerHTML = `<span class="text-[10px] text-[#6d5e4d]">Unavailable</span>`;
     }
 }
 
@@ -430,15 +430,15 @@ function handleSearchInput(query) {
     const matches = allItems.filter(i => i.name.toLowerCase().includes(q)).slice(0, 6);
 
     if (matches.length === 0) {
-        list.innerHTML = '<div class="p-3 text-xs text-zinc-400 text-center font-bold">No assets found</div>';
+        list.innerHTML = '<div class="p-3 text-xs text-[#6d5e4d] text-center font-bold">No assets found</div>';
         list.classList.remove('hidden');
         return;
     }
 
     list.innerHTML = matches.map(m => `
-        <div onclick="selectFromAutocomplete('${m.name.replace(/'/g, "\\'")}')" class="px-3.5 py-2 text-xs font-bold hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer flex items-center justify-between transition">
-            <span class="text-zinc-900 dark:text-white font-extrabold">${m.name}</span>
-            <span class="font-mono text-amber-600 dark:text-amber-400 font-bold">${formatDisplayPrice(m.price)} SFL</span>
+        <div onclick="selectFromAutocomplete('${m.name.replace(/'/g, "\\'")}')" class="px-3.5 py-2 text-xs font-bold hover:bg-[#ede3d1] dark:hover:bg-white/5 cursor-pointer flex items-center justify-between transition">
+            <span class="text-[#1f1710] dark:text-white font-extrabold">${m.name}</span>
+            <span class="font-mono text-amber-900 dark:text-amber-400 font-bold">${formatDisplayPrice(m.price)} SFL</span>
         </div>
     `).join('');
 
@@ -556,7 +556,6 @@ function calculateCustomStack(shouldSave = true) {
     const buyPriceRaw = buyInput ? buyInput.value : '';
     const buyPrice = buyPriceRaw !== '' ? Math.max(0, parseFloat(buyPriceRaw) || 0) : 0;
 
-    // Save state to LocalStorage for this specific item
     if (shouldSave && window.activeItem) {
         saveItemCalcState(window.activeItem.name, qty, buyPriceRaw);
     }
@@ -576,8 +575,6 @@ function calculateCustomStack(shouldSave = true) {
     // Target Profit Price Calculation based on Bought Price + Plaza Tax
     const netMultiplier = 1.0 - taxRateFraction;
     if (buyPrice > 0 && netMultiplier > 0) {
-        // Selling Price required to get a true net +5% and +10% return on buyPrice:
-        // Target = (buyPrice * 1.05) / (1 - Tax)
         const target5SellPrice = (buyPrice * 1.05) / netMultiplier;
         const target10SellPrice = (buyPrice * 1.10) / netMultiplier;
 
@@ -586,7 +583,6 @@ function calculateCustomStack(shouldSave = true) {
         if (target5Label) target5Label.innerText = "+5% Profit Target:";
         if (target10Label) target10Label.innerText = "+10% Profit Target:";
     } else {
-        // Fallback: target based on current floor price
         if (target5El) target5El.innerText = `${formatDisplayPrice(currentPrice * 1.05)} SFL`;
         if (target10El) target10El.innerText = `${formatDisplayPrice(currentPrice * 1.10)} SFL`;
         if (target5Label) target5Label.innerText = "+5% Target:";
@@ -597,28 +593,28 @@ function calculateCustomStack(shouldSave = true) {
         profitEl.innerText = `${profit >= 0 ? '+' : ''}${formatDisplayPrice(profit)}`;
         
         if (profit > 0.000001) {
-            profitEl.className = "font-mono font-black text-xs sm:text-sm text-emerald-600 dark:text-emerald-400";
+            profitEl.className = "font-mono font-black text-xs sm:text-sm text-emerald-900 dark:text-emerald-400";
             if (profitLabelEl) {
                 const roi = totalCost > 0 ? ((profit / totalCost) * 100).toFixed(1) : 0;
-                profitLabelEl.className = "block font-extrabold text-[8px] uppercase text-emerald-600 dark:text-emerald-400";
+                profitLabelEl.className = "block font-black text-[8px] uppercase text-emerald-900 dark:text-emerald-400";
                 profitLabelEl.innerText = totalCost > 0 ? `Net Profit (+${roi}%)` : `Net Yield`;
             }
-            if (profitUnitEl) profitUnitEl.className = "text-[8px] font-bold text-emerald-600/70 dark:text-emerald-400/70";
+            if (profitUnitEl) profitUnitEl.className = "text-[8px] font-black text-emerald-900/80 dark:text-emerald-400/70";
         } else if (profit < -0.000001) {
-            profitEl.className = "font-mono font-black text-xs sm:text-sm text-rose-600 dark:text-rose-400";
+            profitEl.className = "font-mono font-black text-xs sm:text-sm text-rose-900 dark:text-rose-400";
             if (profitLabelEl) {
                 const roi = totalCost > 0 ? ((profit / totalCost) * 100).toFixed(1) : 0;
-                profitLabelEl.className = "block font-extrabold text-[8px] uppercase text-rose-600 dark:text-rose-400";
+                profitLabelEl.className = "block font-black text-[8px] uppercase text-rose-900 dark:text-rose-400";
                 profitLabelEl.innerText = `Net Loss (${roi}%)`;
             }
-            if (profitUnitEl) profitUnitEl.className = "text-[8px] font-bold text-rose-600/70 dark:text-rose-400/70";
+            if (profitUnitEl) profitUnitEl.className = "text-[8px] font-black text-rose-900/80 dark:text-rose-400/70";
         } else {
-            profitEl.className = "font-mono font-black text-xs sm:text-sm text-zinc-500";
+            profitEl.className = "font-mono font-black text-xs sm:text-sm text-[#423425] dark:text-zinc-400";
             if (profitLabelEl) {
-                profitLabelEl.className = "block font-extrabold text-[8px] uppercase text-zinc-400";
+                profitLabelEl.className = "block font-black text-[8px] uppercase text-[#6d5e4d] dark:text-zinc-400";
                 profitLabelEl.innerText = `Net Yield`;
             }
-            if (profitUnitEl) profitUnitEl.className = "text-[8px] font-bold text-zinc-400";
+            if (profitUnitEl) profitUnitEl.className = "text-[8px] font-black text-[#6d5e4d] dark:text-zinc-400";
         }
     }
 }
