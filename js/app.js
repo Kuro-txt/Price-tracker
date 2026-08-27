@@ -3,6 +3,15 @@ window.activeItem = null;
 let autoRefreshTimer = null;
 let currentTab = 'movers';
 
+// Load Watchlist from LocalStorage (defaults with starter items)
+let watchlist = [];
+try {
+    const saved = localStorage.getItem('sunchart_watchlist');
+    watchlist = saved ? JSON.parse(saved) : ['Sunflower', 'Iron', 'Egg', 'Gold'];
+} catch (_) {
+    watchlist = ['Sunflower', 'Iron', 'Egg', 'Gold'];
+}
+
 function formatDisplayPrice(price) {
     const num = parseFloat(price);
     if (isNaN(num)) return "0.00";
@@ -12,30 +21,139 @@ function formatDisplayPrice(price) {
 }
 window.formatDisplayPrice = formatDisplayPrice;
 
-// Tab Switcher (Movers vs Chart)
+// View Switcher (Movers vs Chart vs Watchlist)
 function switchTab(tab) {
     currentTab = tab;
     const chartTab = document.getElementById('chartTabContent');
     const moversTab = document.getElementById('moversTabContent');
+    const watchlistTab = document.getElementById('watchlistTabContent');
+
     const btnChart = document.getElementById('tabBtn-chart');
     const btnMovers = document.getElementById('tabBtn-movers');
+    const btnWatchlist = document.getElementById('tabBtn-watchlist');
+
+    const inactiveClass = "px-2 sm:px-2.5 py-1 rounded-lg transition text-zinc-500 hover:text-black dark:hover:text-white flex items-center gap-1 shrink-0";
+    const activeClass = "px-2 sm:px-2.5 py-1 rounded-lg transition bg-white dark:bg-zinc-800 text-amber-600 dark:text-amber-400 shadow-xs flex items-center gap-1 shrink-0";
+
+    // Hide all tabs
+    if (chartTab) chartTab.classList.add('hidden');
+    if (moversTab) moversTab.classList.add('hidden');
+    if (watchlistTab) watchlistTab.classList.add('hidden');
+
+    if (btnChart) btnChart.className = inactiveClass;
+    if (btnMovers) btnMovers.className = inactiveClass;
+    if (btnWatchlist) btnWatchlist.className = inactiveClass;
 
     if (tab === 'movers') {
         if (moversTab) moversTab.classList.remove('hidden');
-        if (chartTab) chartTab.classList.add('hidden');
-        if (btnMovers) btnMovers.className = "px-2.5 py-1 rounded-lg transition bg-white dark:bg-zinc-800 text-amber-600 dark:text-amber-400 shadow-xs flex items-center gap-1";
-        if (btnChart) btnChart.className = "px-2.5 py-1 rounded-lg transition text-zinc-500 hover:text-black dark:hover:text-white flex items-center gap-1";
-    } else {
+        if (btnMovers) btnMovers.className = activeClass;
+    } else if (tab === 'chart') {
         if (chartTab) chartTab.classList.remove('hidden');
-        if (moversTab) moversTab.classList.add('hidden');
-        if (btnChart) btnChart.className = "px-2.5 py-1 rounded-lg transition bg-white dark:bg-zinc-800 text-amber-600 dark:text-amber-400 shadow-xs flex items-center gap-1";
-        if (btnMovers) btnMovers.className = "px-2.5 py-1 rounded-lg transition text-zinc-500 hover:text-black dark:hover:text-white flex items-center gap-1";
+        if (btnChart) btnChart.className = activeClass;
         if (window.renderChart && window.fullHistoryData?.length > 0) {
             window.renderChart();
         }
+    } else if (tab === 'watchlist') {
+        if (watchlistTab) watchlistTab.classList.remove('hidden');
+        if (btnWatchlist) btnWatchlist.className = activeClass;
+        renderWatchlist();
     }
 }
 window.switchTab = switchTab;
+
+// Watchlist Helpers
+function saveWatchlist() {
+    try {
+        localStorage.setItem('sunchart_watchlist', JSON.stringify(watchlist));
+    } catch (_) {}
+    updateWatchlistBadge();
+    updateActiveItemStar();
+    renderWatchlist();
+}
+
+function updateWatchlistBadge() {
+    const badge = document.getElementById('watchlistCountBadge');
+    if (!badge) return;
+    badge.innerText = watchlist.length;
+    if (watchlist.length > 0) badge.classList.remove('hidden');
+    else badge.classList.add('hidden');
+}
+
+function toggleWatchlist(itemName) {
+    if (!itemName) return;
+    const index = watchlist.findIndex(name => name.toLowerCase() === itemName.toLowerCase());
+    if (index >= 0) {
+        watchlist.splice(index, 1);
+    } else {
+        watchlist.push(itemName);
+    }
+    saveWatchlist();
+}
+window.toggleWatchlist = toggleWatchlist;
+
+function toggleActiveItemWatchlist() {
+    if (!window.activeItem) return;
+    toggleWatchlist(window.activeItem.name);
+}
+window.toggleActiveItemWatchlist = toggleActiveItemWatchlist;
+
+function updateActiveItemStar() {
+    const starBtn = document.getElementById('watchlistStarBtn');
+    const starIcon = document.getElementById('watchlistStarIcon');
+    if (!starBtn || !starIcon || !window.activeItem) return;
+
+    const isWatched = watchlist.some(name => name.toLowerCase() === window.activeItem.name.toLowerCase());
+
+    if (isWatched) {
+        starBtn.className = "w-7 h-7 rounded-xl flex items-center justify-center transition active:scale-90 bg-amber-500/20 text-amber-500 border border-amber-500/30";
+        starIcon.className = "fa-solid fa-star text-xs text-amber-500";
+    } else {
+        starBtn.className = "w-7 h-7 rounded-xl flex items-center justify-center transition active:scale-90 bg-black/5 dark:bg-white/5 hover:bg-amber-500/20 text-zinc-400 hover:text-amber-500";
+        starIcon.className = "fa-regular fa-star text-xs";
+    }
+}
+
+function renderWatchlist() {
+    const grid = document.getElementById('watchlistGrid');
+    if (!grid) return;
+
+    if (watchlist.length === 0) {
+        grid.innerHTML = `
+            <div class="text-center py-8 space-y-1.5">
+                <div class="w-8 h-8 rounded-full bg-amber-500/10 text-amber-500 flex items-center justify-center mx-auto text-xs">
+                    <i class="fa-regular fa-star"></i>
+                </div>
+                <p class="text-xs font-bold text-zinc-600 dark:text-zinc-300">Your Watchlist is Empty</p>
+                <p class="text-[10px] text-zinc-400 max-w-xs mx-auto">Tap the star icon on any crop or resource to pin it here for rapid tracking.</p>
+            </div>
+        `;
+        return;
+    }
+
+    grid.innerHTML = watchlist.map(name => {
+        const item = allItems.find(i => i.name.toLowerCase() === name.toLowerCase()) || { name: name, price: 0 };
+        return `
+            <div class="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-white/70 dark:bg-black/40 hover:bg-white dark:hover:bg-zinc-900 border border-black/5 dark:border-white/10 transition shadow-2xs group">
+                <div onclick="onMoverSelect('${item.name.replace(/'/g, "\\'")}')" class="flex-1 min-w-0 flex items-center gap-2 cursor-pointer">
+                    <span class="w-2 h-2 rounded-full bg-amber-500 shrink-0"></span>
+                    <span class="text-xs font-black text-zinc-800 dark:text-zinc-100 truncate">${item.name}</span>
+                </div>
+
+                <div class="flex items-center gap-3 shrink-0 ml-2">
+                    <div onclick="onMoverSelect('${item.name.replace(/'/g, "\\'")}')" class="text-right cursor-pointer">
+                        <span class="text-xs font-mono font-black text-amber-600 dark:text-amber-400">${formatDisplayPrice(item.price)}</span>
+                        <span class="text-[9px] font-bold text-zinc-400 ml-0.5">SFL</span>
+                    </div>
+
+                    <button onclick="toggleWatchlist('${item.name.replace(/'/g, "\\'")}')" title="Remove from Watchlist" 
+                        class="w-6 h-6 rounded-lg flex items-center justify-center bg-black/5 dark:bg-white/5 hover:bg-rose-500/20 text-zinc-400 hover:text-rose-500 transition active:scale-90">
+                        <i class="fa-solid fa-trash-can text-[10px]"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
 
 function parseResourceItems(data) {
     if (!data) return [];
@@ -83,6 +201,7 @@ async function fetchPrices() {
         if (errorState) errorState.classList.add('hidden');
 
         populateDropdown();
+        renderWatchlist();
 
         if (window.activeItem) {
             const fresh = allItems.find(i => i.name.toLowerCase() === window.activeItem.name.toLowerCase());
@@ -294,12 +413,12 @@ function selectItem(item, loadGraph = true) {
     if (stack100El) stack100El.innerText = formatDisplayPrice(price * 100);
     if (stack1000El) stack1000El.innerText = formatDisplayPrice(price * 1000);
 
-    // Target Profit Price Calculation
     const target5El = document.getElementById('target5Price');
     const target10El = document.getElementById('target10Price');
     if (target5El) target5El.innerText = `${formatDisplayPrice(price * 1.05)} SFL`;
     if (target10El) target10El.innerText = `${formatDisplayPrice(price * 1.10)} SFL`;
 
+    updateActiveItemStar();
     calculateCustomStack();
 
     if (loadGraph && typeof window.loadItemHistoryGraph === 'function') {
@@ -307,7 +426,6 @@ function selectItem(item, loadGraph = true) {
     }
 }
 
-// Quick Add / Set Quantity Handlers
 function setQuantity(val) {
     const qtyInput = document.getElementById('calcQuantity');
     if (!qtyInput) return;
@@ -325,7 +443,6 @@ function addQuantity(amount) {
 }
 window.addQuantity = addQuantity;
 
-// Upgraded Calculation with Plaza Fee (-10%)
 function calculateCustomStack() {
     const qtyInput = document.getElementById('calcQuantity');
     const grossEl = document.getElementById('calcGross');
@@ -338,7 +455,7 @@ function calculateCustomStack() {
     const price = parseFloat(window.activeItem.price) || 0;
 
     const gross = qty * price;
-    const fee = gross * 0.10; // Standard 10% Plaza marketplace fee
+    const fee = gross * 0.10;
     const net = gross - fee;
 
     grossEl.innerText = formatDisplayPrice(gross);
@@ -348,6 +465,7 @@ function calculateCustomStack() {
 
 document.addEventListener('DOMContentLoaded', () => {
     switchTab('movers');
+    updateWatchlistBadge();
     fetchPrices();
     fetchMovers();
     if (autoRefreshTimer) clearInterval(autoRefreshTimer);
