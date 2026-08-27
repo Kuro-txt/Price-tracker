@@ -66,7 +66,7 @@ async function fetchMovers() {
         // Render Surging Gainers (+5%)
         if (gainersContainer) {
             if (!data.gainers || data.gainers.length === 0) {
-                gainersContainer.innerHTML = `<span class="text-[11px] text-[#7a6d5c] dark:text-zinc-500 font-semibold italic">No assets up $\\ge$5% in 12h</span>`;
+                gainersContainer.innerHTML = `<span class="text-[11px] text-[#7a6d5c] dark:text-zinc-500 font-semibold italic">No assets up ≥5% in 12h</span>`;
             } else {
                 gainersContainer.innerHTML = data.gainers.map(item => `
                     <button onclick="onMoverSelect('${item.name.replace(/'/g, "\\'")}')" 
@@ -82,7 +82,7 @@ async function fetchMovers() {
         // Render Dipping Losers (-5%)
         if (losersContainer) {
             if (!data.losers || data.losers.length === 0) {
-                losersContainer.innerHTML = `<span class="text-[11px] text-[#7a6d5c] dark:text-zinc-500 font-semibold italic">No assets down $\\le$-5% in 12h</span>`;
+                losersContainer.innerHTML = `<span class="text-[11px] text-[#7a6d5c] dark:text-zinc-500 font-semibold italic">No assets down ≤-5% in 12h</span>`;
             } else {
                 losersContainer.innerHTML = data.losers.map(item => `
                     <button onclick="onMoverSelect('${item.name.replace(/'/g, "\\'")}')" 
