@@ -93,7 +93,7 @@
                 </div>
 
                 <!-- Refresh Button -->
-                <button id="refreshBtn" onclick="fetchPrices()" class="bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-stone-950 px-3.5 py-1.5 rounded-xl text-xs font-black transition flex items-center gap-1.5 shadow-sm shadow-amber-500/20 active:scale-95">
+                <button id="refreshBtn" onclick="fetchPrices(); fetchMovers();" class="bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-stone-950 px-3.5 py-1.5 rounded-xl text-xs font-black transition flex items-center gap-1.5 shadow-sm shadow-amber-500/20 active:scale-95">
                     <i class="fa-solid fa-rotate text-[11px]" id="refreshIcon"></i> 
                     <span class="hidden sm:inline">Refresh</span>
                 </button>
@@ -132,6 +132,41 @@
             </div>
         </div>
 
+        <!-- 12H Market Movers Section (±5% or More) -->
+        <div class="warm-surface border rounded-2xl p-4 transition-colors duration-200 space-y-3">
+            <div class="flex items-center justify-between pb-1 border-b border-[#dfd3be] dark:border-[#1c1c26]">
+                <div class="flex items-center gap-2">
+                    <span class="text-xs font-black text-[#292017] dark:text-zinc-200 uppercase tracking-wider flex items-center gap-1.5">
+                        <i class="fa-solid fa-bolt-lightning text-amber-500 text-xs"></i> 12H High Movers (±5%)
+                    </span>
+                    <span class="text-[10px] text-[#7a6d5c] dark:text-zinc-500 font-bold hidden sm:inline">• Click asset to inspect</span>
+                </div>
+                <span class="text-[9px] font-extrabold uppercase tracking-wider text-[#7a6d5c] dark:text-zinc-500 bg-[#dfd3bf] dark:bg-[#111116] px-2 py-0.5 rounded-md border border-[#cbbeaa] dark:border-[#22222e]">12H Window</span>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <!-- Top Gainers (+5%+) -->
+                <div class="space-y-2">
+                    <span class="text-[10px] font-black uppercase tracking-wider text-emerald-800 dark:text-emerald-400 flex items-center gap-1">
+                        <i class="fa-solid fa-arrow-trend-up text-[9px]"></i> Surging Assets (+5%)
+                    </span>
+                    <div id="gainersContainer" class="flex flex-wrap gap-2 min-h-[38px] items-center">
+                        <span class="text-[11px] text-[#7a6d5c] dark:text-zinc-500 font-semibold italic">Scanning price movements...</span>
+                    </div>
+                </div>
+
+                <!-- Top Losers (-5%+) -->
+                <div class="space-y-2">
+                    <span class="text-[10px] font-black uppercase tracking-wider text-rose-800 dark:text-rose-400 flex items-center gap-1">
+                        <i class="fa-solid fa-arrow-trend-down text-[9px]"></i> Dipping Assets (-5%)
+                    </span>
+                    <div id="losersContainer" class="flex flex-wrap gap-2 min-h-[38px] items-center">
+                        <span class="text-[11px] text-[#7a6d5c] dark:text-zinc-500 font-semibold italic">Scanning price movements...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Loading State -->
         <div id="loadingState" class="flex flex-col items-center justify-center py-16 warm-surface border rounded-2xl">
             <div class="w-12 h-12 rounded-2xl bg-amber-500/20 flex items-center justify-center text-amber-700 dark:text-amber-400 text-xl mb-3 animate-pulse">
@@ -153,7 +188,7 @@
             </div>
             <h3 class="text-sm sm:text-base font-extrabold text-[#2b2219] dark:text-white">No Asset Selected</h3>
             <p class="text-[#7d6f5d] dark:text-zinc-500 text-xs max-w-xs mx-auto">
-                Select or search for a resource above to inspect floor pricing and seasonal history.
+                Select an item or click any mover above to inspect live charts and stack values.
             </p>
         </div>
 
