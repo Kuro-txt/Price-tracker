@@ -4,7 +4,6 @@
     box-sizing: border-box;
 }
 
-/* Root Color Schemes */
 html {
     background-color: #dfd4c0;
     scrollbar-width: thin;
@@ -17,7 +16,6 @@ html.dark {
     scrollbar-color: #22222c transparent;
 }
 
-/* Base Body & Pixel Background */
 body {
     font-family: 'Plus Jakarta Sans', sans-serif;
     -webkit-tap-highlight-color: transparent;
@@ -37,7 +35,6 @@ body {
     image-rendering: pixelated;
 }
 
-/* Pitch Black OLED Pixel Grid (Dark Mode) */
 html.dark body {
     background-color: #000000 !important;
     color: #f4f4f5 !important;
@@ -50,7 +47,6 @@ html.dark body {
     background-position: 0 0, 0 0, 0 0, 16px 16px;
 }
 
-/* Surface Cards */
 .warm-surface {
     background: rgba(248, 243, 233, 0.95);
     border-color: #cbbeaa;
@@ -63,7 +59,6 @@ html.dark .warm-surface {
     box-shadow: 0 4px 24px -2px rgba(0, 0, 0, 0.95);
 }
 
-/* Scrollbars */
 ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
@@ -91,7 +86,6 @@ html.dark ::-webkit-scrollbar-thumb:hover {
     background: #333342;
 }
 
-/* Number Input Arrow Cleanup */
 input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button {
     -webkit-appearance: none;
