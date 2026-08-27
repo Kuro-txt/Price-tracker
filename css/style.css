@@ -24,7 +24,6 @@ body {
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
     
-    /* Clean Light Linen Grid */
     background-color: #f7f5f0;
     background-image: radial-gradient(rgba(0, 0, 0, 0.06) 1px, transparent 1px);
     background-size: 16px 16px;
@@ -53,7 +52,26 @@ html.dark .glass-panel {
     box-shadow: 0 4px 30px -4px rgba(0, 0, 0, 0.8);
 }
 
-/* Hide Horizontal Scrollbars for Clean Chips */
+/* Native Select & Option Dark Fix */
+select {
+    color-scheme: light;
+}
+
+html.dark select {
+    color-scheme: dark;
+}
+
+select option {
+    background-color: #f7f5f0;
+    color: #18181b;
+}
+
+html.dark select option {
+    background-color: #0d0d12 !important;
+    color: #ffffff !important;
+}
+
+/* Hide Horizontal Scrollbars */
 .no-scrollbar::-webkit-scrollbar {
     display: none;
 }
@@ -62,7 +80,7 @@ html.dark .glass-panel {
     scrollbar-width: none;
 }
 
-/* Input cleanup */
+/* Input number arrows cleanup */
 input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button {
     -webkit-appearance: none;
