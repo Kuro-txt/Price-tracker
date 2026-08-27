@@ -5,17 +5,18 @@
 }
 
 html {
-    background-color: #dfd4c0;
+    background-color: #faf8f5;
     scrollbar-width: thin;
-    scrollbar-color: #baa992 transparent;
+    scrollbar-color: #d6d3cd transparent;
 }
 
 html.dark {
     background-color: #000000 !important;
     color-scheme: dark;
-    scrollbar-color: #22222c transparent;
+    scrollbar-color: #27272a transparent;
 }
 
+/* Subtle Modern Grid Canvas */
 body {
     font-family: 'Plus Jakarta Sans', sans-serif;
     -webkit-tap-highlight-color: transparent;
@@ -23,40 +24,33 @@ body {
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
     
-    /* Warm Farmstead Pixel Grid (Light Mode) */
-    background-color: #dfd4c0;
-    background-image: 
-        linear-gradient(to right, rgba(175, 158, 132, 0.35) 1px, transparent 1px),
-        linear-gradient(to bottom, rgba(175, 158, 132, 0.35) 1px, transparent 1px),
-        linear-gradient(45deg, rgba(206, 192, 170, 0.45) 25%, transparent 25%, transparent 75%, rgba(206, 192, 170, 0.45) 75%),
-        linear-gradient(45deg, rgba(206, 192, 170, 0.45) 25%, transparent 25%, transparent 75%, rgba(206, 192, 170, 0.45) 75%);
-    background-size: 16px 16px, 16px 16px, 32px 32px, 32px 32px;
-    background-position: 0 0, 0 0, 0 0, 16px 16px;
-    image-rendering: pixelated;
+    /* Clean Light Linen Grid */
+    background-color: #f7f5f0;
+    background-image: radial-gradient(rgba(0, 0, 0, 0.06) 1px, transparent 1px);
+    background-size: 16px 16px;
 }
 
+/* OLED Deep Pitch Black */
 html.dark body {
     background-color: #000000 !important;
     color: #f4f4f5 !important;
-    background-image: 
-        linear-gradient(to right, rgba(255, 255, 255, 0.04) 1px, transparent 1px),
-        linear-gradient(to bottom, rgba(255, 255, 255, 0.04) 1px, transparent 1px),
-        linear-gradient(45deg, rgba(255, 255, 255, 0.02) 25%, transparent 25%, transparent 75%, rgba(255, 255, 255, 0.02) 75%),
-        linear-gradient(45deg, rgba(255, 255, 255, 0.02) 25%, transparent 25%, transparent 75%, rgba(255, 255, 255, 0.02) 75%);
-    background-size: 16px 16px, 16px 16px, 32px 32px, 32px 32px;
-    background-position: 0 0, 0 0, 0 0, 16px 16px;
+    background-image: radial-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+    background-size: 16px 16px;
 }
 
-.warm-surface {
-    background: rgba(248, 243, 233, 0.95);
-    border-color: #cbbeaa;
-    box-shadow: 0 4px 16px -2px rgba(100, 80, 50, 0.08), 0 2px 4px rgba(100, 80, 50, 0.04);
+/* Sleek Minimalist Glass Panels */
+.glass-panel {
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    box-shadow: 0 4px 20px -4px rgba(0, 0, 0, 0.03), 0 1px 2px rgba(0, 0, 0, 0.02);
 }
 
-html.dark .warm-surface {
-    background: #08080c !important;
-    border-color: #1c1c26 !important;
-    box-shadow: 0 4px 24px -2px rgba(0, 0, 0, 0.95);
+html.dark .glass-panel {
+    background: rgba(10, 10, 12, 0.75);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    box-shadow: 0 4px 30px -4px rgba(0, 0, 0, 0.8);
 }
 
 /* Hide Horizontal Scrollbars for Clean Chips */
@@ -68,40 +62,12 @@ html.dark .warm-surface {
     scrollbar-width: none;
 }
 
-/* Global Custom Scrollbars */
-::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-}
-
-::-webkit-scrollbar-track {
-    background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-    background: #baa992;
-    border-radius: 9999px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-    background: #a18f77;
-}
-
-html.dark ::-webkit-scrollbar-thumb {
-    background: #22222c;
-    border-radius: 9999px;
-}
-
-html.dark ::-webkit-scrollbar-thumb:hover {
-    background: #333342;
-}
-
+/* Input cleanup */
 input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button {
     -webkit-appearance: none;
     margin: 0;
 }
-
 input[type="number"] {
     -moz-appearance: textfield;
 }
