@@ -2,7 +2,6 @@ let allItems = [];
 window.activeItem = null;
 let autoRefreshTimer = null;
 
-// Format Price Helper
 function formatDisplayPrice(price) {
     const num = parseFloat(price);
     if (isNaN(num)) return "0.00";
@@ -12,17 +11,14 @@ function formatDisplayPrice(price) {
 }
 window.formatDisplayPrice = formatDisplayPrice;
 
-// Universal Array Normalizer
 function parseResourceItems(data) {
     if (!data) return [];
-
     if (Array.isArray(data)) {
         return data.map(item => ({
             name: item.name || item.item_name || "Unknown",
             price: parseFloat(item.price || item.current_price || 0)
         }));
     }
-
     const arrayKey = Object.keys(data).find(k => Array.isArray(data[k]));
     if (arrayKey) {
         return data[arrayKey].map(item => ({
@@ -30,20 +26,17 @@ function parseResourceItems(data) {
             price: parseFloat(item.price || item.current_price || 0)
         }));
     }
-
     if (typeof data === 'object') {
         return Object.entries(data)
-            .filter(([key]) => key !== 'error' && key !== 'status' && key !== 'message')
+            .filter(([key]) => key !== 'error' && key !== 'status')
             .map(([name, val]) => ({
                 name: name,
                 price: typeof val === 'object' && val !== null ? parseFloat(val.price || 0) : parseFloat(val || 0)
             }));
     }
-
     return [];
 }
 
-// Fetch Live Current Market Prices
 async function fetchPrices() {
     const refreshIcon = document.getElementById('refreshIcon');
     const loadingState = document.getElementById('loadingState');
@@ -53,14 +46,12 @@ async function fetchPrices() {
 
     try {
         const res = await fetch('/api/prices');
-        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+        if (!res.ok) throw new Error(`Status: ${res.status}`);
         
         const rawData = await res.json();
         allItems = parseResourceItems(rawData);
 
-        if (allItems.length === 0) {
-            throw new Error("No pricing data returned from database");
-        }
+        if (allItems.length === 0) throw new Error("No data received");
 
         if (loadingState) loadingState.classList.add('hidden');
         if (errorState) errorState.classList.add('hidden');
@@ -69,9 +60,11 @@ async function fetchPrices() {
 
         if (window.activeItem) {
             const fresh = allItems.find(i => i.name.toLowerCase() === window.activeItem.name.toLowerCase());
-            if (fresh) {
-                selectItem(fresh, false);
-            }
+            if (fresh) selectItem(fresh, false);
+        } else if (allItems.length > 0) {
+            // Auto-select Sunflower on first launch
+            const sunflower = allItems.find(i => i.name.toLowerCase() === 'sunflower') || allItems[0];
+            selectItem(sunflower, true);
         }
     } catch (err) {
         console.error("Fetch prices failed:", err);
@@ -79,87 +72,78 @@ async function fetchPrices() {
         if (errorState) {
             errorState.classList.remove('hidden');
             const msg = document.getElementById('errorMessage');
-            if (msg) msg.innerText = err.message || "Failed to fetch pricing data.";
+            if (msg) msg.innerText = err.message || "Failed to load prices.";
         }
     } finally {
         if (refreshIcon) refreshIcon.classList.remove('fa-spin');
     }
 }
 
-// Fetch 12H Movers (Horizontal Pill Rendering)
 async function fetchMovers() {
     const strip = document.getElementById('moversStripContainer');
-
     try {
         const res = await fetch('/api/movers');
-        if (!res.ok) throw new Error("Failed to load movers");
+        if (!res.ok) throw new Error();
         const data = await res.json();
 
         const gainers = Array.isArray(data?.gainers) ? data.gainers : [];
         const losers = Array.isArray(data?.losers) ? data.losers : [];
 
         if (!strip) return;
-
         if (gainers.length === 0 && losers.length === 0) {
-            strip.innerHTML = `<span class="text-[10px] text-[#7a6d5c] dark:text-zinc-500 font-semibold italic shrink-0">No assets moved $\\pm$5% in 12h</span>`;
+            strip.innerHTML = `<span class="text-[10px] text-zinc-500 font-semibold italic">No assets moved ±5% in 12h</span>`;
             return;
         }
 
         const gainersHtml = gainers.map(item => `
             <button onclick="onMoverSelect('${item.name.replace(/'/g, "\\'")}')" 
-                class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-100/90 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800/80 hover:scale-105 active:scale-95 transition shadow-2xs shrink-0 cursor-pointer">
-                <span class="text-[10px] font-black text-[#221a12] dark:text-zinc-100">${item.name}</span>
-                <span class="text-[9px] font-mono font-black text-emerald-800 dark:text-emerald-400">+${parseFloat(item.changePct).toFixed(1)}%</span>
+                class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shrink-0 text-xs font-bold hover:scale-105 transition active:scale-95">
+                <span>${item.name}</span>
+                <span class="font-mono text-[10px] font-black">+${parseFloat(item.changePct).toFixed(1)}%</span>
             </button>
         `).join('');
 
         const losersHtml = losers.map(item => `
             <button onclick="onMoverSelect('${item.name.replace(/'/g, "\\'")}')" 
-                class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-rose-100/90 dark:bg-rose-950/60 border border-rose-300 dark:border-rose-800/80 hover:scale-105 active:scale-95 transition shadow-2xs shrink-0 cursor-pointer">
-                <span class="text-[10px] font-black text-[#221a12] dark:text-zinc-100">${item.name}</span>
-                <span class="text-[9px] font-mono font-black text-rose-800 dark:text-rose-400">${parseFloat(item.changePct).toFixed(1)}%</span>
+                class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 shrink-0 text-xs font-bold hover:scale-105 transition active:scale-95">
+                <span>${item.name}</span>
+                <span class="font-mono text-[10px] font-black">${parseFloat(item.changePct).toFixed(1)}%</span>
             </button>
         `).join('');
 
         strip.innerHTML = gainersHtml + losersHtml;
     } catch (err) {
-        console.error("Movers fetch error:", err);
-        if (strip) strip.innerHTML = `<span class="text-[10px] text-[#7a6d5c] dark:text-zinc-500 font-semibold shrink-0">Movers offline</span>`;
+        if (strip) strip.innerHTML = `<span class="text-[10px] text-zinc-500 font-semibold">Movers unavailable</span>`;
     }
 }
 
-// Click Handler for Movers Pill
 function onMoverSelect(itemName) {
     const item = allItems.find(i => i.name.toLowerCase() === itemName.toLowerCase()) || { name: itemName, price: 0 };
-    
     const dropdown = document.getElementById('itemDropdown');
     const searchInput = document.getElementById('searchInput');
     if (dropdown) dropdown.value = itemName;
     if (searchInput) searchInput.value = itemName;
-
     selectItem(item, true);
 }
 
-// Populate Dropdown Select
 function populateDropdown() {
     const dropdown = document.getElementById('itemDropdown');
     if (!dropdown || !Array.isArray(allItems)) return;
 
     const currentVal = dropdown.value;
-    dropdown.innerHTML = '<option value="">-- Choose from Catalog --</option>';
+    dropdown.innerHTML = '<option value="">Catalog ▾</option>';
 
     const sorted = [...allItems].sort((a, b) => a.name.localeCompare(b.name));
     sorted.forEach(item => {
         const opt = document.createElement('option');
         opt.value = item.name;
-        opt.textContent = `${item.name} (${formatDisplayPrice(item.price)} SFL)`;
+        opt.textContent = `${item.name} (${formatDisplayPrice(item.price)})`;
         dropdown.appendChild(opt);
     });
 
     if (currentVal) dropdown.value = currentVal;
 }
 
-// Dropdown Change Handler
 function onDropdownSelect(itemName) {
     if (!itemName) return;
     const item = allItems.find(i => i.name.toLowerCase() === itemName.toLowerCase());
@@ -170,7 +154,6 @@ function onDropdownSelect(itemName) {
     }
 }
 
-// Autocomplete Filter
 function handleSearchInput(query) {
     const list = document.getElementById('autocompleteList');
     if (!list || !Array.isArray(allItems)) return;
@@ -181,18 +164,18 @@ function handleSearchInput(query) {
     }
 
     const q = query.toLowerCase().trim();
-    const matches = allItems.filter(i => i.name.toLowerCase().includes(q)).slice(0, 8);
+    const matches = allItems.filter(i => i.name.toLowerCase().includes(q)).slice(0, 6);
 
     if (matches.length === 0) {
-        list.innerHTML = '<div class="p-2 text-xs text-[#7a6d5c] dark:text-zinc-500 text-center font-bold">No matching items</div>';
+        list.innerHTML = '<div class="p-3 text-xs text-zinc-400 text-center font-bold">No assets found</div>';
         list.classList.remove('hidden');
         return;
     }
 
     list.innerHTML = matches.map(m => `
-        <div onclick="selectFromAutocomplete('${m.name.replace(/'/g, "\\'")}')" class="px-3 py-2 text-xs font-bold hover:bg-[#eae0cf] dark:hover:bg-[#1a1a24] cursor-pointer flex items-center justify-between transition">
-            <span class="text-[#2b2219] dark:text-white font-extrabold">${m.name}</span>
-            <span class="font-mono font-bold text-amber-800 dark:text-amber-400">${formatDisplayPrice(m.price)} SFL</span>
+        <div onclick="selectFromAutocomplete('${m.name.replace(/'/g, "\\'")}')" class="px-3.5 py-2.5 text-xs font-bold hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer flex items-center justify-between transition">
+            <span class="text-zinc-900 dark:text-white font-extrabold">${m.name}</span>
+            <span class="font-mono text-amber-600 dark:text-amber-400 font-bold">${formatDisplayPrice(m.price)} SFL</span>
         </div>
     `).join('');
 
@@ -213,10 +196,8 @@ function selectFromAutocomplete(itemName) {
         const dropdown = document.getElementById('itemDropdown');
         if (searchInput) searchInput.value = item.name;
         if (dropdown) dropdown.value = item.name;
-
         const list = document.getElementById('autocompleteList');
         if (list) list.classList.add('hidden');
-
         selectItem(item, true);
     }
 }
@@ -229,7 +210,6 @@ document.addEventListener('click', (e) => {
     }
 });
 
-// Select Item and Render Workspace
 function selectItem(item, loadGraph = true) {
     window.activeItem = item;
 
@@ -269,32 +249,14 @@ function calculateCustomStack() {
     resultEl.innerText = formatDisplayPrice(qty * price);
 }
 
-function setupAutoRefresh() {
-    const check = document.getElementById('autoRefreshCheck');
-    if (autoRefreshTimer) clearInterval(autoRefreshTimer);
-
-    if (check && check.checked) {
-        autoRefreshTimer = setInterval(() => {
-            fetchPrices();
-            fetchMovers();
-        }, 15000);
-    }
-
-    if (check) {
-        check.onchange = () => {
-            if (check.checked) {
-                setupAutoRefresh();
-            } else if (autoRefreshTimer) {
-                clearInterval(autoRefreshTimer);
-            }
-        };
-    }
-}
-
 document.addEventListener('DOMContentLoaded', () => {
     fetchPrices();
     fetchMovers();
-    setupAutoRefresh();
+    if (autoRefreshTimer) clearInterval(autoRefreshTimer);
+    autoRefreshTimer = setInterval(() => {
+        fetchPrices();
+        fetchMovers();
+    }, 15000);
 });
 
 // Globals
