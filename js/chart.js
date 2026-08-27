@@ -2,12 +2,10 @@ let chartInstance = null;
 let fullHistoryData = [];
 let selectedRange = "24h";
 
-// Sliding & Scaling Window State
 let viewStart = 0;
 let viewEnd = 0;
 let yPaddingMultiplier = 1.0;
 
-// Pointer & Drag Gesture State
 let isDragging = false;
 let startPointerX = 0;
 let startPointerY = 0;
@@ -16,7 +14,6 @@ let dragStartViewEnd = 0;
 let dragStartYPadding = 1.0;
 let initialPinchDistance = null;
 
-// SFL 4-Season Cycle (7 Days each = 28-day loop)
 const SEASONS = [
     { name: 'Spring', icon: '🌱', color: '#059669', textColor: 'text-emerald-800 dark:text-emerald-400', bg: 'bg-emerald-100/90 dark:bg-emerald-950/80', border: 'border-emerald-300 dark:border-emerald-800/60' },
     { name: 'Summer', icon: '☀️', color: '#d97706', textColor: 'text-amber-800 dark:text-amber-400', bg: 'bg-amber-100/90 dark:bg-amber-950/80', border: 'border-amber-300 dark:border-amber-800/60' },
@@ -131,14 +128,14 @@ function resetSlideView() {
 
 async function loadItemHistoryGraph(itemName) {
     const spinner = document.getElementById('chartSpinner');
-    const countLabel = document.getElementById('graphDataCount');
     if (spinner) spinner.classList.remove('hidden');
 
     let historyData = [];
     try {
         const res = await fetch(`/api/history?item=${encodeURIComponent(itemName)}&range=${selectedRange}`);
         if (res.ok) {
-            historyData = await res.json();
+            const raw = await res.json();
+            historyData = Array.isArray(raw) ? raw : (raw.rows || []);
         }
     } catch (err) {
         console.error("Failed to load history:", err);
@@ -151,9 +148,6 @@ async function loadItemHistoryGraph(itemName) {
             price: window.activeItem ? window.activeItem.price : 0,
             recorded_at: new Date().toISOString()
         }];
-        if (countLabel) countLabel.innerText = "1 point recorded";
-    } else {
-        if (countLabel) countLabel.innerText = `${historyData.length} records (${selectedRange.toUpperCase()})`;
     }
 
     fullHistoryData = historyData;
@@ -189,7 +183,6 @@ function renderChart() {
         const season = getSeasonForDate(validDate);
         itemSeasons.push(season);
 
-        // Smart adaptive label ticks for all timeframes
         if (['6h', '12h', '24h'].includes(selectedRange)) {
             labels.push(validDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
         } else if (selectedRange === '7d') {
@@ -217,7 +210,6 @@ function renderChart() {
     const maxPrice = Math.max(...prices);
     const priceRange = Math.max(maxPrice - minPrice, 0.0001);
 
-    // Clean margin breathing room
     const margin = priceRange * 0.18 * yPaddingMultiplier;
     const yMin = Math.max(0, minPrice - margin);
     const yMax = maxPrice + margin;
@@ -227,15 +219,12 @@ function renderChart() {
     }
 
     const isDark = document.documentElement.classList.contains('dark');
-    
-    // Clean, subtle dashed grid colors
     const gridColor = isDark ? 'rgba(255, 255, 255, 0.04)' : 'rgba(0, 0, 0, 0.06)';
     const tickColor = isDark ? '#71717a' : '#736655';
     const tooltipBg = isDark ? '#000000' : '#241b12';
 
     const pointColors = itemSeasons.map(s => s.color);
 
-    // Subtle gradient glow
     const gradient = ctx.createLinearGradient(0, 0, 0, isMobile ? 180 : 240);
     gradient.addColorStop(0, isDark ? 'rgba(245, 158, 11, 0.22)' : 'rgba(217, 119, 6, 0.18)');
     gradient.addColorStop(1, 'rgba(0, 0, 0, 0.0)');
@@ -293,10 +282,7 @@ function renderChart() {
             },
             scales: {
                 x: {
-                    grid: { 
-                        color: gridColor,
-                        borderDash: [3, 3] 
-                    },
+                    grid: { color: gridColor, borderDash: [3, 3] },
                     ticks: { 
                         font: { family: 'Plus Jakarta Sans', size: isMobile ? 9 : 10, weight: '600' }, 
                         color: tickColor, 
@@ -308,10 +294,7 @@ function renderChart() {
                 y: {
                     min: yMin,
                     max: yMax,
-                    grid: { 
-                        color: gridColor,
-                        borderDash: [3, 3] 
-                    },
+                    grid: { color: gridColor, borderDash: [3, 3] },
                     ticks: { 
                         font: { family: 'Plus Jakarta Sans', size: isMobile ? 9 : 10, weight: '600' }, 
                         color: tickColor, 
