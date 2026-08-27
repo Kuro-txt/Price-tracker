@@ -5,8 +5,19 @@ const db = createClient({
   authToken: process.env.TURSO_AUTH_TOKEN,
 });
 
+let cachedMovers = null;
+let lastFetchTime = 0;
+const CACHE_TTL_MS = 60 * 1000; // 60 seconds
+
 export default async function handler(req, res) {
   try {
+    const now = Date.now();
+    if (cachedMovers && now - lastFetchTime < CACHE_TTL_MS) {
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.setHeader("Cache-Control", "s-maxage=60, stale-while-revalidate");
+      return res.status(200).json(cachedMovers);
+    }
+
     const query = `
       WITH LatestPrices AS (
         SELECT 
@@ -59,9 +70,12 @@ export default async function handler(req, res) {
       }
     });
 
+    cachedMovers = { gainers, losers, changesMap };
+    lastFetchTime = now;
+
     res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Cache-Control", "s-maxage=15, stale-while-revalidate");
-    return res.status(200).json({ gainers, losers, changesMap });
+    res.setHeader("Cache-Control", "s-maxage=60, stale-while-revalidate");
+    return res.status(200).json(cachedMovers);
   } catch (error) {
     console.error("Movers API Error:", error);
     return res.status(500).json({ error: error.message, gainers: [], losers: [], changesMap: {} });
