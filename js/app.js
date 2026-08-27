@@ -2,8 +2,15 @@ let allItems = [];
 window.activeItem = null;
 let autoRefreshTimer = null;
 let currentTab = 'movers';
+let currentTaxRate = 10.0; // Default 10%
+let movers12hMap = {};
 
-// Load Watchlist from LocalStorage (defaults with starter items)
+// Load Settings from LocalStorage
+try {
+    const savedTax = localStorage.getItem('sunchart_tax_rate');
+    if (savedTax) currentTaxRate = parseFloat(savedTax) || 10.0;
+} catch (_) {}
+
 let watchlist = [];
 try {
     const saved = localStorage.getItem('sunchart_watchlist');
@@ -21,7 +28,22 @@ function formatDisplayPrice(price) {
 }
 window.formatDisplayPrice = formatDisplayPrice;
 
-// View Switcher (Movers vs Chart vs Watchlist)
+// Tax Rate Controller
+function onTaxRateChange(val) {
+    currentTaxRate = parseFloat(val) || 10.0;
+    try {
+        localStorage.setItem('sunchart_tax_rate', currentTaxRate.toString());
+    } catch (_) {}
+    calculateCustomStack();
+}
+window.onTaxRateChange = onTaxRateChange;
+
+function syncTaxSelectorUI() {
+    const select = document.getElementById('taxRateSelect');
+    if (select) select.value = currentTaxRate.toString();
+}
+
+// Tab Switcher (Movers vs Chart vs Watchlist)
 function switchTab(tab) {
     currentTab = tab;
     const chartTab = document.getElementById('chartTabContent');
@@ -32,10 +54,9 @@ function switchTab(tab) {
     const btnMovers = document.getElementById('tabBtn-movers');
     const btnWatchlist = document.getElementById('tabBtn-watchlist');
 
-    const inactiveClass = "px-2 sm:px-2.5 py-1 rounded-lg transition text-zinc-500 hover:text-black dark:hover:text-white flex items-center gap-1 shrink-0";
-    const activeClass = "px-2 sm:px-2.5 py-1 rounded-lg transition bg-white dark:bg-zinc-800 text-amber-600 dark:text-amber-400 shadow-xs flex items-center gap-1 shrink-0";
+    const inactiveClass = "py-1 rounded-lg transition text-zinc-500 hover:text-black dark:hover:text-white flex items-center justify-center gap-1";
+    const activeClass = "py-1 rounded-lg transition bg-white dark:bg-zinc-800 text-amber-600 dark:text-amber-400 shadow-xs flex items-center justify-center gap-1";
 
-    // Hide all tabs
     if (chartTab) chartTab.classList.add('hidden');
     if (moversTab) moversTab.classList.add('hidden');
     if (watchlistTab) watchlistTab.classList.add('hidden');
@@ -113,6 +134,7 @@ function updateActiveItemStar() {
     }
 }
 
+// Smooth Watchlist Renderer with 12H % Shift
 function renderWatchlist() {
     const grid = document.getElementById('watchlistGrid');
     if (!grid) return;
@@ -123,8 +145,8 @@ function renderWatchlist() {
                 <div class="w-8 h-8 rounded-full bg-amber-500/10 text-amber-500 flex items-center justify-center mx-auto text-xs">
                     <i class="fa-regular fa-star"></i>
                 </div>
-                <p class="text-xs font-bold text-zinc-600 dark:text-zinc-300">Your Watchlist is Empty</p>
-                <p class="text-[10px] text-zinc-400 max-w-xs mx-auto">Tap the star icon on any crop or resource to pin it here for rapid tracking.</p>
+                <p class="text-xs font-bold text-zinc-600 dark:text-zinc-300">Watchlist is Empty</p>
+                <p class="text-[10px] text-zinc-400 max-w-xs mx-auto">Tap the star icon on any resource to track its floor and 12h price movement here.</p>
             </div>
         `;
         return;
@@ -132,22 +154,56 @@ function renderWatchlist() {
 
     grid.innerHTML = watchlist.map(name => {
         const item = allItems.find(i => i.name.toLowerCase() === name.toLowerCase()) || { name: name, price: 0 };
+        const moverData = movers12hMap[name.toLowerCase()];
+        
+        let changeBadgeHtml = '';
+        if (moverData && typeof moverData.changePct === 'number') {
+            const pct = moverData.changePct;
+            if (pct > 0.001) {
+                changeBadgeHtml = `
+                    <span class="text-[9px] font-mono font-black text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded-md border border-emerald-500/20">
+                        +${pct.toFixed(1)}% (12H)
+                    </span>
+                `;
+            } else if (pct < -0.001) {
+                changeBadgeHtml = `
+                    <span class="text-[9px] font-mono font-black text-rose-600 dark:text-rose-400 bg-rose-500/10 px-1.5 py-0.5 rounded-md border border-rose-500/20">
+                        ${pct.toFixed(1)}% (12H)
+                    </span>
+                `;
+            } else {
+                changeBadgeHtml = `
+                    <span class="text-[9px] font-mono font-bold text-zinc-400 bg-black/5 dark:bg-white/5 px-1.5 py-0.5 rounded-md">
+                        0.0% (12H)
+                    </span>
+                `;
+            }
+        } else {
+            changeBadgeHtml = `
+                <span class="text-[9px] font-mono font-bold text-zinc-400 bg-black/5 dark:bg-white/5 px-1.5 py-0.5 rounded-md">
+                    -- (12H)
+                </span>
+            `;
+        }
+
         return `
             <div class="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-white/70 dark:bg-black/40 hover:bg-white dark:hover:bg-zinc-900 border border-black/5 dark:border-white/10 transition shadow-2xs group">
                 <div onclick="onMoverSelect('${item.name.replace(/'/g, "\\'")}')" class="flex-1 min-w-0 flex items-center gap-2 cursor-pointer">
-                    <span class="w-2 h-2 rounded-full bg-amber-500 shrink-0"></span>
+                    <span class="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0"></span>
                     <span class="text-xs font-black text-zinc-800 dark:text-zinc-100 truncate">${item.name}</span>
                 </div>
 
-                <div class="flex items-center gap-3 shrink-0 ml-2">
-                    <div onclick="onMoverSelect('${item.name.replace(/'/g, "\\'")}')" class="text-right cursor-pointer">
+                <div class="flex items-center gap-2.5 shrink-0 ml-2">
+                    ${changeBadgeHtml}
+
+                    <div onclick="onMoverSelect('${item.name.replace(/'/g, "\\'")}')" class="text-right cursor-pointer min-w-[55px]">
                         <span class="text-xs font-mono font-black text-amber-600 dark:text-amber-400">${formatDisplayPrice(item.price)}</span>
-                        <span class="text-[9px] font-bold text-zinc-400 ml-0.5">SFL</span>
+                        <span class="text-[8px] font-bold text-zinc-400">SFL</span>
                     </div>
 
                     <button onclick="toggleWatchlist('${item.name.replace(/'/g, "\\'")}')" title="Remove from Watchlist" 
                         class="w-6 h-6 rounded-lg flex items-center justify-center bg-black/5 dark:bg-white/5 hover:bg-rose-500/20 text-zinc-400 hover:text-rose-500 transition active:scale-90">
-                        <i class="fa-solid fa-trash-can text-[10px]"></i>
+                        <i class="fa-solid fa-xmark text-[11px]"></i>
                     </button>
                 </div>
             </div>
@@ -235,6 +291,8 @@ async function fetchMovers() {
 
         const gainers = Array.isArray(data?.gainers) ? data.gainers : [];
         const losers = Array.isArray(data?.losers) ? data.losers : [];
+        movers12hMap = data?.changesMap || {};
+
         const totalCount = gainers.length + losers.length;
 
         if (badge) {
@@ -288,6 +346,8 @@ async function fetchMovers() {
                 `).join('');
             }
         }
+
+        renderWatchlist();
     } catch (err) {
         if (gainersList) gainersList.innerHTML = `<span class="text-[10px] text-zinc-500">Unavailable</span>`;
         if (losersList) losersList.innerHTML = `<span class="text-[10px] text-zinc-500">Unavailable</span>`;
@@ -443,9 +503,11 @@ function addQuantity(amount) {
 }
 window.addQuantity = addQuantity;
 
+// Dynamic Tax Applied to Calculator
 function calculateCustomStack() {
     const qtyInput = document.getElementById('calcQuantity');
     const grossEl = document.getElementById('calcGross');
+    const feeLabelEl = document.getElementById('calcFeeLabel');
     const feeEl = document.getElementById('calcFee');
     const netEl = document.getElementById('calcNet');
 
@@ -455,15 +517,17 @@ function calculateCustomStack() {
     const price = parseFloat(window.activeItem.price) || 0;
 
     const gross = qty * price;
-    const fee = gross * 0.10;
+    const fee = gross * (currentTaxRate / 100.0);
     const net = gross - fee;
 
     grossEl.innerText = formatDisplayPrice(gross);
+    if (feeLabelEl) feeLabelEl.innerText = `Plaza Tax (-${currentTaxRate}%)`;
     if (feeEl) feeEl.innerText = `-${formatDisplayPrice(fee)}`;
     if (netEl) netEl.innerText = formatDisplayPrice(net);
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    syncTaxSelectorUI();
     switchTab('movers');
     updateWatchlistBadge();
     fetchPrices();
