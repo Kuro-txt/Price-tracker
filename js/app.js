@@ -5,7 +5,7 @@ let currentTab = 'movers';
 let currentTaxRate = 10.0;
 let movers12hMap = {};
 
-// 1. Persistent Storage Initializers
+// Load Settings from LocalStorage
 try {
     const savedTax = localStorage.getItem('sunchart_tax_rate');
     if (savedTax) currentTaxRate = parseFloat(savedTax) || 10.0;
@@ -28,7 +28,7 @@ function formatDisplayPrice(price) {
 }
 window.formatDisplayPrice = formatDisplayPrice;
 
-// --- Calculator & Tax Storage Helpers ---
+// Calculator & Tax Storage Helpers
 function saveItemCalcState(itemName, qty, buyPrice) {
     if (!itemName) return;
     try {
@@ -283,7 +283,6 @@ async function fetchPrices() {
             const fresh = allItems.find(i => i.name.toLowerCase() === window.activeItem.name.toLowerCase());
             if (fresh) selectItem(fresh, false);
         } else if (allItems.length > 0) {
-            // Restore last active item from local storage, or default to Sunflower
             const savedItemName = localStorage.getItem('sunchart_last_selected_item');
             const targetItem = (savedItemName && allItems.find(i => i.name.toLowerCase() === savedItemName.toLowerCase()))
                 || allItems.find(i => i.name.toLowerCase() === 'sunflower') 
@@ -501,11 +500,6 @@ function selectItem(item, loadGraph = true) {
     if (stack100El) stack100El.innerText = formatDisplayPrice(price * 100);
     if (stack1000El) stack1000El.innerText = formatDisplayPrice(price * 1000);
 
-    const target5El = document.getElementById('target5Price');
-    const target10El = document.getElementById('target10Price');
-    if (target5El) target5El.innerText = `${formatDisplayPrice(price * 1.05)} SFL`;
-    if (target10El) target10El.innerText = `${formatDisplayPrice(price * 1.10)} SFL`;
-
     // Restore saved item-specific Qty and Buy Price
     const savedState = loadItemCalcState(item.name);
     const qtyInput = document.getElementById('calcQuantity');
@@ -514,7 +508,7 @@ function selectItem(item, loadGraph = true) {
     if (buyInput) buyInput.value = savedState.buyPrice !== undefined && savedState.buyPrice !== null ? savedState.buyPrice : '';
 
     updateActiveItemStar();
-    calculateCustomStack(false); // Calculate without re-saving initial state
+    calculateCustomStack(false);
 
     if (loadGraph && typeof window.loadItemHistoryGraph === 'function') {
         window.loadItemHistoryGraph(item.name);
@@ -538,7 +532,7 @@ function addQuantity(amount) {
 }
 window.addQuantity = addQuantity;
 
-// Net Profit, Plaza Tax & Persistent Calculator Engine
+// Net Profit, Plaza Tax & Target Profit Engine
 function calculateCustomStack(shouldSave = true) {
     const qtyInput = document.getElementById('calcQuantity');
     const buyInput = document.getElementById('calcBuyPrice');
@@ -549,6 +543,11 @@ function calculateCustomStack(shouldSave = true) {
     const profitEl = document.getElementById('calcProfit');
     const profitLabelEl = document.getElementById('calcProfitLabel');
     const profitUnitEl = document.getElementById('calcProfitUnit');
+
+    const target5El = document.getElementById('target5Price');
+    const target10El = document.getElementById('target10Price');
+    const target5Label = document.getElementById('target5Label');
+    const target10Label = document.getElementById('target10Label');
 
     if (!qtyInput || !grossEl || !window.activeItem) return;
 
@@ -562,8 +561,9 @@ function calculateCustomStack(shouldSave = true) {
         saveItemCalcState(window.activeItem.name, qty, buyPriceRaw);
     }
 
+    const taxRateFraction = currentTaxRate / 100.0;
     const gross = qty * currentPrice;
-    const fee = gross * (currentTaxRate / 100.0);
+    const fee = gross * taxRateFraction;
     const netYield = gross - fee;
     const totalCost = qty * buyPrice;
     const profit = netYield - totalCost;
@@ -572,6 +572,26 @@ function calculateCustomStack(shouldSave = true) {
     if (feeLabelEl) feeLabelEl.innerText = `Plaza Tax (-${currentTaxRate}%)`;
     if (feeEl) feeEl.innerText = `-${formatDisplayPrice(fee)}`;
     if (costEl) costEl.innerText = formatDisplayPrice(totalCost);
+
+    // Target Profit Price Calculation based on Bought Price + Plaza Tax
+    const netMultiplier = 1.0 - taxRateFraction;
+    if (buyPrice > 0 && netMultiplier > 0) {
+        // Selling Price required to get a true net +5% and +10% return on buyPrice:
+        // Target = (buyPrice * 1.05) / (1 - Tax)
+        const target5SellPrice = (buyPrice * 1.05) / netMultiplier;
+        const target10SellPrice = (buyPrice * 1.10) / netMultiplier;
+
+        if (target5El) target5El.innerText = `${formatDisplayPrice(target5SellPrice)} SFL`;
+        if (target10El) target10El.innerText = `${formatDisplayPrice(target10SellPrice)} SFL`;
+        if (target5Label) target5Label.innerText = "+5% Profit Target:";
+        if (target10Label) target10Label.innerText = "+10% Profit Target:";
+    } else {
+        // Fallback: target based on current floor price
+        if (target5El) target5El.innerText = `${formatDisplayPrice(currentPrice * 1.05)} SFL`;
+        if (target10El) target10El.innerText = `${formatDisplayPrice(currentPrice * 1.10)} SFL`;
+        if (target5Label) target5Label.innerText = "+5% Target:";
+        if (target10Label) target10Label.innerText = "+10% Target:";
+    }
 
     if (profitEl) {
         profitEl.innerText = `${profit >= 0 ? '+' : ''}${formatDisplayPrice(profit)}`;
