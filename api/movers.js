@@ -7,7 +7,7 @@ const db = createClient({
 
 let cachedMovers = null;
 let lastFetchTime = 0;
-const CACHE_TTL_MS = 60 * 1000; // 60 seconds
+const CACHE_TTL_MS = 60 * 1000;
 
 export default async function handler(req, res) {
   try {
@@ -18,21 +18,24 @@ export default async function handler(req, res) {
       return res.status(200).json(cachedMovers);
     }
 
+    // Both CTEs are strictly bounded by timestamps
     const query = `
       WITH LatestPrices AS (
         SELECT 
           item_name, 
           price AS current_price,
-          ROW_NUMBER() OVER (PARTITION BY LOWER(item_name) ORDER BY recorded_at DESC) as rn
+          ROW_NUMBER() OVER (PARTITION BY item_name ORDER BY recorded_at DESC) as rn
         FROM resource_prices
+        WHERE recorded_at >= datetime('now', '-45 minutes')
       ),
       PastPrices AS (
         SELECT 
           item_name, 
           price AS past_price,
-          ROW_NUMBER() OVER (PARTITION BY LOWER(item_name) ORDER BY recorded_at ASC) as rn
+          ROW_NUMBER() OVER (PARTITION BY item_name ORDER BY recorded_at ASC) as rn
         FROM resource_prices
-        WHERE recorded_at >= datetime('now', '-12 hours')
+        WHERE recorded_at >= datetime('now', '-13 hours') 
+          AND recorded_at <= datetime('now', '-11 hours')
       )
       SELECT 
         l.item_name,
@@ -41,7 +44,7 @@ export default async function handler(req, res) {
         ROUND(((l.current_price - p.past_price) / p.past_price) * 100, 2) AS change_pct,
         ROUND(l.current_price - p.past_price, 6) AS change_amt
       FROM LatestPrices l
-      JOIN PastPrices p ON LOWER(l.item_name) = LOWER(p.item_name) AND p.rn = 1
+      JOIN PastPrices p ON l.item_name = p.item_name AND p.rn = 1
       WHERE l.rn = 1 AND p.past_price > 0
       ORDER BY change_pct DESC;
     `;
