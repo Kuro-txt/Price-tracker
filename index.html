@@ -257,7 +257,7 @@
                     </div>
                 </div>
 
-                <!-- Calculator & Dynamic Tax Suite -->
+                <!-- Calculator & Dynamic Tax Suite with Profit / Loss Engine -->
                 <div class="glass-panel rounded-2xl p-3 space-y-2.5">
                     
                     <!-- Clickable Stack Presets -->
@@ -276,15 +276,25 @@
                         </button>
                     </div>
 
-                    <!-- Quantity Input & Increments -->
-                    <div class="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-black/5 dark:border-white/5">
-                        <div class="flex items-center gap-1.5">
-                            <span class="text-[10px] font-extrabold text-zinc-400 uppercase">Qty</span>
+                    <!-- Input Bar: Quantity + Bought At (Buy Price) -->
+                    <div class="grid grid-cols-2 gap-2 pt-1 border-t border-black/5 dark:border-white/5">
+                        <div class="flex items-center gap-1.5 bg-black/5 dark:bg-white/5 p-1 rounded-xl">
+                            <span class="text-[9px] font-extrabold text-zinc-400 uppercase pl-1 shrink-0">Qty</span>
                             <input type="number" id="calcQuantity" value="50" min="1" oninput="calculateCustomStack()" 
-                                class="w-20 bg-white dark:bg-black border border-black/10 dark:border-white/10 rounded-lg px-2 py-1 text-xs font-black font-mono text-zinc-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-amber-500">
+                                class="w-full bg-white dark:bg-black border border-black/10 dark:border-white/10 rounded-lg px-2 py-0.5 text-xs font-black font-mono text-zinc-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-amber-500">
                         </div>
 
-                        <div class="flex items-center gap-1 overflow-x-auto no-scrollbar">
+                        <div class="flex items-center gap-1.5 bg-black/5 dark:bg-white/5 p-1 rounded-xl">
+                            <span class="text-[9px] font-extrabold text-zinc-400 uppercase pl-1 shrink-0">Bought @</span>
+                            <input type="number" id="calcBuyPrice" step="any" placeholder="0.00" oninput="calculateCustomStack()" 
+                                class="w-full bg-white dark:bg-black border border-black/10 dark:border-white/10 rounded-lg px-2 py-0.5 text-xs font-black font-mono text-zinc-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-amber-500">
+                        </div>
+                    </div>
+
+                    <!-- Quick Increment Chips -->
+                    <div class="flex items-center justify-between gap-1 overflow-x-auto no-scrollbar">
+                        <span class="text-[8px] font-extrabold text-zinc-400 uppercase">Quick Add</span>
+                        <div class="flex items-center gap-1">
                             <button onclick="addQuantity(10)" class="px-2 py-0.5 rounded-lg bg-black/5 dark:bg-white/5 hover:bg-amber-500/20 text-[9px] font-bold text-zinc-600 dark:text-zinc-300 transition active:scale-95">+10</button>
                             <button onclick="addQuantity(50)" class="px-2 py-0.5 rounded-lg bg-black/5 dark:bg-white/5 hover:bg-amber-500/20 text-[9px] font-bold text-zinc-600 dark:text-zinc-300 transition active:scale-95">+50</button>
                             <button onclick="addQuantity(100)" class="px-2 py-0.5 rounded-lg bg-black/5 dark:bg-white/5 hover:bg-amber-500/20 text-[9px] font-bold text-zinc-600 dark:text-zinc-300 transition active:scale-95">+100</button>
@@ -293,8 +303,8 @@
                         </div>
                     </div>
 
-                    <!-- Gross, Dynamic Tax & Net Yield Breakdown -->
-                    <div class="grid grid-cols-3 gap-2 bg-black/5 dark:bg-white/5 p-2 rounded-xl text-[10px]">
+                    <!-- 4-Box PnL & Yield Breakdown Grid -->
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-1.5 bg-black/5 dark:bg-white/5 p-2 rounded-xl text-[10px]">
                         <div>
                             <span class="text-zinc-400 block font-semibold text-[8px] uppercase">Gross Value</span>
                             <span id="calcGross" class="font-mono font-black text-zinc-800 dark:text-zinc-200 text-xs">0.00</span>
@@ -305,10 +315,15 @@
                             <span id="calcFee" class="font-mono font-black text-rose-500 text-xs">-0.00</span>
                             <span class="text-[8px] font-bold text-zinc-400">SFL</span>
                         </div>
+                        <div>
+                            <span class="text-zinc-400 block font-semibold text-[8px] uppercase">Cost Basis</span>
+                            <span id="calcCost" class="font-mono font-black text-zinc-700 dark:text-zinc-300 text-xs">0.00</span>
+                            <span class="text-[8px] font-bold text-zinc-400">SFL</span>
+                        </div>
                         <div class="text-right">
-                            <span class="text-emerald-600 dark:text-emerald-400 block font-extrabold text-[8px] uppercase">Net Yield</span>
-                            <span id="calcNet" class="font-mono font-black text-emerald-600 dark:text-emerald-400 text-xs sm:text-sm">0.00</span>
-                            <span class="text-[8px] font-bold text-emerald-600/70 dark:text-emerald-400/70">SFL</span>
+                            <span class="block font-extrabold text-[8px] uppercase" id="calcProfitLabel">Net Profit</span>
+                            <span id="calcProfit" class="font-mono font-black text-xs sm:text-sm text-emerald-600 dark:text-emerald-400">0.00</span>
+                            <span class="text-[8px] font-bold" id="calcProfitUnit">SFL</span>
                         </div>
                     </div>
 
