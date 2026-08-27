@@ -81,10 +81,10 @@
         </div>
     </header>
 
-    <!-- Main Mobile-First Feed -->
+    <!-- Main Content Workspace -->
     <main class="max-w-4xl mx-auto px-3 sm:px-4 py-3 flex-1 w-full space-y-3">
 
-        <!-- Spotlight Search & Quick Switcher Bar -->
+        <!-- Search Bar & Dropdown -->
         <div class="relative">
             <div class="glass-panel rounded-2xl p-1.5 flex items-center gap-2">
                 <div class="relative flex-1">
@@ -106,9 +106,45 @@
             <div id="autocompleteList" class="hidden absolute left-0 right-0 top-full mt-1.5 glass-panel rounded-2xl max-h-60 overflow-y-auto z-50 shadow-2xl divide-y divide-black/5 dark:divide-white/5"></div>
         </div>
 
-        <!-- Horizontal 12H Movers Ticker -->
-        <div class="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5" id="moversStripContainer">
-            <span class="text-[10px] text-zinc-500 font-semibold italic">Scanning 12h shifts...</span>
+        <!-- Redesigned 12H Market Movers Widget -->
+        <div class="glass-panel rounded-2xl p-3 space-y-2.5">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-1.5">
+                    <i class="fa-solid fa-bolt text-amber-500 text-xs"></i>
+                    <span class="text-[11px] font-black uppercase tracking-wider text-zinc-700 dark:text-zinc-300">12H Market Shifts (±5%)</span>
+                </div>
+                <span class="text-[9px] font-extrabold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider bg-black/5 dark:bg-white/5 px-2 py-0.5 rounded-full">
+                    Auto-Updates
+                </span>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <!-- Top Gainers Card -->
+                <div class="bg-emerald-500/5 dark:bg-emerald-950/20 border border-emerald-500/15 dark:border-emerald-500/20 rounded-xl p-2.5 space-y-2">
+                    <div class="flex items-center justify-between text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-wide">
+                        <span class="flex items-center gap-1">
+                            <i class="fa-solid fa-arrow-trend-up text-[9px]"></i> Top Gainers
+                        </span>
+                        <span class="text-[9px] text-emerald-600/70 dark:text-emerald-400/70 font-mono font-bold">12H</span>
+                    </div>
+                    <div id="gainersList" class="flex flex-wrap sm:flex-col gap-1.5 min-h-[32px]">
+                        <span class="text-[11px] text-zinc-400 dark:text-zinc-500 italic py-1">Scanning market...</span>
+                    </div>
+                </div>
+
+                <!-- Top Losers Card -->
+                <div class="bg-rose-500/5 dark:bg-rose-950/20 border border-rose-500/15 dark:border-rose-500/20 rounded-xl p-2.5 space-y-2">
+                    <div class="flex items-center justify-between text-[10px] font-black text-rose-600 dark:text-rose-400 uppercase tracking-wide">
+                        <span class="flex items-center gap-1">
+                            <i class="fa-solid fa-arrow-trend-down text-[9px]"></i> Top Dippers
+                        </span>
+                        <span class="text-[9px] text-rose-600/70 dark:text-rose-400/70 font-mono font-bold">12H</span>
+                    </div>
+                    <div id="losersList" class="flex flex-wrap sm:flex-col gap-1.5 min-h-[32px]">
+                        <span class="text-[11px] text-zinc-400 dark:text-zinc-500 italic py-1">Scanning market...</span>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- Loading State -->
@@ -131,7 +167,7 @@
             <p class="text-xs text-zinc-500 max-w-xs mx-auto">Choose an asset above to inspect pricing and chart trends.</p>
         </div>
 
-        <!-- Active Item Dashboard (Instantly Visible Without Scrolling) -->
+        <!-- Active Item Dashboard -->
         <div id="itemDetailsContainer" class="hidden space-y-3">
             
             <!-- Hero Price & Season Banner -->
@@ -178,7 +214,7 @@
                         </button>
                     </div>
 
-                    <!-- Canvas -->
+                    <!-- Canvas Container -->
                     <div class="relative h-48 sm:h-64 w-full">
                         <div id="chartSpinner" class="hidden absolute inset-0 bg-transparent backdrop-blur-xs flex items-center justify-center z-10">
                             <i class="fa-solid fa-circle-notch fa-spin text-amber-500"></i>
@@ -223,7 +259,7 @@
 
     </main>
 
-    <!-- Clean Footer -->
+    <!-- Footer -->
     <footer class="py-3 text-center text-[10px] font-bold text-zinc-400">
         Data synced live from <a href="https://sfl.world" target="_blank" class="text-amber-600 dark:text-amber-400 hover:underline">sfl.world</a>
     </footer>
