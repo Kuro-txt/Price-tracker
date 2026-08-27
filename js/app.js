@@ -294,6 +294,12 @@ function selectItem(item, loadGraph = true) {
     if (stack100El) stack100El.innerText = formatDisplayPrice(price * 100);
     if (stack1000El) stack1000El.innerText = formatDisplayPrice(price * 1000);
 
+    // Target Profit Price Calculation
+    const target5El = document.getElementById('target5Price');
+    const target10El = document.getElementById('target10Price');
+    if (target5El) target5El.innerText = `${formatDisplayPrice(price * 1.05)} SFL`;
+    if (target10El) target10El.innerText = `${formatDisplayPrice(price * 1.10)} SFL`;
+
     calculateCustomStack();
 
     if (loadGraph && typeof window.loadItemHistoryGraph === 'function') {
@@ -301,14 +307,43 @@ function selectItem(item, loadGraph = true) {
     }
 }
 
+// Quick Add / Set Quantity Handlers
+function setQuantity(val) {
+    const qtyInput = document.getElementById('calcQuantity');
+    if (!qtyInput) return;
+    qtyInput.value = Math.max(1, parseInt(val) || 1);
+    calculateCustomStack();
+}
+window.setQuantity = setQuantity;
+
+function addQuantity(amount) {
+    const qtyInput = document.getElementById('calcQuantity');
+    if (!qtyInput) return;
+    const current = parseInt(qtyInput.value) || 0;
+    qtyInput.value = Math.max(1, current + amount);
+    calculateCustomStack();
+}
+window.addQuantity = addQuantity;
+
+// Upgraded Calculation with Plaza Fee (-10%)
 function calculateCustomStack() {
     const qtyInput = document.getElementById('calcQuantity');
-    const resultEl = document.getElementById('calcResult');
-    if (!qtyInput || !resultEl || !window.activeItem) return;
+    const grossEl = document.getElementById('calcGross');
+    const feeEl = document.getElementById('calcFee');
+    const netEl = document.getElementById('calcNet');
+
+    if (!qtyInput || !grossEl || !window.activeItem) return;
 
     const qty = Math.max(1, parseFloat(qtyInput.value) || 1);
     const price = parseFloat(window.activeItem.price) || 0;
-    resultEl.innerText = formatDisplayPrice(qty * price);
+
+    const gross = qty * price;
+    const fee = gross * 0.10; // Standard 10% Plaza marketplace fee
+    const net = gross - fee;
+
+    grossEl.innerText = formatDisplayPrice(gross);
+    if (feeEl) feeEl.innerText = `-${formatDisplayPrice(fee)}`;
+    if (netEl) netEl.innerText = formatDisplayPrice(net);
 }
 
 document.addEventListener('DOMContentLoaded', () => {
