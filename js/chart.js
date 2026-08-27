@@ -15,10 +15,10 @@ let dragStartYPadding = 1.0;
 let initialPinchDistance = null;
 
 const SEASONS = [
-    { name: 'Spring', icon: '🌱', color: '#059669', textColor: 'text-emerald-800 dark:text-emerald-400', bg: 'bg-emerald-100/90 dark:bg-emerald-950/80', border: 'border-emerald-300 dark:border-emerald-800/60' },
-    { name: 'Summer', icon: '☀️', color: '#d97706', textColor: 'text-amber-800 dark:text-amber-400', bg: 'bg-amber-100/90 dark:bg-amber-950/80', border: 'border-amber-300 dark:border-amber-800/60' },
-    { name: 'Autumn', icon: '🍂', color: '#ea580c', textColor: 'text-orange-800 dark:text-orange-400', bg: 'bg-orange-100/90 dark:bg-orange-950/80', border: 'border-orange-300 dark:border-orange-800/60' },
-    { name: 'Winter', icon: '❄️', color: '#0284c7', textColor: 'text-sky-800 dark:text-sky-400', bg: 'bg-sky-100/90 dark:bg-sky-950/80', border: 'border-sky-300 dark:border-sky-800/60' }
+    { name: 'Spring', icon: '🌱', color: '#10b981' },
+    { name: 'Summer', icon: '☀️', color: '#f59e0b' },
+    { name: 'Autumn', icon: '🍂', color: '#f97316' },
+    { name: 'Winter', icon: '❄️', color: '#38bdf8' }
 ];
 
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
@@ -45,7 +45,6 @@ function getSeasonForDate(date) {
     
     const weekOffset = Math.floor(diffTime / SEVEN_DAYS_MS);
     const seasonIndex = ((weekOffset % 4) + 4) % 4;
-    
     const dayInSeason = (Math.floor((targetTime - (currentWeekStart + weekOffset * SEVEN_DAYS_MS)) / (24 * 60 * 60 * 1000)) + 1);
     
     return {
@@ -57,35 +56,27 @@ function getSeasonForDate(date) {
 function updateActiveSeasonBadge() {
     const badge = document.getElementById('currentSeasonBadge');
     if (!badge) return;
-
     const currentSeason = getSeasonForDate(new Date());
-    badge.className = `inline-flex items-center gap-1 text-[10px] font-black px-2.5 py-0.5 rounded-full border ${currentSeason.bg} ${currentSeason.border} ${currentSeason.textColor}`;
-    badge.innerHTML = `<span>${currentSeason.icon}</span> <span>${currentSeason.name} (Day ${currentSeason.day}/7)</span>`;
+    badge.innerText = `${currentSeason.icon} ${currentSeason.name} (Day ${currentSeason.day}/7)`;
 }
 
-// Compare Starting Point of Timeframe against Current Live Price
 function updatePriceChangeBadge(startPrice, currentPrice) {
     const badge = document.getElementById('priceChangeBadge');
     if (!badge) return;
 
     const diff = currentPrice - startPrice;
     const percent = startPrice > 0 ? (diff / startPrice) * 100 : 0;
-
-    const formattedDiff = Math.abs(diff) < 0.001 
-        ? diff.toFixed(6).replace(/\.?0+$/, "") 
-        : diff.toFixed(4).replace(/\.?0+$/, "");
-
     const rangeLabel = selectedRange.toUpperCase();
 
     if (diff > 0.000001) {
-        badge.className = "inline-flex items-center gap-1 text-[10px] font-black px-2.5 py-0.5 rounded-full border bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-400 border-emerald-300 dark:border-emerald-800/60";
-        badge.innerHTML = `<i class="fa-solid fa-arrow-trend-up text-[9px]"></i> +${percent.toFixed(2)}% (${rangeLabel})`;
+        badge.className = "text-[10px] font-black px-2 py-0.5 rounded-full border bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20";
+        badge.innerHTML = `+${percent.toFixed(2)}% (${rangeLabel})`;
     } else if (diff < -0.000001) {
-        badge.className = "inline-flex items-center gap-1 text-[10px] font-black px-2.5 py-0.5 rounded-full border bg-rose-100 dark:bg-rose-950/80 text-rose-800 dark:text-rose-400 border-rose-300 dark:border-rose-800/60";
-        badge.innerHTML = `<i class="fa-solid fa-arrow-trend-down text-[9px]"></i> ${percent.toFixed(2)}% (${rangeLabel})`;
+        badge.className = "text-[10px] font-black px-2 py-0.5 rounded-full border bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20";
+        badge.innerHTML = `${percent.toFixed(2)}% (${rangeLabel})`;
     } else {
-        badge.className = "inline-flex items-center gap-1 text-[10px] font-black px-2.5 py-0.5 rounded-full border bg-[#e4d9c6] dark:bg-[#111116] text-[#4c3f30] dark:text-zinc-400 border-[#cbbeaa] dark:border-[#22222e]";
-        badge.innerHTML = `<i class="fa-solid fa-minus text-[9px]"></i> 0.00% (${rangeLabel})`;
+        badge.className = "text-[10px] font-black px-2 py-0.5 rounded-full border bg-zinc-500/10 text-zinc-500 border-zinc-500/20";
+        badge.innerHTML = `0.00% (${rangeLabel})`;
     }
 }
 
@@ -96,37 +87,25 @@ function changeRange(range) {
         const btn = document.getElementById(`range-${r}`);
         if (!btn) return;
         if (r === range) {
-            btn.className = "px-2 py-1 rounded-lg transition bg-[#f6eee0] dark:bg-[#181820] text-amber-800 dark:text-amber-400 shadow-xs";
+            btn.className = "px-2 py-0.5 rounded-lg transition bg-white dark:bg-zinc-800 text-amber-600 dark:text-amber-400 shadow-xs";
         } else {
-            btn.className = "px-2 py-1 rounded-lg transition text-[#635443] dark:text-zinc-400 hover:text-black dark:hover:text-white";
+            btn.className = "px-2 py-0.5 rounded-lg transition text-zinc-500 hover:text-black dark:hover:text-white";
         }
     });
 
     resetSlideView();
-
     if (window.activeItem) {
         loadItemHistoryGraph(window.activeItem.name);
     }
-}
-
-function showResetButton() {
-    const btn = document.getElementById('resetSlideBtn');
-    if (btn) btn.classList.remove('hidden');
-}
-
-function hideResetButton() {
-    const btn = document.getElementById('resetSlideBtn');
-    if (btn) btn.classList.add('hidden');
 }
 
 function resetSlideView() {
     viewStart = 0;
     viewEnd = Math.max(0, fullHistoryData.length - 1);
     yPaddingMultiplier = 1.0;
-    hideResetButton();
-    if (fullHistoryData.length > 0) {
-        renderChart();
-    }
+    const btn = document.getElementById('resetSlideBtn');
+    if (btn) btn.classList.add('hidden');
+    if (fullHistoryData.length > 0) renderChart();
 }
 
 async function loadItemHistoryGraph(itemName) {
@@ -159,7 +138,6 @@ async function loadItemHistoryGraph(itemName) {
     yPaddingMultiplier = 1.0;
 
     updateActiveSeasonBadge();
-    hideResetButton();
     renderChart();
     attachDirectGestures();
 }
@@ -168,7 +146,6 @@ function renderChart() {
     const canvas = document.getElementById('priceHistoryChart');
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
-    const isMobile = window.innerWidth < 640;
 
     const clampedStart = Math.max(0, Math.min(Math.round(viewStart), fullHistoryData.length - 2));
     const clampedEnd = Math.max(clampedStart + 1, Math.min(Math.round(viewEnd), fullHistoryData.length - 1));
@@ -183,21 +160,14 @@ function renderChart() {
         const d = new Date(rawDate);
         const validDate = isNaN(d.getTime()) ? new Date() : d;
 
-        const season = getSeasonForDate(validDate);
-        itemSeasons.push(season);
+        itemSeasons.push(getSeasonForDate(validDate));
 
         if (['6h', '12h', '24h'].includes(selectedRange)) {
             labels.push(validDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
         } else if (selectedRange === '7d') {
-            labels.push(isMobile 
-                ? `${validDate.getDate()}/${validDate.getMonth()+1} ${validDate.getHours()}:00` 
-                : `${validDate.toLocaleDateString([], { month: 'short', day: 'numeric' })}, ${validDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`);
-        } else if (selectedRange === 'all') {
-            labels.push(isMobile
-                ? `${validDate.getDate()}/${validDate.getMonth()+1}`
-                : `${validDate.toLocaleDateString([], { month: 'short', day: 'numeric', year: '2-digit' })}`);
+            labels.push(`${validDate.getDate()}/${validDate.getMonth()+1} ${validDate.getHours()}:00`);
         } else {
-            labels.push(`${validDate.getDate()} ${validDate.toLocaleDateString([], { month: 'short' })}`);
+            labels.push(`${validDate.getDate()}/${validDate.getMonth()+1}`);
         }
 
         fullDateTooltips.push(validDate.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }));
@@ -205,7 +175,6 @@ function renderChart() {
 
     const prices = visibleData.map(h => parseFloat(h.price));
 
-    // First point of selected timeframe vs Current Live Price
     if (fullHistoryData.length > 0) {
         const startPrice = parseFloat(fullHistoryData[0].price);
         const currentPrice = parseFloat(window.activeItem?.price ?? fullHistoryData[fullHistoryData.length - 1].price);
@@ -216,49 +185,36 @@ function renderChart() {
     const maxPrice = Math.max(...prices);
     const priceRange = Math.max(maxPrice - minPrice, 0.0001);
 
-    const margin = priceRange * 0.18 * yPaddingMultiplier;
+    const margin = priceRange * 0.15 * yPaddingMultiplier;
     const yMin = Math.max(0, minPrice - margin);
     const yMax = maxPrice + margin;
 
-    if (chartInstance) {
-        chartInstance.destroy();
-    }
+    if (chartInstance) chartInstance.destroy();
 
     const isDark = document.documentElement.classList.contains('dark');
-    const gridColor = isDark ? 'rgba(255, 255, 255, 0.04)' : 'rgba(0, 0, 0, 0.06)';
-    const tickColor = isDark ? '#71717a' : '#736655';
-    const tooltipBg = isDark ? '#000000' : '#241b12';
+    const gridColor = isDark ? 'rgba(255, 255, 255, 0.04)' : 'rgba(0, 0, 0, 0.04)';
+    const tickColor = isDark ? '#71717a' : '#a1a1aa';
 
-    const pointColors = itemSeasons.map(s => s.color);
-
-    const gradient = ctx.createLinearGradient(0, 0, 0, isMobile ? 180 : 240);
-    gradient.addColorStop(0, isDark ? 'rgba(245, 158, 11, 0.22)' : 'rgba(217, 119, 6, 0.18)');
-    gradient.addColorStop(1, 'rgba(0, 0, 0, 0.0)');
+    const gradient = ctx.createLinearGradient(0, 0, 0, 180);
+    gradient.addColorStop(0, 'rgba(245, 158, 11, 0.18)');
+    gradient.addColorStop(1, 'rgba(245, 158, 11, 0.0)');
 
     chartInstance = new Chart(ctx, {
         type: 'line',
         data: {
             labels: labels,
             datasets: [{
-                label: 'Price (SFL)',
                 data: prices,
-                borderColor: '#d97706',
-                segment: {
-                    borderColor: ctxSeg => {
-                        const pIndex = ctxSeg.p1DataIndex;
-                        return itemSeasons[pIndex]?.color || '#d97706';
-                    }
-                },
-                borderWidth: isMobile ? 2 : 2.5,
+                borderColor: '#f59e0b',
+                borderWidth: 2,
                 backgroundColor: gradient,
                 fill: true,
-                tension: 0.32,
-                pointBackgroundColor: pointColors,
-                pointBorderColor: isDark ? '#000000' : '#ede2cf',
-                pointBorderWidth: 1.5,
-                pointRadius: visibleData.length > 20 ? 0 : (isMobile ? 2.5 : 3.5),
-                pointHoverRadius: 5.5,
-                pointHoverBorderWidth: 2,
+                tension: 0.35,
+                pointRadius: 0,
+                pointHoverRadius: 5,
+                pointHoverBackgroundColor: '#f59e0b',
+                pointHoverBorderColor: isDark ? '#000' : '#fff',
+                pointHoverBorderWidth: 2
             }]
         },
         options: {
@@ -269,44 +225,31 @@ function renderChart() {
             plugins: {
                 legend: { display: false },
                 tooltip: {
-                    backgroundColor: tooltipBg,
-                    titleColor: '#faf7f2',
-                    bodyColor: '#fbbf24',
-                    padding: 10,
-                    cornerRadius: 10,
+                    backgroundColor: isDark ? '#18181b' : '#ffffff',
+                    titleColor: isDark ? '#f4f4f5' : '#18181b',
+                    bodyColor: '#f59e0b',
+                    borderColor: isDark ? '#27272a' : '#e4e4e7',
+                    borderWidth: 1,
+                    padding: 8,
+                    cornerRadius: 12,
                     displayColors: false,
                     callbacks: {
-                        title: (items) => {
-                            const index = items[0].dataIndex;
-                            const season = itemSeasons[index];
-                            const timeStr = fullDateTooltips[index];
-                            return `${season?.icon || '🌱'} ${season?.name || 'Spring'} Season (Day ${season?.day || 1}/7)\n📅 ${timeStr}`;
-                        },
-                        label: (ctxLabel) => ` Price: ${formatPrice(ctxLabel.parsed.y)} SFL`
+                        title: (items) => fullDateTooltips[items[0].dataIndex],
+                        label: (ctxLabel) => `Price: ${formatPrice(ctxLabel.parsed.y)} SFL`
                     }
                 }
             },
             scales: {
                 x: {
-                    grid: { color: gridColor, borderDash: [3, 3] },
-                    ticks: { 
-                        font: { family: 'Plus Jakarta Sans', size: isMobile ? 9 : 10, weight: '600' }, 
-                        color: tickColor, 
-                        maxTicksLimit: isMobile ? 5 : 7,
-                        maxRotation: 0
-                    },
+                    grid: { color: gridColor, borderDash: [2, 2] },
+                    ticks: { font: { size: 9, weight: '600' }, color: tickColor, maxTicksLimit: 5 },
                     border: { display: false }
                 },
                 y: {
                     min: yMin,
                     max: yMax,
-                    grid: { color: gridColor, borderDash: [3, 3] },
-                    ticks: { 
-                        font: { family: 'Plus Jakarta Sans', size: isMobile ? 9 : 10, weight: '600' }, 
-                        color: tickColor, 
-                        maxTicksLimit: 5,
-                        callback: (val) => formatPrice(val) 
-                    },
+                    grid: { color: gridColor, borderDash: [2, 2] },
+                    ticks: { font: { size: 9, weight: '600' }, color: tickColor, maxTicksLimit: 4, callback: (val) => formatPrice(val) },
                     border: { display: false }
                 }
             }
@@ -332,40 +275,26 @@ function attachDirectGestures() {
 
     canvas.addEventListener('pointermove', (e) => {
         if (!isDragging || fullHistoryData.length < 2) return;
-
         const deltaX = e.clientX - startPointerX;
         const deltaY = e.clientY - startPointerY;
 
         const visibleSpan = Math.max(1, dragStartViewEnd - dragStartViewStart);
-        const velocityMultiplier = 2.8; 
-        const pixelsPerItem = (canvas.clientWidth / visibleSpan) / velocityMultiplier;
+        const pixelsPerItem = (canvas.clientWidth / visibleSpan) / 2.8;
         const itemsShifted = deltaX / pixelsPerItem;
 
         if (Math.abs(itemsShifted) >= 0.3) {
-            let newStart = dragStartViewStart - itemsShifted;
-            let newEnd = dragStartViewEnd - itemsShifted;
-
-            if (newStart < 0) {
-                newEnd -= newStart;
-                newStart = 0;
-            }
-            if (newEnd > fullHistoryData.length - 1) {
-                newStart -= (newEnd - (fullHistoryData.length - 1));
-                newEnd = fullHistoryData.length - 1;
-            }
-
-            viewStart = Math.max(0, newStart);
-            viewEnd = Math.min(fullHistoryData.length - 1, newEnd);
-            showResetButton();
+            let newStart = Math.max(0, dragStartViewStart - itemsShifted);
+            let newEnd = Math.min(fullHistoryData.length - 1, dragStartViewEnd - itemsShifted);
+            viewStart = newStart;
+            viewEnd = newEnd;
+            const btn = document.getElementById('resetSlideBtn');
+            if (btn) btn.classList.remove('hidden');
         }
 
         if (Math.abs(deltaY) > 2) {
-            const ySensitivity = 0.02;
-            const newYPadding = Math.max(0.05, Math.min(5.0, dragStartYPadding + (deltaY * ySensitivity)));
-            if (Math.abs(newYPadding - yPaddingMultiplier) > 0.01) {
-                yPaddingMultiplier = newYPadding;
-                showResetButton();
-            }
+            yPaddingMultiplier = Math.max(0.1, Math.min(4.0, dragStartYPadding + (deltaY * 0.02)));
+            const btn = document.getElementById('resetSlideBtn');
+            if (btn) btn.classList.remove('hidden');
         }
 
         renderChart();
@@ -377,75 +306,17 @@ function attachDirectGestures() {
             try { canvas.releasePointerCapture(e.pointerId); } catch (_) {}
         }
     };
-
     canvas.addEventListener('pointerup', stopDragging);
     canvas.addEventListener('pointercancel', stopDragging);
-
-    canvas.addEventListener('wheel', (e) => {
-        if (fullHistoryData.length < 2) return;
-        e.preventDefault();
-
-        const zoomDirection = e.deltaY < 0 ? -1 : 1;
-        const currentSpan = viewEnd - viewStart;
-        const step = Math.max(1, Math.round(currentSpan * 0.2)) * zoomDirection;
-
-        let newStart = viewStart + step;
-        let newEnd = viewEnd - step;
-
-        if (newEnd - newStart >= 1 && newStart >= 0 && newEnd < fullHistoryData.length) {
-            viewStart = newStart;
-            viewEnd = newEnd;
-            showResetButton();
-            renderChart();
-        }
-    }, { passive: false });
-
-    canvas.addEventListener('touchmove', (e) => {
-        if (e.touches.length === 2 && fullHistoryData.length >= 2) {
-            e.preventDefault();
-            const touch1 = e.touches[0];
-            const touch2 = e.touches[1];
-            const currentDistance = Math.hypot(touch1.clientX - touch2.clientX, touch1.clientY - touch2.clientY);
-
-            if (initialPinchDistance) {
-                const diff = currentDistance - initialPinchDistance;
-                if (Math.abs(diff) > 4) {
-                    const zoomDirection = diff > 0 ? -1 : 1;
-                    const change = Math.max(1, Math.round((viewEnd - viewStart) * 0.12)) * zoomDirection;
-
-                    let newStart = viewStart + change;
-                    let newEnd = viewEnd - change;
-
-                    if (newEnd - newStart >= 1 && newStart >= 0 && newEnd < fullHistoryData.length) {
-                        viewStart = newStart;
-                        viewEnd = newEnd;
-                        showResetButton();
-                        renderChart();
-                    }
-                    initialPinchDistance = currentDistance;
-                }
-            } else {
-                initialPinchDistance = currentDistance;
-            }
-        }
-    }, { passive: false });
-
-    canvas.addEventListener('touchend', () => {
-        initialPinchDistance = null;
-    });
 }
 
 window.addEventListener('resize', () => {
-    if (fullHistoryData.length > 0) {
-        renderChart();
-    }
+    if (fullHistoryData.length > 0) renderChart();
 });
 
-// Expose globals
+// Globals
 window.fullHistoryData = fullHistoryData;
 window.changeRange = changeRange;
 window.resetSlideView = resetSlideView;
 window.loadItemHistoryGraph = loadItemHistoryGraph;
 window.renderChart = renderChart;
-window.getSeasonForDate = getSeasonForDate;
-window.updateActiveSeasonBadge = updateActiveSeasonBadge;
