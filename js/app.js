@@ -12,6 +12,40 @@ function formatDisplayPrice(price) {
 }
 window.formatDisplayPrice = formatDisplayPrice;
 
+// Universal Array Normalizer (Handles direct arrays, dictionary objects, and wrapper keys)
+function parseResourceItems(data) {
+    if (!data) return [];
+
+    // Case 1: Direct Array
+    if (Array.isArray(data)) {
+        return data.map(item => ({
+            name: item.name || item.item_name || "Unknown",
+            price: parseFloat(item.price || item.current_price || 0)
+        }));
+    }
+
+    // Case 2: Wrapped array ({ prices: [...] } or { data: [...] } or { items: [...] })
+    const arrayKey = Object.keys(data).find(k => Array.isArray(data[k]));
+    if (arrayKey) {
+        return data[arrayKey].map(item => ({
+            name: item.name || item.item_name || "Unknown",
+            price: parseFloat(item.price || item.current_price || 0)
+        }));
+    }
+
+    // Case 3: Key-Value Dictionary ({ "Sunflower": 0.002, "Iron": 0.15 } or { "Sunflower": { price: 0.002 } })
+    if (typeof data === 'object') {
+        return Object.entries(data)
+            .filter(([key]) => key !== 'error' && key !== 'status' && key !== 'message')
+            .map(([name, val]) => ({
+                name: name,
+                price: typeof val === 'object' && val !== null ? parseFloat(val.price || 0) : parseFloat(val || 0)
+            }));
+    }
+
+    return [];
+}
+
 // Fetch Live Current Market Prices
 async function fetchPrices() {
     const refreshIcon = document.getElementById('refreshIcon');
@@ -25,8 +59,12 @@ async function fetchPrices() {
         const res = await fetch('/api/prices');
         if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
         
-        const data = await res.json();
-        allItems = data;
+        const rawData = await res.json();
+        allItems = parseResourceItems(rawData);
+
+        if (allItems.length === 0) {
+            throw new Error("No pricing data returned from database");
+        }
 
         if (loadingState) loadingState.classList.add('hidden');
         if (errorState) errorState.classList.add('hidden');
@@ -37,7 +75,6 @@ async function fetchPrices() {
 
         populateDropdown();
 
-        // If an item is active, update floor and recalculate stack
         if (window.activeItem) {
             const fresh = allItems.find(i => i.name.toLowerCase() === window.activeItem.name.toLowerCase());
             if (fresh) {
@@ -47,7 +84,11 @@ async function fetchPrices() {
     } catch (err) {
         console.error("Fetch prices failed:", err);
         if (loadingState) loadingState.classList.add('hidden');
-        if (errorState) errorState.classList.remove('hidden');
+        if (errorState) {
+            errorState.classList.remove('hidden');
+            const msg = document.getElementById('errorMessage');
+            if (msg) msg.innerText = err.message || "Failed to fetch pricing data.";
+        }
     } finally {
         if (refreshIcon) refreshIcon.classList.remove('fa-spin');
     }
@@ -63,32 +104,35 @@ async function fetchMovers() {
         if (!res.ok) throw new Error("Failed to load movers");
         const data = await res.json();
 
-        // Render Surging Gainers (+5%)
+        const gainers = Array.isArray(data?.gainers) ? data.gainers : [];
+        const losers = Array.isArray(data?.losers) ? data.losers : [];
+
+        // Render Gainers (+5%)
         if (gainersContainer) {
-            if (!data.gainers || data.gainers.length === 0) {
-                gainersContainer.innerHTML = `<span class="text-[11px] text-[#7a6d5c] dark:text-zinc-500 font-semibold italic">No assets up ≥5% in 12h</span>`;
+            if (gainers.length === 0) {
+                gainersContainer.innerHTML = `<span class="text-[11px] text-[#7a6d5c] dark:text-zinc-500 font-semibold italic">No assets up $\\ge$5% in 12h</span>`;
             } else {
-                gainersContainer.innerHTML = data.gainers.map(item => `
+                gainersContainer.innerHTML = gainers.map(item => `
                     <button onclick="onMoverSelect('${item.name.replace(/'/g, "\\'")}')" 
                         class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-emerald-100/90 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800/80 hover:scale-105 active:scale-95 transition shadow-2xs cursor-pointer text-left">
                         <span class="text-xs font-black text-[#221a12] dark:text-zinc-100">${item.name}</span>
-                        <span class="text-[10px] font-mono font-black text-emerald-800 dark:text-emerald-400">+${item.changePct.toFixed(1)}%</span>
+                        <span class="text-[10px] font-mono font-black text-emerald-800 dark:text-emerald-400">+${parseFloat(item.changePct).toFixed(1)}%</span>
                         <span class="text-[9px] font-mono text-[#7a6d5c] dark:text-zinc-400">(${formatDisplayPrice(item.price)} SFL)</span>
                     </button>
                 `).join('');
             }
         }
 
-        // Render Dipping Losers (-5%)
+        // Render Losers (-5%)
         if (losersContainer) {
-            if (!data.losers || data.losers.length === 0) {
-                losersContainer.innerHTML = `<span class="text-[11px] text-[#7a6d5c] dark:text-zinc-500 font-semibold italic">No assets down ≤-5% in 12h</span>`;
+            if (losers.length === 0) {
+                losersContainer.innerHTML = `<span class="text-[11px] text-[#7a6d5c] dark:text-zinc-500 font-semibold italic">No assets down $\\le$-5% in 12h</span>`;
             } else {
-                losersContainer.innerHTML = data.losers.map(item => `
+                losersContainer.innerHTML = losers.map(item => `
                     <button onclick="onMoverSelect('${item.name.replace(/'/g, "\\'")}')" 
                         class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-rose-100/90 dark:bg-rose-950/60 border border-rose-300 dark:border-rose-800/80 hover:scale-105 active:scale-95 transition shadow-2xs cursor-pointer text-left">
                         <span class="text-xs font-black text-[#221a12] dark:text-zinc-100">${item.name}</span>
-                        <span class="text-[10px] font-mono font-black text-rose-800 dark:text-rose-400">${item.changePct.toFixed(1)}%</span>
+                        <span class="text-[10px] font-mono font-black text-rose-800 dark:text-rose-400">${parseFloat(item.changePct).toFixed(1)}%</span>
                         <span class="text-[9px] font-mono text-[#7a6d5c] dark:text-zinc-400">(${formatDisplayPrice(item.price)} SFL)</span>
                     </button>
                 `).join('');
@@ -112,7 +156,6 @@ function onMoverSelect(itemName) {
 
     selectItem(item, true);
     
-    // Smooth scroll down to chart view on mobile
     const detailsContainer = document.getElementById('itemDetailsContainer');
     if (detailsContainer) {
         detailsContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -122,7 +165,7 @@ function onMoverSelect(itemName) {
 // Populate Dropdown Select
 function populateDropdown() {
     const dropdown = document.getElementById('itemDropdown');
-    if (!dropdown) return;
+    if (!dropdown || !Array.isArray(allItems)) return;
 
     const currentVal = dropdown.value;
     dropdown.innerHTML = '<option value="">-- Choose an item --</option>';
@@ -152,7 +195,7 @@ function onDropdownSelect(itemName) {
 // Autocomplete Filter
 function handleSearchInput(query) {
     const list = document.getElementById('autocompleteList');
-    if (!list) return;
+    if (!list || !Array.isArray(allItems)) return;
 
     if (!query || query.trim() === '') {
         list.classList.add('hidden');
@@ -200,7 +243,6 @@ function selectFromAutocomplete(itemName) {
     }
 }
 
-// Close Autocomplete on Click Outside
 document.addEventListener('click', (e) => {
     const list = document.getElementById('autocompleteList');
     const searchInput = document.getElementById('searchInput');
@@ -239,7 +281,6 @@ function selectItem(item, loadGraph = true) {
     }
 }
 
-// Custom Stack Multiplier Calculator
 function calculateCustomStack() {
     const qtyInput = document.getElementById('calcQuantity');
     const resultEl = document.getElementById('calcResult');
@@ -250,7 +291,6 @@ function calculateCustomStack() {
     resultEl.innerText = formatDisplayPrice(qty * price);
 }
 
-// 15-Second Polling Controller
 function setupAutoRefresh() {
     const check = document.getElementById('autoRefreshCheck');
     if (autoRefreshTimer) clearInterval(autoRefreshTimer);
@@ -273,7 +313,6 @@ function setupAutoRefresh() {
     }
 }
 
-// App Boot
 document.addEventListener('DOMContentLoaded', () => {
     fetchPrices();
     fetchMovers();
