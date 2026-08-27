@@ -62,7 +62,6 @@ async function fetchPrices() {
             const fresh = allItems.find(i => i.name.toLowerCase() === window.activeItem.name.toLowerCase());
             if (fresh) selectItem(fresh, false);
         } else if (allItems.length > 0) {
-            // Auto-select Sunflower on first launch
             const sunflower = allItems.find(i => i.name.toLowerCase() === 'sunflower') || allItems[0];
             selectItem(sunflower, true);
         }
@@ -79,8 +78,11 @@ async function fetchPrices() {
     }
 }
 
+// Redesigned Movers Renderer
 async function fetchMovers() {
-    const strip = document.getElementById('moversStripContainer');
+    const gainersList = document.getElementById('gainersList');
+    const losersList = document.getElementById('losersList');
+
     try {
         const res = await fetch('/api/movers');
         if (!res.ok) throw new Error();
@@ -89,31 +91,54 @@ async function fetchMovers() {
         const gainers = Array.isArray(data?.gainers) ? data.gainers : [];
         const losers = Array.isArray(data?.losers) ? data.losers : [];
 
-        if (!strip) return;
-        if (gainers.length === 0 && losers.length === 0) {
-            strip.innerHTML = `<span class="text-[10px] text-zinc-500 font-semibold italic">No assets moved ±5% in 12h</span>`;
-            return;
+        // Render Gainers
+        if (gainersList) {
+            if (gainers.length === 0) {
+                gainersList.innerHTML = `<span class="text-[11px] text-zinc-400 dark:text-zinc-500 italic py-1">No items up ≥5% in 12h</span>`;
+            } else {
+                gainersList.innerHTML = gainers.map(item => `
+                    <button onclick="onMoverSelect('${item.name.replace(/'/g, "\\'")}')" 
+                        class="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-white/70 dark:bg-black/40 hover:bg-white dark:hover:bg-zinc-900 border border-emerald-500/20 transition shadow-2xs active:scale-[0.98] group cursor-pointer text-left">
+                        <div class="min-w-0 flex items-center gap-1.5">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
+                            <span class="text-xs font-black text-zinc-800 dark:text-zinc-100 truncate">${item.name}</span>
+                        </div>
+                        <div class="flex items-center gap-2 shrink-0 ml-2">
+                            <span class="text-[10px] font-mono font-bold text-zinc-500 dark:text-zinc-400">${formatDisplayPrice(item.price)} SFL</span>
+                            <span class="text-[10px] font-mono font-black text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded-md border border-emerald-500/20">
+                                +${parseFloat(item.changePct).toFixed(1)}%
+                            </span>
+                        </div>
+                    </button>
+                `).join('');
+            }
         }
 
-        const gainersHtml = gainers.map(item => `
-            <button onclick="onMoverSelect('${item.name.replace(/'/g, "\\'")}')" 
-                class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shrink-0 text-xs font-bold hover:scale-105 transition active:scale-95">
-                <span>${item.name}</span>
-                <span class="font-mono text-[10px] font-black">+${parseFloat(item.changePct).toFixed(1)}%</span>
-            </button>
-        `).join('');
-
-        const losersHtml = losers.map(item => `
-            <button onclick="onMoverSelect('${item.name.replace(/'/g, "\\'")}')" 
-                class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 shrink-0 text-xs font-bold hover:scale-105 transition active:scale-95">
-                <span>${item.name}</span>
-                <span class="font-mono text-[10px] font-black">${parseFloat(item.changePct).toFixed(1)}%</span>
-            </button>
-        `).join('');
-
-        strip.innerHTML = gainersHtml + losersHtml;
+        // Render Losers
+        if (losersList) {
+            if (losers.length === 0) {
+                losersList.innerHTML = `<span class="text-[11px] text-zinc-400 dark:text-zinc-500 italic py-1">No items down ≤-5% in 12h</span>`;
+            } else {
+                losersList.innerHTML = losers.map(item => `
+                    <button onclick="onMoverSelect('${item.name.replace(/'/g, "\\'")}')" 
+                        class="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-white/70 dark:bg-black/40 hover:bg-white dark:hover:bg-zinc-900 border border-rose-500/20 transition shadow-2xs active:scale-[0.98] group cursor-pointer text-left">
+                        <div class="min-w-0 flex items-center gap-1.5">
+                            <span class="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0"></span>
+                            <span class="text-xs font-black text-zinc-800 dark:text-zinc-100 truncate">${item.name}</span>
+                        </div>
+                        <div class="flex items-center gap-2 shrink-0 ml-2">
+                            <span class="text-[10px] font-mono font-bold text-zinc-500 dark:text-zinc-400">${formatDisplayPrice(item.price)} SFL</span>
+                            <span class="text-[10px] font-mono font-black text-rose-600 dark:text-rose-400 bg-rose-500/10 px-1.5 py-0.5 rounded-md border border-rose-500/20">
+                                ${parseFloat(item.changePct).toFixed(1)}%
+                            </span>
+                        </div>
+                    </button>
+                `).join('');
+            }
+        }
     } catch (err) {
-        if (strip) strip.innerHTML = `<span class="text-[10px] text-zinc-500 font-semibold">Movers unavailable</span>`;
+        if (gainersList) gainersList.innerHTML = `<span class="text-[10px] text-zinc-500">Unavailable</span>`;
+        if (losersList) losersList.innerHTML = `<span class="text-[10px] text-zinc-500">Unavailable</span>`;
     }
 }
 
