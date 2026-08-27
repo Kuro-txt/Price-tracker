@@ -632,7 +632,20 @@ document.addEventListener('DOMContentLoaded', () => {
         fetchMovers();
     }, 15000);
 });
-
+// Add to the bottom of js/app.js:
+document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+        if (autoRefreshTimer) clearInterval(autoRefreshTimer);
+    } else {
+        fetchPrices();
+        fetchMovers();
+        if (autoRefreshTimer) clearInterval(autoRefreshTimer);
+        autoRefreshTimer = setInterval(() => {
+            fetchPrices();
+            fetchMovers();
+        }, 30000); // Relaxed to 30 seconds
+    }
+});
 // Globals
 window.fetchPrices = fetchPrices;
 window.fetchMovers = fetchMovers;
