@@ -47,8 +47,8 @@
         window.toggleTheme = toggleTheme;
     </script>
 
-    <!-- Styles & Dependencies -->
-    <link rel="stylesheet" href="css/style.css">
+    <!-- Styles & Dependencies (Safe Fallback to Root if css/ is missing) -->
+    <link rel="stylesheet" href="css/style.css" onerror="this.onerror=null;this.href='style.css';">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 </head>
@@ -270,7 +270,7 @@
                             </span>
                         </div>
 
-                        <!-- All Timeframe Selectors: 6H, 12H, 24H, 7D, 1M, 3M, ALL -->
+                        <!-- All Timeframe Selectors -->
                         <div class="flex items-center gap-1.5 overflow-x-auto max-w-full pb-0.5">
                             <div class="flex items-center bg-[#dfd3bf] dark:bg-black p-0.5 rounded-xl border border-[#c5b59f] dark:border-[#1c1c26] text-[10px] font-extrabold shrink-0">
                                 <button onclick="changeRange('6h')" id="range-6h" class="px-2 py-1 rounded-lg transition text-[#635443] dark:text-zinc-400 hover:text-black dark:hover:text-white">6H</button>
@@ -322,8 +322,8 @@
         <p>Market data synced live from <a href="https://sfl.world" target="_blank" class="text-amber-800 dark:text-amber-400 hover:underline font-black">sfl.world</a></p>
     </footer>
 
-    <!-- Scripts -->
-    <script src="js/chart.js"></script>
-    <script src="js/app.js"></script>
+    <!-- Scripts (Safe Fallback to Root if js/ is missing) -->
+    <script src="js/chart.js" onerror="this.onerror=null;this.src='chart.js';"></script>
+    <script src="js/app.js" onerror="this.onerror=null;this.src='app.js';"></script>
 </body>
 </html>
