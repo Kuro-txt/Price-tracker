@@ -1,7 +1,7 @@
 let allItems = [];
 window.activeItem = null;
 let autoRefreshTimer = null;
-let currentTab = 'chart';
+let currentTab = 'movers';
 
 function formatDisplayPrice(price) {
     const num = parseFloat(price);
@@ -12,7 +12,7 @@ function formatDisplayPrice(price) {
 }
 window.formatDisplayPrice = formatDisplayPrice;
 
-// View Switcher: Chart vs Movers
+// Tab Switcher (Movers vs Chart)
 function switchTab(tab) {
     currentTab = tab;
     const chartTab = document.getElementById('chartTabContent');
@@ -20,7 +20,12 @@ function switchTab(tab) {
     const btnChart = document.getElementById('tabBtn-chart');
     const btnMovers = document.getElementById('tabBtn-movers');
 
-    if (tab === 'chart') {
+    if (tab === 'movers') {
+        if (moversTab) moversTab.classList.remove('hidden');
+        if (chartTab) chartTab.classList.add('hidden');
+        if (btnMovers) btnMovers.className = "px-2.5 py-1 rounded-lg transition bg-white dark:bg-zinc-800 text-amber-600 dark:text-amber-400 shadow-xs flex items-center gap-1";
+        if (btnChart) btnChart.className = "px-2.5 py-1 rounded-lg transition text-zinc-500 hover:text-black dark:hover:text-white flex items-center gap-1";
+    } else {
         if (chartTab) chartTab.classList.remove('hidden');
         if (moversTab) moversTab.classList.add('hidden');
         if (btnChart) btnChart.className = "px-2.5 py-1 rounded-lg transition bg-white dark:bg-zinc-800 text-amber-600 dark:text-amber-400 shadow-xs flex items-center gap-1";
@@ -28,11 +33,6 @@ function switchTab(tab) {
         if (window.renderChart && window.fullHistoryData?.length > 0) {
             window.renderChart();
         }
-    } else {
-        if (chartTab) chartTab.classList.add('hidden');
-        if (moversTab) moversTab.classList.remove('hidden');
-        if (btnMovers) btnMovers.className = "px-2.5 py-1 rounded-lg transition bg-white dark:bg-zinc-800 text-amber-600 dark:text-amber-400 shadow-xs flex items-center gap-1";
-        if (btnChart) btnChart.className = "px-2.5 py-1 rounded-lg transition text-zinc-500 hover:text-black dark:hover:text-white flex items-center gap-1";
     }
 }
 window.switchTab = switchTab;
@@ -175,7 +175,6 @@ async function fetchMovers() {
     }
 }
 
-// When tapping a mover, select the item and switch immediately to Chart view
 function onMoverSelect(itemName) {
     const item = allItems.find(i => i.name.toLowerCase() === itemName.toLowerCase()) || { name: itemName, price: 0 };
     const dropdown = document.getElementById('itemDropdown');
@@ -313,6 +312,7 @@ function calculateCustomStack() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    switchTab('movers');
     fetchPrices();
     fetchMovers();
     if (autoRefreshTimer) clearInterval(autoRefreshTimer);
