@@ -50,6 +50,7 @@
             </div>
 
             <div class="flex items-center gap-1.5 shrink-0">
+                <!-- Tax Selector -->
                 <div class="flex items-center gap-1 bg-[#dfd4c0] dark:bg-white/5 border border-[#c5b59f] dark:border-white/10 px-2 py-0.5 rounded-xl text-[10px] font-bold">
                     <span class="text-[#6d5e4d] dark:text-zinc-400 uppercase text-[8px] font-black tracking-wider">Tax</span>
                     <select id="taxRateSelect" onchange="onTaxRateChange(this.value)" class="bg-transparent text-amber-900 dark:text-amber-400 font-black focus:outline-none cursor-pointer text-[10px]">
@@ -59,11 +60,19 @@
                         <option value="12.5">12.5%</option>
                     </select>
                 </div>
+
+                <!-- Global Notifications Toggle Button -->
+                <button id="globalNotifBtn" onclick="toggleGlobalNotifications()" aria-label="Toggle Notifications" class="w-7 h-7 rounded-xl bg-[#dfd4c0] dark:glass-panel border border-[#c5b59f] dark:border-white/10 flex items-center justify-center text-[#4a3c2e] dark:text-zinc-300 hover:text-amber-700 transition active:scale-95">
+                    <i id="globalNotifIcon" class="fa-solid fa-bell text-[11px]"></i>
+                </button>
+
+                <!-- Theme Toggle -->
                 <button onclick="toggleTheme()" aria-label="Toggle Theme" class="w-7 h-7 rounded-xl bg-[#dfd4c0] dark:glass-panel border border-[#c5b59f] dark:border-white/10 flex items-center justify-center text-[#4a3c2e] dark:text-zinc-300 hover:text-amber-700 transition active:scale-95">
                     <i class="fa-solid fa-moon text-[11px] block dark:hidden"></i>
                     <i class="fa-solid fa-sun text-[11px] hidden dark:block text-amber-400"></i>
                 </button>
-                <!-- refresh now calls fetchMarket() — 1 DB read instead of 2 -->
+
+                <!-- Refresh Button -->
                 <button onclick="fetchMarket()" class="w-7 h-7 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-stone-950 flex items-center justify-center font-bold transition shadow-sm active:scale-95" aria-label="Refresh">
                     <i class="fa-solid fa-rotate text-[11px]" id="refreshIcon"></i>
                 </button>
@@ -120,44 +129,38 @@
             <p id="errorMessage">Failed to load market data.</p>
         </div>
 
-        <!-- ═══ TAB 1: MOVERS ═══ -->
+        <!-- ═══ TAB 1: MOVERS (ALL ASSETS) ═══ -->
         <div id="moversTabContent" class="space-y-2.5">
             <div class="glass-panel rounded-2xl p-3 space-y-2.5">
 
-                <!-- Header + Filter Tabs -->
-                <div class="flex items-center justify-between gap-2 pb-2 border-b border-[#dfd4c0] dark:border-white/5 flex-wrap">
-                    <span class="text-[11px] font-black uppercase tracking-wider text-[#241a12] dark:text-zinc-300 flex items-center gap-1.5 shrink-0">
+                <!-- Header -->
+                <div class="flex items-center justify-between gap-2 pb-2 border-b border-[#dfd4c0] dark:border-white/5">
+                    <span class="text-[11px] font-black uppercase tracking-wider text-[#241a12] dark:text-zinc-300 flex items-center gap-1.5">
                         <i class="fa-solid fa-bolt text-amber-600 dark:text-amber-500 text-xs"></i> 12H Market Movers
                     </span>
-                    <!-- Filter selector -->
-                    <div class="flex items-center bg-[#ede3d1] dark:bg-white/5 p-0.5 rounded-xl border border-[#c5b59f] dark:border-white/10 text-[9px] font-black shrink-0">
-                        <button onclick="setMoversFilter('all')" id="moverFilter-all" class="px-2 py-0.5 rounded-lg transition bg-[#fbf8f2] dark:bg-zinc-800 text-amber-900 dark:text-amber-400 shadow-xs">All</button>
-                        <button onclick="setMoversFilter('5pct')" id="moverFilter-5pct" class="px-2 py-0.5 rounded-lg transition text-[#6d5e4d] dark:text-zinc-400 hover:text-black dark:hover:text-white">±5%+</button>
-                        <button onclick="setMoversFilter('gainers')" id="moverFilter-gainers" class="px-2 py-0.5 rounded-lg transition text-[#6d5e4d] dark:text-zinc-400 hover:text-black dark:hover:text-white">↑ Up</button>
-                        <button onclick="setMoversFilter('losers')" id="moverFilter-losers" class="px-2 py-0.5 rounded-lg transition text-[#6d5e4d] dark:text-zinc-400 hover:text-black dark:hover:text-white">↓ Down</button>
-                    </div>
+                    <span class="text-[9px] text-[#7d6e5d] dark:text-zinc-400 font-bold">All catalog assets</span>
                 </div>
 
                 <!-- Notification prompt banner -->
                 <div id="notifBanner" class="hidden flex items-center justify-between gap-2 bg-amber-500/10 dark:bg-amber-500/5 border border-amber-600/25 dark:border-amber-500/20 rounded-xl px-3 py-2">
                     <span class="text-[10px] font-bold text-amber-900 dark:text-amber-400 flex items-center gap-1.5">
                         <i class="fa-solid fa-bell text-xs"></i>
-                        Enable alerts for ±5% movers &amp; watchlist moves
+                        Get alerts for ±5% movers &amp; watchlist updates
                     </span>
-                    <button onclick="requestNotifPermission(); document.getElementById('notifBanner').classList.add('hidden')"
+                    <button onclick="toggleGlobalNotifications()"
                         class="text-[8px] font-black px-2 py-0.5 rounded-lg bg-amber-500/30 border border-amber-600/30 text-amber-900 dark:text-amber-400 whitespace-nowrap shrink-0">
                         Enable
                     </button>
                 </div>
 
-                <!-- Two-column mover lists (both scrollable) -->
+                <!-- Two-column all items mover lists (both scrollable) -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                     <div class="bg-emerald-500/10 dark:bg-emerald-950/20 border border-emerald-600/25 dark:border-emerald-500/20 rounded-xl p-2.5 space-y-1.5">
                         <div class="text-[10px] font-black text-emerald-900 dark:text-emerald-400 uppercase tracking-wide flex items-center justify-between">
                             <span>🌱 Gainers</span>
                             <span class="text-[9px] font-mono opacity-70">Pulsing dot = ±5%+</span>
                         </div>
-                        <div id="gainersList" class="space-y-1 max-h-72 overflow-y-auto no-scrollbar">
+                        <div id="gainersList" class="space-y-1 max-h-80 overflow-y-auto no-scrollbar">
                             <span class="text-[11px] text-[#7d6e5d] dark:text-zinc-400 font-bold italic py-1">Scanning market...</span>
                         </div>
                     </div>
@@ -166,7 +169,7 @@
                             <span>🍂 Losers</span>
                             <span class="text-[9px] font-mono opacity-70">Tap to inspect</span>
                         </div>
-                        <div id="losersList" class="space-y-1 max-h-72 overflow-y-auto no-scrollbar">
+                        <div id="losersList" class="space-y-1 max-h-80 overflow-y-auto no-scrollbar">
                             <span class="text-[11px] text-[#7d6e5d] dark:text-zinc-400 font-bold italic py-1">Scanning market...</span>
                         </div>
                     </div>
@@ -315,11 +318,11 @@
                 <div class="glass-panel rounded-2xl p-3 space-y-2">
                     <div class="flex items-center justify-between pb-1 border-b border-[#dfd4c0] dark:border-white/5">
                         <span class="text-[11px] font-black uppercase tracking-wider text-[#241a12] dark:text-zinc-300 flex items-center gap-1.5">
-                            <i class="fa-solid fa-bell text-amber-600 dark:text-amber-500 text-xs"></i> Price Alert
+                            <i class="fa-solid fa-bell text-amber-600 dark:text-amber-500 text-xs"></i> Price Target Alert
                         </span>
-                        <button id="notifPermBtn" onclick="requestNotifPermission()"
+                        <button id="notifPermBtn" onclick="toggleGlobalNotifications()"
                             class="text-[8px] font-black px-2 py-0.5 rounded-lg bg-amber-500/20 border border-amber-600/30 text-amber-900 dark:text-amber-400 transition hover:bg-amber-500/30 active:scale-95">
-                            Enable Alerts
+                            Notification Toggle
                         </button>
                     </div>
                     <div class="grid grid-cols-2 gap-2">
@@ -350,7 +353,7 @@
                     <span class="text-[11px] font-black uppercase tracking-wider text-[#241a12] dark:text-zinc-300 flex items-center gap-1.5">
                         <i class="fa-solid fa-star text-amber-600 dark:text-amber-500 text-xs"></i> Pinned Watchlist
                     </span>
-                    <span class="text-[9px] text-[#6d5e4d] dark:text-zinc-400 font-bold">12H change · ±2% alerts</span>
+                    <span class="text-[9px] text-[#6d5e4d] dark:text-zinc-400 font-bold">12H shifts</span>
                 </div>
                 <div id="watchlistGrid" class="space-y-1.5"></div>
             </div>
@@ -364,12 +367,5 @@
 
     <script src="js/chart.js"></script>
     <script src="js/app.js"></script>
-
-    <!-- Show notification banner if permission not yet granted -->
-    <script>
-        if (Notification?.permission === 'default') {
-            document.getElementById('notifBanner')?.classList.remove('hidden');
-        }
-    </script>
 </body>
 </html>
