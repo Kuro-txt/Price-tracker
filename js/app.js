@@ -64,35 +64,49 @@ function showToast(message, type = "info", durationMs = 4500) {
 }
 window.showToast = showToast;
 
-// ─── Notification Toggle Functionality ────────────────────────────────────────
+// ─── Permanent Notification Toggle System ─────────────────────────────────────
 function updateNotifToggleUI() {
-    const btnIcon = document.getElementById("globalNotifIcon");
-    const btn = document.getElementById("globalNotifBtn");
-    const banner = document.getElementById("notifBanner");
+    const headerBtn     = document.getElementById("globalNotifBtn");
+    const headerIcon    = document.getElementById("globalNotifIcon");
+    const moversBtn     = document.getElementById("moversNotifToggleBtn");
+    const moversIcon    = document.getElementById("moversNotifIcon");
+    const moversText    = document.getElementById("moversNotifText");
+    const chartBtn      = document.getElementById("chartNotifToggleBtn");
+    const chartText     = document.getElementById("chartNotifText");
 
     const hasPermission = "Notification" in window && Notification.permission === "granted";
 
-    if (btnIcon && btn) {
-        if (notifEnabled && hasPermission) {
-            btnIcon.className = "fa-solid fa-bell text-[11px] text-amber-600 dark:text-amber-400";
-            btn.title = "Notifications: ON (Click to disable)";
-            btn.classList.add("border-amber-500/40");
-        } else if (notifEnabled && !hasPermission) {
-            btnIcon.className = "fa-regular fa-bell text-[11px] text-amber-700/70 dark:text-zinc-400 animate-pulse";
-            btn.title = "Notifications: Enable browser permission";
-            btn.classList.remove("border-amber-500/40");
-        } else {
-            btnIcon.className = "fa-solid fa-bell-slash text-[11px] text-[#857666] dark:text-zinc-500";
-            btn.title = "Notifications: OFF (Click to enable)";
-            btn.classList.remove("border-amber-500/40");
+    if (notifEnabled) {
+        // ON State
+        if (headerBtn && headerIcon) {
+            headerBtn.className = "w-7 h-7 rounded-xl bg-amber-500/20 dark:bg-amber-500/10 border border-amber-600/30 dark:border-amber-500/20 text-amber-900 dark:text-amber-400 flex items-center justify-center transition active:scale-95 shadow-2xs";
+            headerIcon.className = "fa-solid fa-bell text-[11px]";
+            headerBtn.title = "Notifications: ON (Click to disable)";
         }
-    }
-
-    if (banner) {
-        if (!hasPermission && notifEnabled) {
-            banner.classList.remove("hidden");
-        } else {
-            banner.classList.add("hidden");
+        if (moversBtn && moversIcon && moversText) {
+            moversBtn.className = "flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[9px] font-black transition border bg-amber-500/20 dark:bg-amber-500/10 text-amber-900 dark:text-amber-400 border-amber-600/30 dark:border-amber-500/20 active:scale-95 shadow-2xs cursor-pointer";
+            moversIcon.className = "fa-solid fa-bell text-[10px]";
+            moversText.innerText = "Alerts ON (±5%)";
+        }
+        if (chartBtn && chartText) {
+            chartBtn.className = "text-[8px] font-black px-2 py-0.5 rounded-lg border transition bg-amber-500/20 dark:bg-amber-500/10 text-amber-900 dark:text-amber-400 border-amber-600/30 dark:border-amber-500/20 active:scale-95 cursor-pointer";
+            chartText.innerText = "🔔 Alerts ON";
+        }
+    } else {
+        // OFF State
+        if (headerBtn && headerIcon) {
+            headerBtn.className = "w-7 h-7 rounded-xl bg-[#dfd4c0] dark:glass-panel border border-[#c5b59f] dark:border-white/10 text-[#857666] dark:text-zinc-500 flex items-center justify-center transition active:scale-95";
+            headerIcon.className = "fa-solid fa-bell-slash text-[11px]";
+            headerBtn.title = "Notifications: OFF (Click to enable)";
+        }
+        if (moversBtn && moversIcon && moversText) {
+            moversBtn.className = "flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[9px] font-black transition border bg-[#dfd4c0] dark:bg-white/5 text-[#857666] dark:text-zinc-400 border-[#c5b59f] dark:border-white/10 active:scale-95 cursor-pointer";
+            moversIcon.className = "fa-solid fa-bell-slash text-[10px]";
+            moversText.innerText = "Alerts OFF";
+        }
+        if (chartBtn && chartText) {
+            chartBtn.className = "text-[8px] font-black px-2 py-0.5 rounded-lg border transition bg-[#dfd4c0] dark:bg-white/5 text-[#857666] dark:text-zinc-400 border-[#c5b59f] dark:border-white/10 active:scale-95 cursor-pointer";
+            chartText.innerText = "🔕 Alerts OFF";
         }
     }
 }
@@ -105,24 +119,24 @@ async function toggleGlobalNotifications() {
     }
 
     if (!notifEnabled) {
-        // Turning ON
+        // Toggle to ON
         if (Notification.permission !== "granted") {
             const perm = await Notification.requestPermission();
             if (perm !== "granted") {
-                showToast("Please allow notification permission in your browser.", "warning");
+                showToast("Please allow notification permission in browser settings.", "warning");
                 return;
             }
         }
         notifEnabled = true;
         try { localStorage.setItem("sunchart_notifications_enabled", "true"); } catch (_) {}
         updateNotifToggleUI();
-        showToast("🔔 Notifications enabled for ±5% movers & watchlist!", "success");
+        showToast("🔔 Market alerts ENABLED for ±5% movers & watchlist!", "success");
     } else {
-        // Turning OFF
+        // Toggle to OFF
         notifEnabled = false;
         try { localStorage.setItem("sunchart_notifications_enabled", "false"); } catch (_) {}
         updateNotifToggleUI();
-        showToast("🔕 Notifications muted.", "info");
+        showToast("🔕 Market alerts MUTED.", "info");
     }
 }
 window.toggleGlobalNotifications = toggleGlobalNotifications;
@@ -352,7 +366,7 @@ function syncTaxSelectorUI() {
     if (select) select.value = currentTaxRate.toString();
 }
 
-// ─── Tab Switcher ─────────────────────────────────────────────────────────────
+// ─── Tab Switcher ─────────────────────────────────────────────────────
 function switchTab(tab) {
     currentTab = tab;
     const INACTIVE = "py-1 rounded-lg transition text-[#6d5e4d] dark:text-zinc-400 hover:text-black dark:hover:text-white flex items-center justify-center gap-1";
