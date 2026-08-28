@@ -16,21 +16,18 @@ html.dark {
     scrollbar-color: #27272a transparent;
 }
 
-/* Grounded Warm Canvas with Subtle Contrast Grid (Light Mode) */
 body {
     font-family: 'Plus Jakarta Sans', sans-serif;
     -webkit-tap-highlight-color: transparent;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
-    
     background-color: #dfd5c2;
     background-image: radial-gradient(rgba(120, 95, 65, 0.18) 1.2px, transparent 1.2px);
     background-size: 16px 16px;
     color: #1f1710;
 }
 
-/* OLED Deep Pitch Black Canvas (Dark Mode) */
 html.dark body {
     background-color: #000000 !important;
     color: #f4f4f5 !important;
@@ -38,7 +35,6 @@ html.dark body {
     background-size: 16px 16px;
 }
 
-/* Solid, High-Contrast Structured Cards */
 .glass-panel {
     background: #fbf8f2;
     border: 1px solid #cbbeaa;
@@ -51,7 +47,6 @@ html.dark .glass-panel {
     box-shadow: 0 4px 30px -4px rgba(0, 0, 0, 0.8);
 }
 
-/* Select & Option Colors */
 select {
     color-scheme: light;
 }
@@ -70,10 +65,7 @@ html.dark select option {
     color: #ffffff !important;
 }
 
-/* Scrollbars & Input Cleanup */
-.no-scrollbar::-webkit-scrollbar {
-    display: none;
-}
+.no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar {
     -ms-overflow-style: none;
     scrollbar-width: none;
@@ -84,6 +76,43 @@ input[type="number"]::-webkit-outer-spin-button {
     -webkit-appearance: none;
     margin: 0;
 }
-input[type="number"] {
-    -moz-appearance: textfield;
+input[type="number"] { -moz-appearance: textfield; }
+
+/* ── Toast notifications ─────────────────────────────────── */
+.toast {
+    position: fixed;
+    bottom: 1.25rem;
+    right: 1rem;
+    z-index: 9999;
+    max-width: 300px;
+    padding: 0.6rem 1rem;
+    border-radius: 0.875rem;
+    font-size: 0.7rem;
+    font-weight: 800;
+    border-width: 1px;
+    border-style: solid;
+    box-shadow: 0 8px 30px -4px rgba(0,0,0,0.25);
+    transition: opacity 0.3s ease;
+    pointer-events: none;
 }
+.toast.info    { background:#fbf8f2; border-color:#cbbeaa; color:#1f1710; }
+.toast.success { background:#ecfdf5; border-color:#6ee7b7; color:#065f46; }
+.toast.warning { background:#fffbeb; border-color:#fcd34d; color:#78350f; }
+.toast.alert   { background:#fff1f2; border-color:#fda4af; color:#9f1239; }
+
+html.dark .toast.info    { background:#18181b; border-color:#3f3f46; color:#f4f4f5; }
+html.dark .toast.success { background:#022c22; border-color:#065f46; color:#6ee7b7; }
+html.dark .toast.warning { background:#1c1400; border-color:#78350f; color:#fcd34d; }
+html.dark .toast.alert   { background:#1f0812; border-color:#9f1239; color:#fda4af; }
+
+/* ── Skeleton loader ─────────────────────────────────────── */
+@keyframes skeleton-pulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.4; }
+}
+.skeleton {
+    animation: skeleton-pulse 1.5s ease-in-out infinite;
+    border-radius: 0.5rem;
+    background: #e8dfd0;
+}
+html.dark .skeleton { background: #27272a; }
