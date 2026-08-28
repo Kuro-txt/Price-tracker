@@ -1,4 +1,4 @@
-import { getDb } from "./lib/db.js";
+import { getDb, ensureTablesExist } from "./lib/db.js";
 
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -6,17 +6,9 @@ export default async function handler(req, res) {
 
   try {
     const db = getDb();
+    await ensureTablesExist(db);
 
-    // 1. Ensure cache table exists
-    await db.execute(`
-      CREATE TABLE IF NOT EXISTS market_cache (
-        key        TEXT PRIMARY KEY,
-        payload    TEXT NOT NULL,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
-
-    // 2. Serve from 1-row cache (1 read)
+    // 1. Serve from 1-row cache (1 read)
     const cacheRes = await db.execute(
       "SELECT payload FROM market_cache WHERE key = 'prices' LIMIT 1;"
     );
@@ -27,14 +19,14 @@ export default async function handler(req, res) {
       }
     }
 
-    // 3. Fallback: fetch latest price per item via correct subquery join
+    // 2. Fallback: fetch latest price per item
     let prices = await fetchLatestPrices(db, "-6 hours");
 
     if (prices.length === 0) {
       prices = await fetchLatestPrices(db, null);
     }
 
-    // 4. Save to cache for future requests
+    // 3. Save to cache for future requests
     if (prices.length > 0) {
       await db.execute({
         sql: `
@@ -56,26 +48,31 @@ export default async function handler(req, res) {
 }
 
 async function fetchLatestPrices(db, timeModifier) {
-  const whereClause = timeModifier
-    ? `WHERE recorded_at >= datetime('now', '${timeModifier}')`
-    : "";
+  try {
+    const whereClause = timeModifier
+      ? `WHERE recorded_at >= datetime('now', '${timeModifier}')`
+      : "";
 
-  const res = await db.execute(`
-    SELECT rp.item_name AS name, rp.price
-    FROM resource_prices rp
-    JOIN (
-      SELECT item_name, MAX(recorded_at) AS max_at
-      FROM resource_prices
-      ${whereClause}
-      GROUP BY item_name
-    ) latest
-      ON  rp.item_name  = latest.item_name
-      AND rp.recorded_at = latest.max_at
-    ORDER BY rp.item_name ASC;
-  `);
+    const res = await db.execute(`
+      SELECT rp.item_name AS name, rp.price
+      FROM resource_prices rp
+      JOIN (
+        SELECT item_name, MAX(recorded_at) AS max_at
+        FROM resource_prices
+        ${whereClause}
+        GROUP BY item_name
+      ) latest
+        ON  rp.item_name  = latest.item_name
+        AND rp.recorded_at = latest.max_at
+      ORDER BY rp.item_name ASC;
+    `);
 
-  return res.rows.map(r => ({
-    name:  r.name,
-    price: parseFloat(r.price),
-  }));
+    return res.rows.map(r => ({
+      name:  r.name,
+      price: parseFloat(r.price),
+    }));
+  } catch (err) {
+    console.error("fetchLatestPrices Error:", err);
+    return [];
+  }
 }
