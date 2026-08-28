@@ -12,7 +12,9 @@ let startPointerY = 0;
 let dragStartViewStart = 0;
 let dragStartViewEnd = 0;
 let dragStartYPadding = 1.0;
-let initialPinchDistance = null;
+
+// Ranges where chart zoom/pan/stretch is disabled
+const LOCKED_STRETCH_RANGES = ['6h', '12h', '24h', '7d'];
 
 // SFL 4-Season Cycle Palette (Spring, Summer, Autumn, Winter)
 const SEASONS = [
@@ -115,6 +117,18 @@ function updatePriceChangeBadge(startPrice, currentPrice) {
     }
 }
 
+function updateCanvasCursor() {
+    const canvas = document.getElementById('priceHistoryChart');
+    if (!canvas) return;
+    if (LOCKED_STRETCH_RANGES.includes(selectedRange)) {
+        canvas.style.cursor = 'default';
+        canvas.classList.remove('cursor-grab', 'active:cursor-grabbing');
+    } else {
+        canvas.style.cursor = 'grab';
+        canvas.classList.add('cursor-grab');
+    }
+}
+
 function changeRange(range) {
     selectedRange = range;
     const ranges = ['6h', '12h', '24h', '7d', '30d', '90d', 'all'];
@@ -128,6 +142,7 @@ function changeRange(range) {
         }
     });
 
+    updateCanvasCursor();
     resetSlideView();
     if (window.activeItem) {
         loadItemHistoryGraph(window.activeItem.name);
@@ -173,6 +188,7 @@ async function loadItemHistoryGraph(itemName) {
     yPaddingMultiplier = 1.0;
 
     updateActiveSeasonBadge();
+    updateCanvasCursor();
     renderChart();
     attachDirectGestures();
 }
@@ -316,7 +332,10 @@ function attachDirectGestures() {
     canvas.dataset.gesturesAttached = "true";
 
     canvas.addEventListener('pointerdown', (e) => {
+        // Prevent stretching / dragging on 6h, 12h, 24h, and 7d
+        if (LOCKED_STRETCH_RANGES.includes(selectedRange)) return;
         if (fullHistoryData.length < 2) return;
+
         isDragging = true;
         canvas.setPointerCapture(e.pointerId);
         startPointerX = e.clientX;
@@ -327,7 +346,7 @@ function attachDirectGestures() {
     });
 
     canvas.addEventListener('pointermove', (e) => {
-        if (!isDragging || fullHistoryData.length < 2) return;
+        if (!isDragging || LOCKED_STRETCH_RANGES.includes(selectedRange) || fullHistoryData.length < 2) return;
         const deltaX = e.clientX - startPointerX;
         const deltaY = e.clientY - startPointerY;
 
