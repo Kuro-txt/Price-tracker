@@ -10,6 +10,25 @@ let movers12hMap     = {};
 let _lastGainers     = [];
 let _lastLosers      = [];
 
+// ─── Notification System State ────────────────────────────────────────────────
+let currentRuleType = "percent"; // 'percent' | 'above' | 'below'
+let masterNotifEnabled = true;
+try {
+    const saved = localStorage.getItem("sunchart_master_notif");
+    masterNotifEnabled = saved !== null ? JSON.parse(saved) : true;
+} catch (_) { masterNotifEnabled = true; }
+
+// Alert rules array: [ { id, item, type: 'percent'|'above'|'below', value: number } ]
+let alertRules = [];
+try {
+    const savedRules = localStorage.getItem("sunchart_alert_rules");
+    alertRules = savedRules ? JSON.parse(savedRules) : [
+        { id: "rule_default_movers", item: "*", type: "percent", value: 5 }
+    ];
+} catch (_) {
+    alertRules = [{ id: "rule_default_movers", item: "*", type: "percent", value: 5 }];
+}
+
 // ─── Persisted Settings ───────────────────────────────────────────────────────
 try {
     const savedTax = localStorage.getItem("sunchart_tax_rate");
@@ -21,6 +40,51 @@ try {
     const saved = localStorage.getItem("sunchart_watchlist");
     watchlist = saved ? JSON.parse(saved) : ["Sunflower", "Iron", "Egg", "Gold"];
 } catch (_) { watchlist = ["Sunflower", "Iron", "Egg", "Gold"]; }
+
+// ─── Web Audio Chime Generator ────────────────────────────────────────────────
+function playNotificationSound() {
+    try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+        if (ctx.state === "suspended") ctx.resume();
+
+        const now = ctx.currentTime;
+        const osc1 = ctx.createOscillator();
+        const osc2 = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        osc1.type = "sine";
+        osc2.type = "triangle";
+
+        // Pleasant melodic chime: E5 (659Hz) -> A5 (880Hz)
+        osc1.frequency.setValueAtTime(659.25, now);
+        osc1.frequency.exponentialRampToValueAtTime(880.00, now + 0.12);
+
+        osc2.frequency.setValueAtTime(329.63, now);
+        osc2.frequency.exponentialRampToValueAtTime(440.00, now + 0.12);
+
+        gain.gain.setValueAtTime(0.001, now);
+        gain.gain.linearRampToValueAtTime(0.2, now + 0.04);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.55);
+
+        osc1.connect(gain);
+        osc2.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc1.start(now);
+        osc2.start(now);
+        osc1.stop(now + 0.6);
+        osc2.stop(now + 0.6);
+    } catch (_) {}
+}
+
+// ─── PWA Service Worker Registration ──────────────────────────────────────────
+if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+        navigator.serviceWorker.register("/sw.js").catch(() => {});
+    });
+}
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
 function escapeHtml(str) {
@@ -37,6 +101,373 @@ function formatDisplayPrice(price) {
     return num.toFixed(2);
 }
 window.formatDisplayPrice = formatDisplayPrice;
+
+function showToast(message, type = "info", durationMs = 4500) {
+    const toast = document.createElement("div");
+    toast.className = `toast ${type}`;
+    toast.innerHTML = message;
+    document.body.appendChild(toast);
+    setTimeout(() => {
+        toast.style.opacity = "0";
+        setTimeout(() => toast.remove(), 350);
+    }, durationMs);
+}
+window.showToast = showToast;
+
+// ─── Notification Trigger Dispatcher ──────────────────────────────────────────
+function dispatchAlertNotification(title, body, type = "info") {
+    if (!masterNotifEnabled) return;
+
+    // 1. Play Audio Chime
+    playNotificationSound();
+
+    // 2. Show in-app Toast
+    showToast(`<strong>${escapeHtml(title)}</strong><br><span class="text-[9px] opacity-90">${escapeHtml(body)}</span>`, type, 7000);
+
+    // 3. Native Browser / Phone Push (Service Worker or Notification API)
+    if ("Notification" in window && Notification.permission === "granted") {
+        if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+            navigator.serviceWorker.ready.then(reg => {
+                reg.showNotification(title, {
+                    body: body,
+                    icon: "https://sfl.world/favicon.ico",
+                    badge: "https://sfl.world/favicon.ico",
+                    tag: title,
+                    renotify: true
+                });
+            }).catch(() => {
+                try { new Notification(title, { body, icon: "https://sfl.world/favicon.ico" }); } catch (_) {}
+            });
+        } else {
+            try { new Notification(title, { body, icon: "https://sfl.world/favicon.ico" }); } catch (_) {}
+        }
+    }
+}
+
+// ─── Alert Rules Engine ───────────────────────────────────────────────────────
+function evaluateAlertRules(pricesList, changesMap) {
+    if (!masterNotifEnabled || !alertRules || alertRules.length === 0) return;
+
+    let firedHistory = {};
+    try { firedHistory = JSON.parse(sessionStorage.getItem("sunchart_alert_fired") || "{}"); } catch (_) {}
+
+    const pricesMap = {};
+    pricesList.forEach(p => { pricesMap[p.name.toLowerCase()] = p.price; });
+
+    alertRules.forEach(rule => {
+        const targetItems = rule.item === "*"
+            ? pricesList.map(p => p.name)
+            : [rule.item];
+
+        targetItems.forEach(itemName => {
+            const lowerName = itemName.toLowerCase();
+            const currentPrice = pricesMap[lowerName];
+            const mover = changesMap[lowerName];
+
+            if (currentPrice === undefined) return;
+
+            let shouldFire = false;
+            let title = "";
+            let body = "";
+            let toastType = "info";
+            let cooldownKey = "";
+
+            if (rule.type === "percent" && mover && typeof mover.changePct === "number") {
+                const threshold = parseFloat(rule.value) || 5;
+                if (Math.abs(mover.changePct) >= threshold) {
+                    const direction = mover.changePct >= 0 ? "up" : "down";
+                    cooldownKey = `${rule.id}:${lowerName}:${direction}:${threshold}`;
+                    if (!firedHistory[cooldownKey]) {
+                        shouldFire = true;
+                        const sign = mover.changePct >= 0 ? "+" : "";
+                        title = `${mover.changePct >= 0 ? "🚀 Surging" : "📉 Dipping"}: ${itemName}`;
+                        body = `Moved ${sign}${mover.changePct.toFixed(1)}% (12H) · Now ${formatDisplayPrice(currentPrice)} SFL`;
+                        toastType = mover.changePct >= 0 ? "success" : "alert";
+                    }
+                }
+            } else if (rule.type === "above") {
+                const targetVal = parseFloat(rule.value);
+                if (!isNaN(targetVal) && currentPrice >= targetVal) {
+                    cooldownKey = `${rule.id}:${lowerName}:above:${targetVal}`;
+                    if (!firedHistory[cooldownKey]) {
+                        shouldFire = true;
+                        title = `🎯 Target Reached: ${itemName}`;
+                        body = `Price reached ${formatDisplayPrice(currentPrice)} SFL (Target: ≥ ${formatDisplayPrice(targetVal)} SFL)`;
+                        toastType = "success";
+                    }
+                }
+            } else if (rule.type === "below") {
+                const targetVal = parseFloat(rule.value);
+                if (!isNaN(targetVal) && currentPrice <= targetVal) {
+                    cooldownKey = `${rule.id}:${lowerName}:below:${targetVal}`;
+                    if (!firedHistory[cooldownKey]) {
+                        shouldFire = true;
+                        title = `⚠️ Price Drop: ${itemName}`;
+                        body = `Price fell to ${formatDisplayPrice(currentPrice)} SFL (Target: ≤ ${formatDisplayPrice(targetVal)} SFL)`;
+                        toastType = "warning";
+                    }
+                }
+            }
+
+            if (shouldFire) {
+                firedHistory[cooldownKey] = true;
+                dispatchAlertNotification(title, body, toastType);
+            }
+        });
+    });
+
+    try { sessionStorage.setItem("sunchart_alert_fired", JSON.stringify(firedHistory)); } catch (_) {}
+}
+
+// ─── Modal Management & UI ────────────────────────────────────────────────────
+function openNotifModal() {
+    const modal = document.getElementById("notifModal");
+    if (!modal) return;
+    populateRuleItemDropdown();
+    renderRuleValueInput();
+    renderAlertRules();
+    updateModalUI();
+    modal.classList.remove("hidden");
+}
+window.openNotifModal = openNotifModal;
+
+function openNotifModalForActiveItem() {
+    openNotifModal();
+    if (window.activeItem) {
+        const select = document.getElementById("ruleItemSelect");
+        if (select) select.value = window.activeItem.name;
+    }
+}
+window.openNotifModalForActiveItem = openNotifModalForActiveItem;
+
+function closeNotifModal() {
+    const modal = document.getElementById("notifModal");
+    if (modal) modal.classList.add("hidden");
+}
+window.closeNotifModal = closeNotifModal;
+
+function populateRuleItemDropdown() {
+    const select = document.getElementById("ruleItemSelect");
+    if (!select || !Array.isArray(allItems)) return;
+    const currentVal = select.value || "*";
+    select.innerHTML = `<option value="*">🌍 Any Catalog Asset</option>`;
+    [...allItems].sort((a, b) => a.name.localeCompare(b.name)).forEach(item => {
+        const opt = document.createElement("option");
+        opt.value = item.name;
+        opt.textContent = `${item.name} (${formatDisplayPrice(item.price)} SFL)`;
+        select.appendChild(opt);
+    });
+    select.value = currentVal;
+}
+
+function setRuleType(type) {
+    currentRuleType = type;
+    ["percent", "above", "below"].forEach(t => {
+        const btn = document.getElementById(`ruleTypeBtn-${t}`);
+        if (!btn) return;
+        btn.className = t === type
+            ? "py-1 rounded-lg transition bg-[#fbf8f2] dark:bg-zinc-800 text-amber-900 dark:text-amber-400 shadow-xs"
+            : "py-1 rounded-lg transition text-[#6d5e4d] dark:text-zinc-400 hover:text-black dark:hover:text-white";
+    });
+    renderRuleValueInput();
+}
+window.setRuleType = setRuleType;
+
+function renderRuleValueInput() {
+    const container = document.getElementById("ruleValueContainer");
+    if (!container) return;
+
+    if (currentRuleType === "percent") {
+        container.innerHTML = `
+            <div>
+                <label class="text-[8px] font-black uppercase text-[#6d5e4d] dark:text-zinc-400 block mb-1">Percentage Shift Threshold</label>
+                <div class="flex items-center gap-1.5 mb-1.5">
+                    <button type="button" onclick="setPresetPercent(3)" class="px-2 py-0.5 rounded-lg bg-[#ede3d1] dark:bg-white/5 hover:bg-amber-500/20 text-[9px] font-black border border-[#cbbeaa] dark:border-transparent">±3%</button>
+                    <button type="button" onclick="setPresetPercent(5)" class="px-2 py-0.5 rounded-lg bg-[#ede3d1] dark:bg-white/5 hover:bg-amber-500/20 text-[9px] font-black border border-[#cbbeaa] dark:border-transparent">±5%</button>
+                    <button type="button" onclick="setPresetPercent(10)" class="px-2 py-0.5 rounded-lg bg-[#ede3d1] dark:bg-white/5 hover:bg-amber-500/20 text-[9px] font-black border border-[#cbbeaa] dark:border-transparent">±10%</button>
+                    <button type="button" onclick="setPresetPercent(15)" class="px-2 py-0.5 rounded-lg bg-[#ede3d1] dark:bg-white/5 hover:bg-amber-500/20 text-[9px] font-black border border-[#cbbeaa] dark:border-transparent">±15%</button>
+                </div>
+                <div class="flex items-center gap-1.5 bg-[#ede3d1] dark:bg-white/5 border border-[#cbbeaa] dark:border-transparent p-1 rounded-xl">
+                    <span class="text-[9px] font-black text-[#6d5e4d] dark:text-zinc-400 uppercase pl-1 shrink-0">Trigger ± %</span>
+                    <input type="number" id="ruleValueInput" value="5" min="1" step="0.5"
+                        class="w-full bg-[#fbf8f2] dark:bg-zinc-900 border border-[#cbbeaa] dark:border-white/10 rounded-lg px-2 py-1 text-xs font-black font-mono text-[#1f1710] dark:text-white focus:outline-none">
+                </div>
+            </div>`;
+    } else {
+        const label = currentRuleType === "above" ? "Target Price Ceiling (SFL)" : "Target Price Floor (SFL)";
+        const placeholder = currentRuleType === "above" ? "e.g. 1.25" : "e.g. 0.45";
+        container.innerHTML = `
+            <div>
+                <label class="text-[8px] font-black uppercase text-[#6d5e4d] dark:text-zinc-400 block mb-1">${label}</label>
+                <div class="flex items-center gap-1.5 bg-[#ede3d1] dark:bg-white/5 border border-[#cbbeaa] dark:border-transparent p-1 rounded-xl">
+                    <span class="text-[9px] font-black text-[#6d5e4d] dark:text-zinc-400 uppercase pl-1 shrink-0">Price SFL</span>
+                    <input type="number" id="ruleValueInput" step="any" placeholder="${placeholder}"
+                        class="w-full bg-[#fbf8f2] dark:bg-zinc-900 border border-[#cbbeaa] dark:border-white/10 rounded-lg px-2 py-1 text-xs font-black font-mono text-[#1f1710] dark:text-white focus:outline-none">
+                </div>
+            </div>`;
+    }
+}
+
+function setPresetPercent(val) {
+    const input = document.getElementById("ruleValueInput");
+    if (input) input.value = val;
+}
+window.setPresetPercent = setPresetPercent;
+
+function addNewAlertRule() {
+    const itemSelect = document.getElementById("ruleItemSelect");
+    const valInput = document.getElementById("ruleValueInput");
+    if (!itemSelect || !valInput) return;
+
+    const item = itemSelect.value || "*";
+    const val = parseFloat(valInput.value);
+
+    if (isNaN(val) || val <= 0) {
+        showToast("Please enter a valid positive value.", "warning");
+        return;
+    }
+
+    const newRule = {
+        id: `rule_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        item: item,
+        type: currentRuleType,
+        value: val
+    };
+
+    alertRules.push(newRule);
+    saveAlertRules();
+    renderAlertRules();
+    showToast(`🔔 Alert created for ${item === "*" ? "Any Asset" : item}!`, "success");
+
+    // Request permission if not yet granted
+    if ("Notification" in window && Notification.permission === "default") {
+        Notification.requestPermission().then(() => updateModalUI());
+    }
+}
+window.addNewAlertRule = addNewAlertRule;
+
+function removeAlertRule(ruleId) {
+    alertRules = alertRules.filter(r => r.id !== ruleId);
+    saveAlertRules();
+    renderAlertRules();
+}
+window.removeAlertRule = removeAlertRule;
+
+function clearAllAlertRules() {
+    alertRules = [];
+    saveAlertRules();
+    renderAlertRules();
+    showToast("All alert rules cleared.", "info");
+}
+window.clearAllAlertRules = clearAllAlertRules;
+
+function saveAlertRules() {
+    try { localStorage.setItem("sunchart_alert_rules", JSON.stringify(alertRules)); } catch (_) {}
+    updateBadgeCount();
+}
+
+function renderAlertRules() {
+    const listEl = document.getElementById("activeRulesList");
+    const countNum = document.getElementById("rulesCountNum");
+    if (countNum) countNum.innerText = alertRules.length;
+    if (!listEl) return;
+
+    if (alertRules.length === 0) {
+        listEl.innerHTML = `<div class="p-3 text-center text-xs text-[#6d5e4d] dark:text-zinc-500 font-bold bg-[#ede3d1]/50 dark:bg-white/5 rounded-xl">No active alert rules configured.</div>`;
+        return;
+    }
+
+    listEl.innerHTML = alertRules.map(rule => {
+        let conditionText = "";
+        let badgeColor = "bg-amber-500/15 text-amber-900 dark:text-amber-400 border-amber-600/30";
+
+        if (rule.type === "percent") {
+            conditionText = `±${rule.value}% 12H Movement`;
+            badgeColor = "bg-emerald-500/15 text-emerald-900 dark:text-emerald-400 border-emerald-600/30";
+        } else if (rule.type === "above") {
+            conditionText = `Price ≥ ${formatDisplayPrice(rule.value)} SFL`;
+            badgeColor = "bg-amber-500/15 text-amber-900 dark:text-amber-400 border-amber-600/30";
+        } else if (rule.type === "below") {
+            conditionText = `Price ≤ ${formatDisplayPrice(rule.value)} SFL`;
+            badgeColor = "bg-rose-500/15 text-rose-900 dark:text-rose-400 border-rose-600/30";
+        }
+
+        const itemLabel = rule.item === "*" ? "🌍 Any Catalog Asset" : rule.item;
+
+        return `
+            <div class="flex items-center justify-between px-3 py-2 rounded-xl bg-[#ede3d1] dark:bg-white/5 border border-[#cbbeaa] dark:border-white/10 text-xs shadow-2xs">
+                <div class="min-w-0 flex-1">
+                    <span class="font-extrabold text-[#1f1710] dark:text-white block truncate">${escapeHtml(itemLabel)}</span>
+                    <span class="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded-md border ${badgeColor}">${escapeHtml(conditionText)}</span>
+                </div>
+                <button onclick="removeAlertRule('${rule.id}')" title="Delete Alert" class="w-6 h-6 rounded-lg flex items-center justify-center bg-[#fbf8f2] dark:bg-zinc-800 hover:bg-rose-500/20 text-[#6d5e4d] hover:text-rose-700 transition active:scale-90 ml-2 shrink-0">
+                    <i class="fa-solid fa-trash-can text-[10px]"></i>
+                </button>
+            </div>`;
+    }).join("");
+}
+
+function updateBadgeCount() {
+    const badge = document.getElementById("activeNotifBadge");
+    if (!badge) return;
+    const count = alertRules.length;
+    badge.innerText = count;
+    badge.classList.toggle("hidden", count === 0 || !masterNotifEnabled);
+}
+
+function updateModalUI() {
+    const statusText = document.getElementById("notifPermStatusText");
+    const toggleBtn = document.getElementById("modalMasterToggleBtn");
+    const toggleText = document.getElementById("modalMasterToggleText");
+    const bellIcon = document.getElementById("notifBellIcon");
+
+    const hasPerm = "Notification" in window && Notification.permission === "granted";
+
+    if (statusText) {
+        statusText.innerText = hasPerm
+            ? "Status: Browser Push Enabled"
+            : ("Notification" in window ? `Status: Permission ${Notification.permission}` : "Status: Audio / In-App Chimes");
+    }
+
+    if (toggleBtn && toggleText) {
+        if (masterNotifEnabled) {
+            toggleBtn.className = "px-3 py-1 rounded-xl text-[10px] font-black border transition active:scale-95 bg-amber-500/20 text-amber-900 dark:text-amber-400 border-amber-600/30";
+            toggleText.innerText = "ON";
+        } else {
+            toggleBtn.className = "px-3 py-1 rounded-xl text-[10px] font-black border transition active:scale-95 bg-[#fbf8f2] dark:bg-zinc-800 text-[#857666] dark:text-zinc-500 border-[#cbbeaa] dark:border-transparent";
+            toggleText.innerText = "OFF";
+        }
+    }
+
+    if (bellIcon) {
+        bellIcon.className = masterNotifEnabled
+            ? "fa-solid fa-bell text-[11px] text-amber-700 dark:text-amber-400"
+            : "fa-solid fa-bell-slash text-[11px] text-[#857666] dark:text-zinc-500";
+    }
+
+    updateBadgeCount();
+}
+
+async function toggleMasterNotifications() {
+    if (!masterNotifEnabled) {
+        if ("Notification" in window && Notification.permission !== "granted") {
+            await Notification.requestPermission();
+        }
+        masterNotifEnabled = true;
+        showToast("🔔 Master notifications enabled!", "success");
+    } else {
+        masterNotifEnabled = false;
+        showToast("🔕 Master notifications muted.", "info");
+    }
+    try { localStorage.setItem("sunchart_master_notif", JSON.stringify(masterNotifEnabled)); } catch (_) {}
+    updateModalUI();
+}
+window.toggleMasterNotifications = toggleMasterNotifications;
+
+function testNotificationAlert() {
+    dispatchAlertNotification("🔔 Test Alert: Sunflower", "Price shifted +5.2% · Chime & Push working!", "success");
+}
+window.testNotificationAlert = testNotificationAlert;
 
 // ─── Auto-refresh (60s interval) ──────────────────────────────────────────────
 function startAutoRefresh(intervalMs = 60000) {
@@ -89,7 +520,9 @@ async function fetchMarket() {
         errorState?.classList.add("hidden");
 
         populateDropdown();
+        populateRuleItemDropdown();
         renderMovers(gainers, losers);
+        evaluateAlertRules(allItems, movers12hMap);
         renderWatchlist();
 
         if (window.activeItem) {
@@ -120,7 +553,7 @@ window.fetchPrices = fetchMarket;
 window.fetchMovers = fetchMarket;
 window.fetchMarket = fetchMarket;
 
-// ─── Movers Renderer (Shows ALL Items) ────────────────────────────────────────
+// ─── Movers Renderer ──────────────────────────────────────────────────────────
 function renderMovers(allGainers, allLosers) {
     _lastGainers = allGainers || [];
     _lastLosers  = allLosers || [];
@@ -309,7 +742,7 @@ function renderWatchlist() {
     }).join("");
 }
 
-// Watchlist & Movers click delegation
+// Delegation for clicks
 document.addEventListener("click", e => {
     const el     = e.target.closest("[data-action]");
     if (!el) return;
@@ -501,6 +934,7 @@ function calculateCustomStack(shouldSave = true) {
 document.addEventListener("DOMContentLoaded", () => {
     syncTaxSelectorUI();
     updateWatchlistBadge();
+    updateModalUI();
     switchTab("movers");
 
     fetchMarket();
