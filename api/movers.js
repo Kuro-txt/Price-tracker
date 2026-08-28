@@ -1,4 +1,4 @@
-import { getDb } from "./lib/db.js";
+import { getDb, ensureTablesExist } from "./lib/db.js";
 
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -6,17 +6,9 @@ export default async function handler(req, res) {
 
   try {
     const db = getDb();
+    await ensureTablesExist(db);
 
-    // 1. Ensure cache table exists
-    await db.execute(`
-      CREATE TABLE IF NOT EXISTS market_cache (
-        key        TEXT PRIMARY KEY,
-        payload    TEXT NOT NULL,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
-
-    // 2. Serve from 1-row cache (1 read)
+    // 1. Serve from 1-row cache (1 read)
     const cacheRes = await db.execute(
       "SELECT payload FROM market_cache WHERE key = 'movers' LIMIT 1;"
     );
@@ -32,7 +24,7 @@ export default async function handler(req, res) {
       }
     }
 
-    // 3. Fallback: compute movers via correct subquery joins
+    // 2. Fallback: compute movers
     const moversRes = await db.execute(`
       WITH Latest AS (
         SELECT rp.item_name, rp.price AS current_price
@@ -86,7 +78,7 @@ export default async function handler(req, res) {
 
     const payload = { gainers, losers, changesMap };
 
-    // 4. Save to cache
+    // 3. Save to cache
     if (Object.keys(changesMap).length > 0) {
       await db.execute({
         sql: `
