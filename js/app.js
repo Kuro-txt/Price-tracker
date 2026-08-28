@@ -1,12 +1,17 @@
 "use strict";
 
-let allItems       = [];
-window.activeItem  = null;
+// ─── State ────────────────────────────────────────────────────────────────────
+let allItems         = [];
+window.activeItem    = null;
 let autoRefreshTimer = null;
-let currentTab     = "movers";
-let currentTaxRate = 10.0;
-let movers12hMap   = {};
+let currentTab       = "movers";
+let currentTaxRate   = 10.0;
+let movers12hMap     = {};
+let currentMoversFilter = "all"; // 'all' | '5pct' | 'gainers' | 'losers'
+let _lastGainers     = [];
+let _lastLosers      = [];
 
+// ─── Persisted Settings ───────────────────────────────────────────────────────
 try {
     const savedTax = localStorage.getItem("sunchart_tax_rate");
     if (savedTax) currentTaxRate = parseFloat(savedTax) || 10.0;
@@ -16,9 +21,7 @@ let watchlist = [];
 try {
     const saved = localStorage.getItem("sunchart_watchlist");
     watchlist = saved ? JSON.parse(saved) : ["Sunflower", "Iron", "Egg", "Gold"];
-} catch (_) {
-    watchlist = ["Sunflower", "Iron", "Egg", "Gold"];
-}
+} catch (_) { watchlist = ["Sunflower", "Iron", "Egg", "Gold"]; }
 
 let priceAlerts = {};
 try {
@@ -27,13 +30,11 @@ try {
 
 let notifPermission = Notification?.permission ?? "default";
 
+// ─── Utilities ────────────────────────────────────────────────────────────────
 function escapeHtml(str) {
     return String(str)
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
 }
 
 function formatDisplayPrice(price) {
@@ -57,31 +58,260 @@ function showToast(message, type = "info", durationMs = 4500) {
 }
 window.showToast = showToast;
 
-function startAutoRefresh(intervalMs = 15000) {
+// ─── Auto-refresh (leak-free, 60s interval) ───────────────────────────────────
+function startAutoRefresh(intervalMs = 60000) {
     stopAutoRefresh();
-    autoRefreshTimer = setInterval(() => {
-        fetchPrices();
-        fetchMovers();
-    }, intervalMs);
+    autoRefreshTimer = setInterval(() => fetchMarket(), intervalMs);
 }
-
 function stopAutoRefresh() {
-    if (autoRefreshTimer !== null) {
-        clearInterval(autoRefreshTimer);
-        autoRefreshTimer = null;
-    }
+    if (autoRefreshTimer !== null) { clearInterval(autoRefreshTimer); autoRefreshTimer = null; }
 }
 
 document.addEventListener("visibilitychange", () => {
     if (document.hidden) {
         stopAutoRefresh();
     } else {
-        fetchPrices();
-        fetchMovers();
-        startAutoRefresh(30000);
+        fetchMarket();
+        startAutoRefresh(60000);
     }
 });
 
+// ─── Combined Market Fetch (1 DB read instead of 2) ───────────────────────────
+async function fetchMarket() {
+    const refreshIcon  = document.getElementById("refreshIcon");
+    const loadingState = document.getElementById("loadingState");
+    const errorState   = document.getElementById("errorState");
+
+    if (refreshIcon) refreshIcon.classList.add("fa-spin");
+
+    try {
+        const res = await fetch("/api/market");
+        if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.error || `Status: ${res.status}`);
+        }
+        const data = await res.json();
+
+        // ── Process prices ──
+        const rawPrices = Array.isArray(data.prices) ? data.prices : [];
+        allItems = rawPrices.map(item => ({
+            name:  item.name  || item.item_name || "Unknown",
+            price: parseFloat(item.price || 0),
+        }));
+
+        // ── Process movers ──
+        const moversData = data.movers || {};
+        movers12hMap     = moversData.changesMap || {};
+        const gainers    = Array.isArray(moversData.gainers) ? moversData.gainers : [];
+        const losers     = Array.isArray(moversData.losers)  ? moversData.losers  : [];
+
+        loadingState?.classList.add("hidden");
+        errorState?.classList.add("hidden");
+
+        populateDropdown();
+        renderMovers(gainers, losers);
+        checkMoverNotifications(movers12hMap);
+        checkPriceAlerts();
+        renderWatchlist();
+
+        if (window.activeItem) {
+            const fresh = allItems.find(i => i.name.toLowerCase() === window.activeItem.name.toLowerCase());
+            if (fresh) selectItem(fresh, false);
+        } else if (allItems.length > 0) {
+            const savedName  = localStorage.getItem("sunchart_last_selected_item");
+            const targetItem = (savedName && allItems.find(i => i.name.toLowerCase() === savedName.toLowerCase()))
+                || allItems.find(i => i.name.toLowerCase() === "sunflower")
+                || allItems[0];
+            selectItem(targetItem, true);
+        }
+
+    } catch (err) {
+        console.error("fetchMarket failed:", err);
+        loadingState?.classList.add("hidden");
+        if (errorState) {
+            errorState.classList.remove("hidden");
+            const msg = document.getElementById("errorMessage");
+            if (msg) msg.innerText = err.message || "Failed to load market data.";
+        }
+    } finally {
+        if (refreshIcon) refreshIcon.classList.remove("fa-spin");
+    }
+}
+
+// Keep old names as aliases for any external callers
+window.fetchPrices  = fetchMarket;
+window.fetchMovers  = fetchMarket;
+window.fetchMarket  = fetchMarket;
+
+// ─── Movers Renderer (all items, with filter) ─────────────────────────────────
+function setMoversFilter(filter) {
+    currentMoversFilter = filter;
+    ["all", "5pct", "gainers", "losers"].forEach(f => {
+        const btn = document.getElementById(`moverFilter-${f}`);
+        if (!btn) return;
+        btn.className = f === filter
+            ? "px-2 py-0.5 rounded-lg transition bg-[#fbf8f2] dark:bg-zinc-800 text-amber-900 dark:text-amber-400 shadow-xs"
+            : "px-2 py-0.5 rounded-lg transition text-[#6d5e4d] dark:text-zinc-400 hover:text-black dark:hover:text-white";
+    });
+    renderMovers(_lastGainers, _lastLosers);
+}
+window.setMoversFilter = setMoversFilter;
+
+function renderMovers(allGainers, allLosers) {
+    _lastGainers = allGainers;
+    _lastLosers  = allLosers;
+
+    const gainersList = document.getElementById("gainersList");
+    const losersList  = document.getElementById("losersList");
+    const badge       = document.getElementById("moversCountBadge");
+
+    // Apply filter
+    let gainers, losers;
+    switch (currentMoversFilter) {
+        case "5pct":
+            gainers = allGainers.filter(g => g.changePct >= 5);
+            losers  = allLosers.filter(l => l.changePct <= -5);
+            break;
+        case "gainers":
+            gainers = allGainers;
+            losers  = [];
+            break;
+        case "losers":
+            gainers = [];
+            losers  = allLosers;
+            break;
+        default: // 'all'
+            gainers = allGainers;
+            losers  = allLosers;
+    }
+
+    const total = gainers.length + losers.length;
+    if (badge) {
+        badge.innerText = total;
+        badge.classList.toggle("hidden", total === 0);
+    }
+
+    const buildGainerRow = item => {
+        const isBig = item.changePct >= 5;
+        return `
+            <button data-action="mover-select" data-item-name="${escapeHtml(item.name)}"
+                class="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-[#fbf8f2] dark:bg-black/40 hover:bg-[#ede3d1] dark:hover:bg-zinc-900 border ${isBig ? 'border-emerald-500/50 dark:border-emerald-500/30' : 'border-emerald-600/20 dark:border-emerald-500/10'} transition shadow-2xs active:scale-[0.98] cursor-pointer text-left">
+                <div class="min-w-0 flex items-center gap-1.5">
+                    <span class="w-1.5 h-1.5 rounded-full ${isBig ? 'bg-emerald-500 animate-pulse' : 'bg-emerald-700/50 dark:bg-emerald-600/50'} shrink-0"></span>
+                    <span class="text-xs font-black text-[#1f1710] dark:text-zinc-100 truncate">${escapeHtml(item.name)}</span>
+                </div>
+                <div class="flex items-center gap-2 shrink-0 ml-2">
+                    <span class="text-[10px] font-mono font-bold text-[#423425] dark:text-zinc-400">${formatDisplayPrice(item.price)} SFL</span>
+                    <span class="text-[10px] font-mono font-black text-emerald-900 dark:text-emerald-400 bg-emerald-500/15 dark:bg-emerald-500/10 px-1.5 py-0.5 rounded-md border border-emerald-600/30 dark:border-emerald-500/20">
+                        +${parseFloat(item.changePct).toFixed(1)}%
+                    </span>
+                </div>
+            </button>`;
+    };
+
+    const buildLoserRow = item => {
+        const isBig = item.changePct <= -5;
+        return `
+            <button data-action="mover-select" data-item-name="${escapeHtml(item.name)}"
+                class="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-[#fbf8f2] dark:bg-black/40 hover:bg-[#ede3d1] dark:hover:bg-zinc-900 border ${isBig ? 'border-rose-500/50 dark:border-rose-500/30' : 'border-rose-600/20 dark:border-rose-500/10'} transition shadow-2xs active:scale-[0.98] cursor-pointer text-left">
+                <div class="min-w-0 flex items-center gap-1.5">
+                    <span class="w-1.5 h-1.5 rounded-full ${isBig ? 'bg-rose-500 animate-pulse' : 'bg-rose-700/50 dark:bg-rose-600/50'} shrink-0"></span>
+                    <span class="text-xs font-black text-[#1f1710] dark:text-zinc-100 truncate">${escapeHtml(item.name)}</span>
+                </div>
+                <div class="flex items-center gap-2 shrink-0 ml-2">
+                    <span class="text-[10px] font-mono font-bold text-[#423425] dark:text-zinc-400">${formatDisplayPrice(item.price)} SFL</span>
+                    <span class="text-[10px] font-mono font-black text-rose-900 dark:text-rose-400 bg-rose-500/15 dark:bg-rose-500/10 px-1.5 py-0.5 rounded-md border border-rose-600/30 dark:border-rose-500/20">
+                        ${parseFloat(item.changePct).toFixed(1)}%
+                    </span>
+                </div>
+            </button>`;
+    };
+
+    if (gainersList) {
+        gainersList.innerHTML = gainers.length === 0
+            ? `<span class="text-[11px] text-[#6d5e4d] dark:text-zinc-400 font-bold italic py-1">No gainers to show</span>`
+            : gainers.map(buildGainerRow).join("");
+    }
+
+    if (losersList) {
+        losersList.innerHTML = losers.length === 0
+            ? `<span class="text-[11px] text-[#6d5e4d] dark:text-zinc-400 font-bold italic py-1">No losers to show</span>`
+            : losers.map(buildLoserRow).join("");
+    }
+}
+
+// ─── Mover Notifications ─────────────────────────────────────────────────────
+// Fires at most once per session per item-direction pair.
+// ±5% threshold for ALL items; ±2% threshold for watchlist items.
+function checkMoverNotifications(changesMap) {
+    if (!changesMap || Object.keys(changesMap).length === 0) return;
+
+    let notified = {};
+    try { notified = JSON.parse(sessionStorage.getItem("sunchart_mover_notifs") || "{}"); } catch (_) {}
+
+    const toFire = [];
+
+    // ── 1. Any item ±5%+ ──
+    Object.values(changesMap).forEach(item => {
+        if (Math.abs(item.changePct) < 5) return;
+        const key = `any:${item.name.toLowerCase()}:${item.changePct > 0 ? "up" : "down"}`;
+        if (notified[key]) return;
+        notified[key] = true;
+        toFire.push({
+            item,
+            toastType: item.changePct > 0 ? "success" : "alert",
+            icon:  item.changePct > 0 ? "🚀" : "📉",
+            label: "Mover",
+        });
+    });
+
+    // ── 2. Watchlist items ±2%+ (lower threshold — user specifically pins these) ──
+    watchlist.forEach(name => {
+        const mover = changesMap[name.toLowerCase()];
+        if (!mover || Math.abs(mover.changePct) < 2) return;
+        const key = `watchlist:${name.toLowerCase()}:${mover.changePct > 0 ? "up" : "down"}`;
+        if (notified[key]) return;
+        notified[key] = true;
+        // Skip if already in the ±5% list to avoid duplicate toast
+        const duplicate = toFire.some(n => n.item.name.toLowerCase() === name.toLowerCase());
+        if (!duplicate) {
+            toFire.push({
+                item: mover,
+                toastType: mover.changePct > 0 ? "success" : "warning",
+                icon:  mover.changePct > 0 ? "⭐" : "⚠️",
+                label: "Watchlist",
+            });
+        }
+    });
+
+    // Fire
+    toFire.forEach(({ item, toastType, icon, label }) => {
+        const sign = item.changePct > 0 ? "+" : "";
+        showToast(
+            `${icon} <strong>${escapeHtml(item.name)}</strong> ${sign}${item.changePct.toFixed(1)}% · ${formatDisplayPrice(item.price)} SFL <span class="opacity-60">(${label})</span>`,
+            toastType,
+            7000
+        );
+        if (Notification?.permission === "granted") {
+            try {
+                new Notification(`SunChart: ${item.name} ${sign}${item.changePct.toFixed(1)}%`, {
+                    body: `Price: ${formatDisplayPrice(item.price)} SFL · ${label}`,
+                    icon: "/favicon.ico",
+                });
+            } catch (_) {}
+        }
+    });
+
+    try { sessionStorage.setItem("sunchart_mover_notifs", JSON.stringify(notified)); } catch (_) {}
+}
+
+// Delegate clicks for movers
+document.addEventListener("click", e => {
+    const el = e.target.closest("[data-action='mover-select']");
+    if (el) onMoverSelect(el.dataset.itemName);
+});
+
+// ─── Calculator State ─────────────────────────────────────────────────────────
 function saveItemCalcState(itemName, qty, buyPrice) {
     if (!itemName) return;
     try {
@@ -90,17 +320,15 @@ function saveItemCalcState(itemName, qty, buyPrice) {
         localStorage.setItem("sunchart_calc_map", JSON.stringify(map));
     } catch (_) {}
 }
-
 function loadItemCalcState(itemName) {
     if (!itemName) return { qty: 50, buyPrice: "" };
     try {
         const map = JSON.parse(localStorage.getItem("sunchart_calc_map") || "{}");
         return map[itemName.toLowerCase()] || { qty: 50, buyPrice: "" };
-    } catch (_) {
-        return { qty: 50, buyPrice: "" };
-    }
+    } catch (_) { return { qty: 50, buyPrice: "" }; }
 }
 
+// ─── Tax Rate ─────────────────────────────────────────────────────────────────
 function onTaxRateChange(val) {
     currentTaxRate = parseFloat(val) || 10.0;
     try { localStorage.setItem("sunchart_tax_rate", currentTaxRate.toString()); } catch (_) {}
@@ -113,42 +341,37 @@ function syncTaxSelectorUI() {
     if (select) select.value = currentTaxRate.toString();
 }
 
+// ─── Tab Switcher ─────────────────────────────────────────────────────────────
 function switchTab(tab) {
     currentTab = tab;
     const INACTIVE = "py-1 rounded-lg transition text-[#6d5e4d] dark:text-zinc-400 hover:text-black dark:hover:text-white flex items-center justify-center gap-1";
     const ACTIVE   = "py-1 rounded-lg transition bg-[#fbf8f2] dark:bg-zinc-800 text-amber-900 dark:text-amber-400 shadow-xs flex items-center justify-center gap-1";
-
     ["movers", "chart", "watchlist"].forEach(t => {
         document.getElementById(`${t}TabContent`)?.classList.add("hidden");
         const btn = document.getElementById(`tabBtn-${t}`);
         if (btn) btn.className = INACTIVE;
     });
-
     document.getElementById(`${tab}TabContent`)?.classList.remove("hidden");
     const activeBtn = document.getElementById(`tabBtn-${tab}`);
     if (activeBtn) activeBtn.className = ACTIVE;
-
-    if (tab === "chart" && window.renderChart && window.fullHistoryData?.length > 0) {
-        window.renderChart();
-    }
+    if (tab === "chart" && window.renderChart && window.fullHistoryData?.length > 0) window.renderChart();
     if (tab === "watchlist") renderWatchlist();
 }
 window.switchTab = switchTab;
 
+// ─── Watchlist ────────────────────────────────────────────────────────────────
 function saveWatchlist() {
     try { localStorage.setItem("sunchart_watchlist", JSON.stringify(watchlist)); } catch (_) {}
     updateWatchlistBadge();
     updateActiveItemStar();
     renderWatchlist();
 }
-
 function updateWatchlistBadge() {
     const badge = document.getElementById("watchlistCountBadge");
     if (!badge) return;
     badge.innerText = watchlist.length;
     badge.classList.toggle("hidden", watchlist.length === 0);
 }
-
 function toggleWatchlist(itemName) {
     if (!itemName) return;
     const idx = watchlist.findIndex(n => n.toLowerCase() === itemName.toLowerCase());
@@ -157,7 +380,6 @@ function toggleWatchlist(itemName) {
     saveWatchlist();
 }
 window.toggleWatchlist = toggleWatchlist;
-
 function toggleActiveItemWatchlist() {
     if (!window.activeItem) return;
     toggleWatchlist(window.activeItem.name);
@@ -168,7 +390,6 @@ function updateActiveItemStar() {
     const starBtn  = document.getElementById("watchlistStarBtn");
     const starIcon = document.getElementById("watchlistStarIcon");
     if (!starBtn || !starIcon || !window.activeItem) return;
-
     const isWatched = watchlist.some(n => n.toLowerCase() === window.activeItem.name.toLowerCase());
     if (isWatched) {
         starBtn.className  = "w-7 h-7 rounded-xl flex items-center justify-center transition active:scale-90 bg-amber-500/20 text-amber-800 dark:text-amber-500 border border-amber-600/30";
@@ -182,7 +403,6 @@ function updateActiveItemStar() {
 function renderWatchlist() {
     const grid = document.getElementById("watchlistGrid");
     if (!grid) return;
-
     if (watchlist.length === 0) {
         grid.innerHTML = `
             <div class="text-center py-8 space-y-1.5">
@@ -190,31 +410,26 @@ function renderWatchlist() {
                     <i class="fa-regular fa-star"></i>
                 </div>
                 <p class="text-xs font-black text-[#1f1710] dark:text-zinc-300">Watchlist is Empty</p>
-                <p class="text-[10px] text-[#6d5e4d] dark:text-zinc-400 font-medium max-w-xs mx-auto">
-                    Tap the ★ icon on any resource to track it here.
-                </p>
+                <p class="text-[10px] text-[#6d5e4d] dark:text-zinc-400 font-medium max-w-xs mx-auto">Tap the ★ icon on any resource to track it here.</p>
             </div>`;
         return;
     }
-
     grid.innerHTML = watchlist.map(name => {
-        const item       = allItems.find(i => i.name.toLowerCase() === name.toLowerCase()) || { name, price: 0 };
-        const moverData  = movers12hMap[name.toLowerCase()];
-        const safeName   = escapeHtml(item.name);
-
+        const item      = allItems.find(i => i.name.toLowerCase() === name.toLowerCase()) || { name, price: 0 };
+        const moverData = movers12hMap[name.toLowerCase()];
+        const safeName  = escapeHtml(item.name);
         let changeBadge = "";
         if (moverData && typeof moverData.changePct === "number") {
             const pct = moverData.changePct;
             if (pct > 0.001)
-                changeBadge = `<span class="text-[9px] font-mono font-black text-emerald-900 dark:text-emerald-400 bg-emerald-500/15 dark:bg-emerald-500/10 px-1.5 py-0.5 rounded-md border border-emerald-600/30 dark:border-emerald-500/20">+${pct.toFixed(1)}% (12H)</span>`;
+                changeBadge = `<span class="text-[9px] font-mono font-black text-emerald-900 dark:text-emerald-400 bg-emerald-500/15 dark:bg-emerald-500/10 px-1.5 py-0.5 rounded-md border border-emerald-600/30 dark:border-emerald-500/20">+${pct.toFixed(1)}%</span>`;
             else if (pct < -0.001)
-                changeBadge = `<span class="text-[9px] font-mono font-black text-rose-900 dark:text-rose-400 bg-rose-500/15 dark:bg-rose-500/10 px-1.5 py-0.5 rounded-md border border-rose-600/30 dark:border-rose-500/20">${pct.toFixed(1)}% (12H)</span>`;
+                changeBadge = `<span class="text-[9px] font-mono font-black text-rose-900 dark:text-rose-400 bg-rose-500/15 dark:bg-rose-500/10 px-1.5 py-0.5 rounded-md border border-rose-600/30 dark:border-rose-500/20">${pct.toFixed(1)}%</span>`;
             else
-                changeBadge = `<span class="text-[9px] font-mono font-bold text-[#5c4d3d] dark:text-zinc-400 bg-[#ede3d1] dark:bg-white/5 border border-[#cbbeaa] dark:border-transparent px-1.5 py-0.5 rounded-md">0.0% (12H)</span>`;
+                changeBadge = `<span class="text-[9px] font-mono font-bold text-[#5c4d3d] dark:text-zinc-400 bg-[#ede3d1] dark:bg-white/5 border border-[#cbbeaa] dark:border-transparent px-1.5 py-0.5 rounded-md">0.0%</span>`;
         } else {
-            changeBadge = `<span class="text-[9px] font-mono font-bold text-[#5c4d3d] dark:text-zinc-400 bg-[#ede3d1] dark:bg-white/5 border border-[#cbbeaa] dark:border-transparent px-1.5 py-0.5 rounded-md">-- (12H)</span>`;
+            changeBadge = `<span class="text-[9px] font-mono font-bold text-[#5c4d3d] dark:text-zinc-400 bg-[#ede3d1] dark:bg-white/5 border border-[#cbbeaa] dark:border-transparent px-1.5 py-0.5 rounded-md">--</span>`;
         }
-
         return `
             <div class="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-[#ede3d1] dark:bg-black/40 hover:bg-[#e4d8c2] dark:hover:bg-zinc-900 border border-[#cbbeaa] dark:border-white/10 transition shadow-2xs group">
                 <div data-action="select" data-item-name="${safeName}" class="flex-1 min-w-0 flex items-center gap-2 cursor-pointer">
@@ -236,21 +451,21 @@ function renderWatchlist() {
     }).join("");
 }
 
+// Watchlist event delegation
 document.addEventListener("click", e => {
-    const el = e.target.closest("[data-action]");
+    const el     = e.target.closest("[data-action]");
     if (!el) return;
     const name   = el.dataset.itemName;
     const action = el.dataset.action;
     if (!name) return;
-
     if (action === "select") onMoverSelect(name);
     if (action === "remove") toggleWatchlist(name);
 });
 
+// ─── Price Alerts ─────────────────────────────────────────────────────────────
 function saveAlerts() {
     try { localStorage.setItem("sunchart_alerts", JSON.stringify(priceAlerts)); } catch (_) {}
 }
-
 function loadAlertsForItem(itemName) {
     const key   = itemName.toLowerCase();
     const alert = priceAlerts[key] || {};
@@ -260,29 +475,23 @@ function loadAlertsForItem(itemName) {
     if (belowInput) belowInput.value = alert.below ?? "";
     updateAlertStatus(itemName);
 }
-
 function updateAlertStatus(itemName) {
     const statusEl = document.getElementById("alertStatus");
     if (!statusEl) return;
-    const key   = itemName?.toLowerCase();
-    const alert = key ? priceAlerts[key] : null;
+    const alert = priceAlerts[itemName?.toLowerCase()];
     const parts = [];
     if (alert?.above) parts.push(`🔔 Above ${formatDisplayPrice(alert.above)} SFL`);
     if (alert?.below) parts.push(`🔕 Below ${formatDisplayPrice(alert.below)} SFL`);
-    if (parts.length > 0) {
-        statusEl.innerHTML  = parts.join("  ·  ");
-        statusEl.className  = "text-[9px] font-bold text-center text-amber-800 dark:text-amber-400";
-    } else {
-        statusEl.innerHTML  = "No alerts set for this item.";
-        statusEl.className  = "text-[9px] font-bold text-center text-[#6d5e4d] dark:text-zinc-500";
-    }
+    statusEl.innerHTML = parts.length > 0 ? parts.join("  ·  ") : "No alerts set for this item.";
+    statusEl.className = parts.length > 0
+        ? "text-[9px] font-bold text-center text-amber-800 dark:text-amber-400"
+        : "text-[9px] font-bold text-center text-[#6d5e4d] dark:text-zinc-500";
 }
-
 function onAlertInput() {
     if (!window.activeItem) return;
-    const key        = window.activeItem.name.toLowerCase();
-    const aboveVal   = parseFloat(document.getElementById("alertAbove")?.value);
-    const belowVal   = parseFloat(document.getElementById("alertBelow")?.value);
+    const key      = window.activeItem.name.toLowerCase();
+    const aboveVal = parseFloat(document.getElementById("alertAbove")?.value);
+    const belowVal = parseFloat(document.getElementById("alertBelow")?.value);
     priceAlerts[key] = {
         above: isNaN(aboveVal) || aboveVal <= 0 ? null : aboveVal,
         below: isNaN(belowVal) || belowVal <= 0 ? null : belowVal,
@@ -303,15 +512,12 @@ function clearActiveAlerts() {
 window.clearActiveAlerts = clearActiveAlerts;
 
 function requestNotifPermission() {
-    if (!("Notification" in window)) {
-        showToast("Browser notifications are not supported.", "warning");
-        return;
-    }
+    if (!("Notification" in window)) { showToast("Browser notifications not supported.", "warning"); return; }
     Notification.requestPermission().then(perm => {
         notifPermission = perm;
         const btn = document.getElementById("notifPermBtn");
         if (perm === "granted") {
-            showToast("🔔 Notifications enabled!", "success");
+            showToast("🔔 Notifications enabled! You'll get alerts for ±5% movers and watchlist items.", "success");
             if (btn) { btn.innerText = "Alerts ON"; btn.disabled = true; }
         } else {
             showToast("Notifications blocked. Enable them in browser settings.", "warning");
@@ -320,207 +526,46 @@ function requestNotifPermission() {
 }
 window.requestNotifPermission = requestNotifPermission;
 
+// Price-threshold alerts (from manual alert inputs)
 const _triggeredAlerts = new Set();
-
 function checkPriceAlerts() {
     allItems.forEach(item => {
         const key   = item.name.toLowerCase();
         const alert = priceAlerts[key];
         if (!alert) return;
-
         if (alert.above && item.price >= alert.above) {
-            const alertKey = `${key}:above:${alert.above}`;
-            if (!_triggeredAlerts.has(alertKey)) {
-                _triggeredAlerts.add(alertKey);
-                fireAlert(item.name, item.price, `🚀 ${item.name} hit ${formatDisplayPrice(alert.above)} SFL (above target)`, "alert");
+            const ak = `${key}:above:${alert.above}`;
+            if (!_triggeredAlerts.has(ak)) {
+                _triggeredAlerts.add(ak);
+                _fireAlert(item.name, item.price, `🚀 ${item.name} hit ${formatDisplayPrice(alert.above)} SFL (above target)`, "alert");
             }
         }
         if (alert.below && item.price <= alert.below) {
-            const alertKey = `${key}:below:${alert.below}`;
-            if (!_triggeredAlerts.has(alertKey)) {
-                _triggeredAlerts.add(alertKey);
-                fireAlert(item.name, item.price, `📉 ${item.name} dropped to ${formatDisplayPrice(alert.below)} SFL (below target)`, "warning");
+            const ak = `${key}:below:${alert.below}`;
+            if (!_triggeredAlerts.has(ak)) {
+                _triggeredAlerts.add(ak);
+                _fireAlert(item.name, item.price, `📉 ${item.name} dropped to ${formatDisplayPrice(alert.below)} SFL (below target)`, "warning");
             }
         }
     });
 }
-
-function fireAlert(itemName, price, message, toastType) {
+function _fireAlert(itemName, price, message, toastType) {
     showToast(message, toastType, 8000);
-    if (notifPermission === "granted") {
-        try {
-            new Notification(`SunChart Alert: ${itemName}`, {
-                body: `Current price: ${formatDisplayPrice(price)} SFL`,
-                icon: "/favicon.ico",
-            });
-        } catch (_) {}
+    if (Notification?.permission === "granted") {
+        try { new Notification(`SunChart Alert: ${itemName}`, { body: `Price: ${formatDisplayPrice(price)} SFL`, icon: "/favicon.ico" }); }
+        catch (_) {}
     }
 }
 
-function parseResourceItems(data) {
-    if (!data) return [];
-    if (Array.isArray(data)) {
-        return data.map(item => ({
-            name:  item.name || item.item_name || "Unknown",
-            price: parseFloat(item.price || item.current_price || 0),
-        }));
-    }
-    const arrayKey = Object.keys(data).find(k => Array.isArray(data[k]));
-    if (arrayKey) {
-        return data[arrayKey].map(item => ({
-            name:  item.name || item.item_name || "Unknown",
-            price: parseFloat(item.price || item.current_price || 0),
-        }));
-    }
-    if (typeof data === "object") {
-        return Object.entries(data)
-            .filter(([key]) => key !== "error" && key !== "status")
-            .map(([name, val]) => ({
-                name,
-                price: typeof val === "object" && val !== null
-                    ? parseFloat(val.price || 0)
-                    : parseFloat(val || 0),
-            }));
-    }
-    return [];
-}
-
-async function fetchPrices() {
-    const refreshIcon  = document.getElementById("refreshIcon");
-    const loadingState = document.getElementById("loadingState");
-    const errorState   = document.getElementById("errorState");
-
-    if (refreshIcon) refreshIcon.classList.add("fa-spin");
-
-    try {
-        const res     = await fetch("/api/prices");
-        if (!res.ok) throw new Error(`Status: ${res.status}`);
-        const rawData = await res.json();
-        allItems      = parseResourceItems(rawData);
-        if (allItems.length === 0) throw new Error("No data received");
-
-        loadingState?.classList.add("hidden");
-        errorState?.classList.add("hidden");
-
-        populateDropdown();
-        checkPriceAlerts();
-        renderWatchlist();
-
-        if (window.activeItem) {
-            const fresh = allItems.find(i => i.name.toLowerCase() === window.activeItem.name.toLowerCase());
-            if (fresh) selectItem(fresh, false);
-        } else if (allItems.length > 0) {
-            const savedName  = localStorage.getItem("sunchart_last_selected_item");
-            const targetItem = (savedName && allItems.find(i => i.name.toLowerCase() === savedName.toLowerCase()))
-                || allItems.find(i => i.name.toLowerCase() === "sunflower")
-                || allItems[0];
-            selectItem(targetItem, true);
-        }
-    } catch (err) {
-        console.error("Fetch prices failed:", err);
-        loadingState?.classList.add("hidden");
-        if (errorState) {
-            errorState.classList.remove("hidden");
-            const msg = document.getElementById("errorMessage");
-            if (msg) msg.innerText = err.message || "Failed to load prices.";
-        }
-    } finally {
-        if (refreshIcon) refreshIcon.classList.remove("fa-spin");
-    }
-}
-
-async function fetchMovers() {
-    const gainersList = document.getElementById("gainersList");
-    const losersList  = document.getElementById("losersList");
-    const badge       = document.getElementById("moversCountBadge");
-
-    try {
-        const res  = await fetch("/api/movers");
-        if (!res.ok) throw new Error();
-        const data = await res.json();
-
-        const allGainers = Array.isArray(data?.gainers) ? data.gainers : [];
-        const allLosers  = Array.isArray(data?.losers)  ? data.losers  : [];
-        movers12hMap     = data?.changesMap || {};
-
-        const gainers = allGainers.filter(g => g.changePct >= 5);
-        const losers  = allLosers.filter(l => l.changePct <= -5);
-        const total   = gainers.length + losers.length;
-
-        if (badge) {
-            badge.innerText = total;
-            badge.classList.toggle("hidden", total === 0);
-        }
-
-        if (gainersList) {
-            gainersList.innerHTML = gainers.length === 0
-                ? `<span class="text-[11px] text-[#6d5e4d] dark:text-zinc-400 font-bold italic py-1">No items up ≥5% in 12h</span>`
-                : gainers.map(item => `
-                    <button data-action="mover-select" data-item-name="${escapeHtml(item.name)}"
-                        class="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-[#fbf8f2] dark:bg-black/40 hover:bg-[#ede3d1] dark:hover:bg-zinc-900 border border-emerald-600/30 dark:border-emerald-500/20 transition shadow-2xs active:scale-[0.98] cursor-pointer text-left">
-                        <div class="min-w-0 flex items-center gap-1.5">
-                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-600 dark:bg-emerald-500 shrink-0"></span>
-                            <span class="text-xs font-black text-[#1f1710] dark:text-zinc-100 truncate">${escapeHtml(item.name)}</span>
-                        </div>
-                        <div class="flex items-center gap-2 shrink-0 ml-2">
-                            <span class="text-[10px] font-mono font-bold text-[#423425] dark:text-zinc-400">${formatDisplayPrice(item.price)} SFL</span>
-                            <span class="text-[10px] font-mono font-black text-emerald-900 dark:text-emerald-400 bg-emerald-500/15 dark:bg-emerald-500/10 px-1.5 py-0.5 rounded-md border border-emerald-600/30 dark:border-emerald-500/20">
-                                +${parseFloat(item.changePct).toFixed(1)}%
-                            </span>
-                        </div>
-                    </button>`).join("");
-        }
-
-        if (losersList) {
-            losersList.innerHTML = losers.length === 0
-                ? `<span class="text-[11px] text-[#6d5e4d] dark:text-zinc-400 font-bold italic py-1">No items down ≤-5% in 12h</span>`
-                : losers.map(item => `
-                    <button data-action="mover-select" data-item-name="${escapeHtml(item.name)}"
-                        class="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-[#fbf8f2] dark:bg-black/40 hover:bg-[#ede3d1] dark:hover:bg-zinc-900 border border-rose-600/30 dark:border-rose-500/20 transition shadow-2xs active:scale-[0.98] cursor-pointer text-left">
-                        <div class="min-w-0 flex items-center gap-1.5">
-                            <span class="w-1.5 h-1.5 rounded-full bg-rose-600 dark:bg-rose-500 shrink-0"></span>
-                            <span class="text-xs font-black text-[#1f1710] dark:text-zinc-100 truncate">${escapeHtml(item.name)}</span>
-                        </div>
-                        <div class="flex items-center gap-2 shrink-0 ml-2">
-                            <span class="text-[10px] font-mono font-bold text-[#423425] dark:text-zinc-400">${formatDisplayPrice(item.price)} SFL</span>
-                            <span class="text-[10px] font-mono font-black text-rose-900 dark:text-rose-400 bg-rose-500/15 dark:bg-rose-500/10 px-1.5 py-0.5 rounded-md border border-rose-600/30 dark:border-rose-500/20">
-                                ${parseFloat(item.changePct).toFixed(1)}%
-                            </span>
-                        </div>
-                    </button>`).join("");
-        }
-
-        renderWatchlist();
-    } catch (err) {
-        if (gainersList) gainersList.innerHTML = `<span class="text-[10px] text-[#6d5e4d]">Unavailable</span>`;
-        if (losersList)  losersList.innerHTML  = `<span class="text-[10px] text-[#6d5e4d]">Unavailable</span>`;
-    }
-}
-
-document.addEventListener("click", e => {
-    const el = e.target.closest("[data-action='mover-select']");
-    if (el) onMoverSelect(el.dataset.itemName);
-});
-
-function onMoverSelect(itemName) {
-    if (!itemName) return;
-    const item = allItems.find(i => i.name.toLowerCase() === itemName.toLowerCase()) || { name: itemName, price: 0 };
-    const dropdown    = document.getElementById("itemDropdown");
-    const searchInput = document.getElementById("searchInput");
-    if (dropdown)    dropdown.value    = item.name;
-    if (searchInput) searchInput.value = item.name;
-    switchTab("chart");
-    selectItem(item, true);
-}
-
+// ─── Dropdown / Search ────────────────────────────────────────────────────────
 function populateDropdown() {
     const dropdown = document.getElementById("itemDropdown");
     if (!dropdown || !Array.isArray(allItems)) return;
     const currentVal = dropdown.value;
     dropdown.innerHTML = '<option value="">Catalog ▾</option>';
     [...allItems].sort((a, b) => a.name.localeCompare(b.name)).forEach(item => {
-        const opt       = document.createElement("option");
-        opt.value       = item.name;
+        const opt = document.createElement("option");
+        opt.value = item.name;
         opt.textContent = `${item.name} (${formatDisplayPrice(item.price)})`;
         dropdown.appendChild(opt);
     });
@@ -531,8 +576,8 @@ function onDropdownSelect(itemName) {
     if (!itemName) return;
     const item = allItems.find(i => i.name.toLowerCase() === itemName.toLowerCase());
     if (item) {
-        const searchInput = document.getElementById("searchInput");
-        if (searchInput) searchInput.value = item.name;
+        const si = document.getElementById("searchInput");
+        if (si) si.value = item.name;
         switchTab("chart");
         selectItem(item, true);
     }
@@ -541,53 +586,56 @@ function onDropdownSelect(itemName) {
 function handleSearchInput(query) {
     const list = document.getElementById("autocompleteList");
     if (!list || !Array.isArray(allItems)) return;
-    if (!query || query.trim() === "") { list.classList.add("hidden"); return; }
-
+    if (!query?.trim()) { list.classList.add("hidden"); return; }
     const q       = query.toLowerCase().trim();
     const matches = allItems.filter(i => i.name.toLowerCase().includes(q)).slice(0, 6);
-
-    if (matches.length === 0) {
-        list.innerHTML = '<div class="p-3 text-xs text-[#6d5e4d] text-center font-bold">No assets found</div>';
-    } else {
-        list.innerHTML = matches.map(m => `
+    list.innerHTML = matches.length === 0
+        ? '<div class="p-3 text-xs text-[#6d5e4d] text-center font-bold">No assets found</div>'
+        : matches.map(m => `
             <div data-action="autocomplete" data-item-name="${escapeHtml(m.name)}"
                 class="px-3.5 py-2 text-xs font-bold hover:bg-[#ede3d1] dark:hover:bg-white/5 cursor-pointer flex items-center justify-between transition">
                 <span class="text-[#1f1710] dark:text-white font-extrabold">${escapeHtml(m.name)}</span>
                 <span class="font-mono text-amber-900 dark:text-amber-400 font-bold">${formatDisplayPrice(m.price)} SFL</span>
             </div>`).join("");
-    }
     list.classList.remove("hidden");
 }
 
 function showAutocomplete() {
-    const searchInput = document.getElementById("searchInput");
-    if (searchInput?.value.trim()) handleSearchInput(searchInput.value);
+    const si = document.getElementById("searchInput");
+    if (si?.value.trim()) handleSearchInput(si.value);
 }
 
 document.addEventListener("click", e => {
-    const list   = document.getElementById("autocompleteList");
+    const list = document.getElementById("autocompleteList");
     const search = document.getElementById("searchInput");
-    const acEl   = e.target.closest("[data-action='autocomplete']");
-
+    const acEl = e.target.closest("[data-action='autocomplete']");
     if (acEl) {
-        const itemName = acEl.dataset.itemName;
-        const item     = allItems.find(i => i.name.toLowerCase() === itemName.toLowerCase());
+        const item = allItems.find(i => i.name.toLowerCase() === acEl.dataset.itemName.toLowerCase());
         if (item) {
-            if (search)    search.value     = item.name;
-            const dropdown = document.getElementById("itemDropdown");
-            if (dropdown)  dropdown.value   = item.name;
+            if (search) search.value = item.name;
+            const dd = document.getElementById("itemDropdown");
+            if (dd) dd.value = item.name;
             list?.classList.add("hidden");
             switchTab("chart");
             selectItem(item, true);
         }
         return;
     }
-
-    if (list && search && !list.contains(e.target) && e.target !== search) {
-        list.classList.add("hidden");
-    }
+    if (list && search && !list.contains(e.target) && e.target !== search) list.classList.add("hidden");
 });
 
+function onMoverSelect(itemName) {
+    if (!itemName) return;
+    const item = allItems.find(i => i.name.toLowerCase() === itemName.toLowerCase()) || { name: itemName, price: 0 };
+    const dd = document.getElementById("itemDropdown");
+    const si = document.getElementById("searchInput");
+    if (dd) dd.value = item.name;
+    if (si) si.value = item.name;
+    switchTab("chart");
+    selectItem(item, true);
+}
+
+// ─── Item Selection ───────────────────────────────────────────────────────────
 function selectItem(item, loadGraph = true) {
     window.activeItem = item;
     try { localStorage.setItem("sunchart_last_selected_item", item.name); } catch (_) {}
@@ -596,65 +644,40 @@ function selectItem(item, loadGraph = true) {
     document.getElementById("itemDetailsContainer")?.classList.remove("hidden");
 
     const price = parseFloat(item.price) || 0;
-    const nameEl      = document.getElementById("selectedItemName");
-    const priceEl     = document.getElementById("selectedItemPrice");
-    const stack10El   = document.getElementById("stack10Price");
-    const stack100El  = document.getElementById("stack100Price");
-    const stack1000El = document.getElementById("stack1000Price");
-
-    if (nameEl)      nameEl.innerText     = item.name;
-    if (priceEl)     priceEl.innerText    = formatDisplayPrice(price);
-    if (stack10El)   stack10El.innerText  = formatDisplayPrice(price * 10);
-    if (stack100El)  stack100El.innerText = formatDisplayPrice(price * 100);
-    if (stack1000El) stack1000El.innerText = formatDisplayPrice(price * 1000);
+    const ids   = { selectedItemName: item.name, selectedItemPrice: formatDisplayPrice(price),
+                    stack10Price: formatDisplayPrice(price * 10), stack100Price: formatDisplayPrice(price * 100),
+                    stack1000Price: formatDisplayPrice(price * 1000) };
+    Object.entries(ids).forEach(([id, val]) => { const el = document.getElementById(id); if (el) el.innerText = val; });
 
     const saved    = loadItemCalcState(item.name);
     const qtyInput = document.getElementById("calcQuantity");
     const buyInput = document.getElementById("calcBuyPrice");
     if (qtyInput) qtyInput.value = saved.qty || 50;
-    if (buyInput) buyInput.value = saved.buyPrice !== undefined && saved.buyPrice !== null && saved.buyPrice !== ""
-        ? saved.buyPrice : "";
+    if (buyInput) buyInput.value = (saved.buyPrice != null && saved.buyPrice !== "") ? saved.buyPrice : "";
 
     loadAlertsForItem(item.name);
     updateActiveItemStar();
     calculateCustomStack(false);
-
-    if (loadGraph && typeof window.loadItemHistoryGraph === "function") {
-        window.loadItemHistoryGraph(item.name);
-    }
+    if (loadGraph && typeof window.loadItemHistoryGraph === "function") window.loadItemHistoryGraph(item.name);
 }
 
+// ─── Calculator ───────────────────────────────────────────────────────────────
 function setQuantity(val) {
-    const qtyInput = document.getElementById("calcQuantity");
-    if (!qtyInput) return;
-    qtyInput.value = Math.max(1, parseInt(val) || 1);
-    calculateCustomStack();
+    const q = document.getElementById("calcQuantity");
+    if (q) { q.value = Math.max(1, parseInt(val) || 1); calculateCustomStack(); }
 }
 window.setQuantity = setQuantity;
 
 function addQuantity(amount) {
-    const qtyInput = document.getElementById("calcQuantity");
-    if (!qtyInput) return;
-    qtyInput.value = Math.max(1, (parseInt(qtyInput.value) || 0) + amount);
-    calculateCustomStack();
+    const q = document.getElementById("calcQuantity");
+    if (q) { q.value = Math.max(1, (parseInt(q.value) || 0) + amount); calculateCustomStack(); }
 }
 window.addQuantity = addQuantity;
 
 function calculateCustomStack(shouldSave = true) {
-    const qtyInput       = document.getElementById("calcQuantity");
-    const buyInput       = document.getElementById("calcBuyPrice");
-    const grossEl        = document.getElementById("calcGross");
-    const feeLabelEl     = document.getElementById("calcFeeLabel");
-    const feeEl          = document.getElementById("calcFee");
-    const costEl         = document.getElementById("calcCost");
-    const profitEl       = document.getElementById("calcProfit");
-    const profitLabelEl  = document.getElementById("calcProfitLabel");
-    const profitUnitEl   = document.getElementById("calcProfitUnit");
-    const target5El      = document.getElementById("target5Price");
-    const target10El     = document.getElementById("target10Price");
-    const target5Label   = document.getElementById("target5Label");
-    const target10Label  = document.getElementById("target10Label");
-
+    const qtyInput  = document.getElementById("calcQuantity");
+    const buyInput  = document.getElementById("calcBuyPrice");
+    const grossEl   = document.getElementById("calcGross");
     if (!qtyInput || !grossEl || !window.activeItem) return;
 
     const qty          = Math.max(1, parseFloat(qtyInput.value) || 1);
@@ -662,85 +685,73 @@ function calculateCustomStack(shouldSave = true) {
     const buyPriceRaw  = buyInput ? buyInput.value : "";
     const buyPrice     = buyPriceRaw !== "" ? Math.max(0, parseFloat(buyPriceRaw) || 0) : 0;
 
-    if (shouldSave && window.activeItem) {
-        saveItemCalcState(window.activeItem.name, qty, buyPriceRaw);
-    }
+    if (shouldSave && window.activeItem) saveItemCalcState(window.activeItem.name, qty, buyPriceRaw);
 
-    const taxFrac  = currentTaxRate / 100.0;
-    const gross    = qty * currentPrice;
-    const fee      = gross * taxFrac;
-    const netYield = gross - fee;
+    const taxFrac   = currentTaxRate / 100.0;
+    const gross     = qty * currentPrice;
+    const fee       = gross * taxFrac;
+    const netYield  = gross - fee;
     const totalCost = qty * buyPrice;
-    const profit   = netYield - totalCost;
+    const profit    = netYield - totalCost;
+    const netMult   = 1.0 - taxFrac;
 
-    grossEl.innerText = formatDisplayPrice(gross);
-    if (feeLabelEl) feeLabelEl.innerText = `Plaza Tax (-${currentTaxRate}%)`;
-    if (feeEl)      feeEl.innerText      = `-${formatDisplayPrice(fee)}`;
-    if (costEl)     costEl.innerText     = formatDisplayPrice(totalCost);
+    const set = (id, val) => { const el = document.getElementById(id); if (el) el.innerText = val; };
+    set("calcGross", formatDisplayPrice(gross));
+    set("calcFeeLabel", `Plaza Tax (-${currentTaxRate}%)`);
+    set("calcFee", `-${formatDisplayPrice(fee)}`);
+    set("calcCost", formatDisplayPrice(totalCost));
 
-    const netMult = 1.0 - taxFrac;
     if (buyPrice > 0 && netMult > 0) {
-        if (target5El)    target5El.innerText    = `${formatDisplayPrice((buyPrice * 1.05) / netMult)} SFL`;
-        if (target10El)   target10El.innerText   = `${formatDisplayPrice((buyPrice * 1.10) / netMult)} SFL`;
-        if (target5Label) target5Label.innerText = "+5% Profit Target:";
-        if (target10Label) target10Label.innerText = "+10% Profit Target:";
+        set("target5Price",  `${formatDisplayPrice((buyPrice * 1.05) / netMult)} SFL`);
+        set("target10Price", `${formatDisplayPrice((buyPrice * 1.10) / netMult)} SFL`);
+        set("target5Label",  "+5% Profit Target:");
+        set("target10Label", "+10% Profit Target:");
     } else {
-        if (target5El)    target5El.innerText    = `${formatDisplayPrice(currentPrice * 1.05)} SFL`;
-        if (target10El)   target10El.innerText   = `${formatDisplayPrice(currentPrice * 1.10)} SFL`;
-        if (target5Label) target5Label.innerText = "+5% Target:";
-        if (target10Label) target10Label.innerText = "+10% Target:";
+        set("target5Price",  `${formatDisplayPrice(currentPrice * 1.05)} SFL`);
+        set("target10Price", `${formatDisplayPrice(currentPrice * 1.10)} SFL`);
+        set("target5Label",  "+5% Target:");
+        set("target10Label", "+10% Target:");
     }
 
+    const profitEl       = document.getElementById("calcProfit");
+    const profitLabelEl  = document.getElementById("calcProfitLabel");
+    const profitUnitEl   = document.getElementById("calcProfitUnit");
     if (profitEl) {
         profitEl.innerText = `${profit >= 0 ? "+" : ""}${formatDisplayPrice(profit)}`;
+        const roi = totalCost > 0 ? ((profit / totalCost) * 100).toFixed(1) : 0;
         if (profit > 0.000001) {
-            profitEl.className = "font-mono font-black text-xs sm:text-sm text-emerald-900 dark:text-emerald-400";
-            if (profitLabelEl) {
-                const roi = totalCost > 0 ? ((profit / totalCost) * 100).toFixed(1) : 0;
-                profitLabelEl.className = "block font-black text-[8px] uppercase text-emerald-900 dark:text-emerald-400";
-                profitLabelEl.innerText = totalCost > 0 ? `Net Profit (+${roi}%)` : "Net Yield";
-            }
+            profitEl.className       = "font-mono font-black text-xs sm:text-sm text-emerald-900 dark:text-emerald-400";
+            if (profitLabelEl) { profitLabelEl.className = "block font-black text-[8px] uppercase text-emerald-900 dark:text-emerald-400"; profitLabelEl.innerText = totalCost > 0 ? `Net Profit (+${roi}%)` : "Net Yield"; }
             if (profitUnitEl) profitUnitEl.className = "text-[8px] font-black text-emerald-900/80 dark:text-emerald-400/70";
         } else if (profit < -0.000001) {
-            profitEl.className = "font-mono font-black text-xs sm:text-sm text-rose-900 dark:text-rose-400";
-            if (profitLabelEl) {
-                const roi = totalCost > 0 ? ((profit / totalCost) * 100).toFixed(1) : 0;
-                profitLabelEl.className = "block font-black text-[8px] uppercase text-rose-900 dark:text-rose-400";
-                profitLabelEl.innerText = `Net Loss (${roi}%)`;
-            }
+            profitEl.className       = "font-mono font-black text-xs sm:text-sm text-rose-900 dark:text-rose-400";
+            if (profitLabelEl) { profitLabelEl.className = "block font-black text-[8px] uppercase text-rose-900 dark:text-rose-400"; profitLabelEl.innerText = `Net Loss (${roi}%)`; }
             if (profitUnitEl) profitUnitEl.className = "text-[8px] font-black text-rose-900/80 dark:text-rose-400/70";
         } else {
-            profitEl.className = "font-mono font-black text-xs sm:text-sm text-[#423425] dark:text-zinc-400";
-            if (profitLabelEl) {
-                profitLabelEl.className = "block font-black text-[8px] uppercase text-[#6d5e4d] dark:text-zinc-400";
-                profitLabelEl.innerText = "Net Yield";
-            }
+            profitEl.className       = "font-mono font-black text-xs sm:text-sm text-[#423425] dark:text-zinc-400";
+            if (profitLabelEl) { profitLabelEl.className = "block font-black text-[8px] uppercase text-[#6d5e4d] dark:text-zinc-400"; profitLabelEl.innerText = "Net Yield"; }
             if (profitUnitEl) profitUnitEl.className = "text-[8px] font-black text-[#6d5e4d] dark:text-zinc-400";
         }
     }
 }
 
+// ─── Boot ─────────────────────────────────────────────────────────────────────
 document.addEventListener("DOMContentLoaded", () => {
     syncTaxSelectorUI();
     updateWatchlistBadge();
     switchTab("movers");
 
     notifPermission = Notification?.permission ?? "default";
-    const notifBtn  = document.getElementById("notifPermBtn");
-    if (notifBtn && notifPermission === "granted") {
-        notifBtn.innerText = "Alerts ON";
-        notifBtn.disabled  = true;
-    }
+    const notifBtn = document.getElementById("notifPermBtn");
+    if (notifBtn && notifPermission === "granted") { notifBtn.innerText = "Alerts ON"; notifBtn.disabled = true; }
 
-    fetchPrices();
-    fetchMovers();
-    startAutoRefresh(15000);
+    fetchMarket();
+    startAutoRefresh(60000);
 });
 
-window.fetchPrices            = fetchPrices;
-window.fetchMovers            = fetchMovers;
-window.onMoverSelect          = onMoverSelect;
-window.onDropdownSelect       = onDropdownSelect;
-window.handleSearchInput      = handleSearchInput;
-window.showAutocomplete       = showAutocomplete;
-window.calculateCustomStack   = calculateCustomStack;
+// ─── Global Exports ───────────────────────────────────────────────────────────
+window.onMoverSelect        = onMoverSelect;
+window.onDropdownSelect     = onDropdownSelect;
+window.handleSearchInput    = handleSearchInput;
+window.showAutocomplete     = showAutocomplete;
+window.calculateCustomStack = calculateCustomStack;
