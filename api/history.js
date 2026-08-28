@@ -1,4 +1,4 @@
-import { getDb } from "./lib/db.js";
+import { getDb, ensureTablesExist } from "./lib/db.js";
 
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -20,8 +20,8 @@ export default async function handler(req, res) {
     const timeModifier = timeModifiers[range] ?? "-24 hours";
 
     const db = getDb();
+    await ensureTablesExist(db);
 
-    // Uses idx_item_time index: scans only rows for this item in the requested range
     const result = await db.execute({
       sql: `
         SELECT price, recorded_at
