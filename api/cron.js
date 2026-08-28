@@ -31,15 +31,15 @@ export default async function handler(req, res) {
       );
     `);
 
-    // 2. Fetch from the official Sunflower Land community API
+    // 2. Fetch live prices from the active v1 endpoint
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000);
 
-    const sflResponse = await fetch("https://api.sunflower-land.com/community/prices", {
+    const sflResponse = await fetch("https://sfl.world/api/v1/prices", {
       signal: controller.signal,
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-        "Accept": "application/json",
+        "Accept": "application/json, text/plain, */*",
         "Cache-Control": "no-cache"
       }
     });
@@ -48,7 +48,7 @@ export default async function handler(req, res) {
     const responseText = await sflResponse.text();
 
     if (!sflResponse.ok) {
-      throw new Error(`Upstream API error (${sflResponse.status}): ${responseText.slice(0, 150)}`);
+      throw new Error(`SFL API responded with HTTP ${sflResponse.status}: ${responseText.slice(0, 150)}`);
     }
 
     if (responseText.trim().startsWith("<")) {
@@ -59,37 +59,49 @@ export default async function handler(req, res) {
     try {
       rawData = JSON.parse(responseText);
     } catch (_) {
-      throw new Error(`Invalid JSON received: ${responseText.slice(0, 150)}`);
+      throw new Error(`Invalid JSON received from SFL. Snippet: ${responseText.slice(0, 150)}`);
     }
 
-    // 3. Normalize parsed data into standardized item array
+    // 3. Normalize parsed data into standardized item array: [{ name: "Sunflower", price: 0.0012 }, ...]
     const currentPrices = [];
-    
+
     if (Array.isArray(rawData)) {
       rawData.forEach(item => {
-        const name = item.name || item.item_name || item.token;
+        const name = item.name || item.item_name || item.item;
         const price = parseFloat(item.price || item.current_price || item.sfl || 0);
-        if (name && !isNaN(price)) currentPrices.push({ name, price });
-      });
-    } else if (typeof rawData === 'object' && rawData !== null) {
-      const dataObj = rawData.prices || rawData.data || rawData;
-      
-      Object.entries(dataObj).forEach(([name, val]) => {
-        if (name === 'error' || name === 'status') return;
-        let price = 0;
-        if (typeof val === 'object' && val !== null) {
-          price = parseFloat(val.price || val.sfl || val.floor || 0);
-        } else {
-          price = parseFloat(val || 0);
-        }
-        if (name && !isNaN(price)) {
+        if (name && !isNaN(price) && price > 0) {
           currentPrices.push({ name, price });
         }
       });
+    } else if (typeof rawData === 'object' && rawData !== null) {
+      const targetObj = rawData.prices || rawData.data || rawData;
+
+      if (Array.isArray(targetObj)) {
+        targetObj.forEach(item => {
+          const name = item.name || item.item_name || item.item;
+          const price = parseFloat(item.price || item.current_price || item.sfl || 0);
+          if (name && !isNaN(price) && price > 0) {
+            currentPrices.push({ name, price });
+          }
+        });
+      } else {
+        Object.entries(targetObj).forEach(([name, val]) => {
+          if (name === 'error' || name === 'status' || name === 'message') return;
+          let price = 0;
+          if (typeof val === 'object' && val !== null) {
+            price = parseFloat(val.price || val.sfl || val.floor || 0);
+          } else {
+            price = parseFloat(val || 0);
+          }
+          if (name && !isNaN(price) && price > 0) {
+            currentPrices.push({ name, price });
+          }
+        });
+      }
     }
 
     if (currentPrices.length === 0) {
-      throw new Error("No valid price entries could be parsed from the API response.");
+      throw new Error(`Parsed price list is empty. Verify SFL API response format: ${responseText.slice(0, 200)}`);
     }
 
     // 4. Batch Insert new records into resource_prices
@@ -114,6 +126,7 @@ export default async function handler(req, res) {
       pastMap[r.item_name.toLowerCase()] = parseFloat(r.price);
     });
 
+    // 6. Compute Movers in memory
     const gainers = [];
     const losers = [];
     const changesMap = {};
@@ -143,7 +156,7 @@ export default async function handler(req, res) {
     gainers.sort((a, b) => b.changePct - a.changePct);
     losers.sort((a, b) => a.changePct - b.changePct);
 
-    // 6. Save updated snapshots to market_cache (1-row reads for frontend)
+    // 7. Save updated snapshots to market_cache (1-row reads for frontend)
     await db.batch([
       {
         sql: `INSERT INTO market_cache (key, payload, updated_at) VALUES ('prices', ?, datetime('now'))
