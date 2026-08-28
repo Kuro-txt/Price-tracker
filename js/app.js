@@ -7,9 +7,17 @@ let autoRefreshTimer = null;
 let currentTab       = "movers";
 let currentTaxRate   = 10.0;
 let movers12hMap     = {};
-let currentMoversFilter = "all"; // 'all' | '5pct' | 'gainers' | 'losers'
 let _lastGainers     = [];
 let _lastLosers      = [];
+
+// ─── Notifications Toggle State ───────────────────────────────────────────────
+let notifEnabled = true;
+try {
+    const savedNotif = localStorage.getItem("sunchart_notifications_enabled");
+    notifEnabled = savedNotif !== null ? JSON.parse(savedNotif) : true;
+} catch (_) {
+    notifEnabled = true;
+}
 
 // ─── Persisted Settings ───────────────────────────────────────────────────────
 try {
@@ -27,8 +35,6 @@ let priceAlerts = {};
 try {
     priceAlerts = JSON.parse(localStorage.getItem("sunchart_alerts") || "{}");
 } catch (_) {}
-
-let notifPermission = Notification?.permission ?? "default";
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
 function escapeHtml(str) {
@@ -57,6 +63,69 @@ function showToast(message, type = "info", durationMs = 4500) {
     }, durationMs);
 }
 window.showToast = showToast;
+
+// ─── Notification Toggle Functionality ────────────────────────────────────────
+function updateNotifToggleUI() {
+    const btnIcon = document.getElementById("globalNotifIcon");
+    const btn = document.getElementById("globalNotifBtn");
+    const banner = document.getElementById("notifBanner");
+
+    const hasPermission = "Notification" in window && Notification.permission === "granted";
+
+    if (btnIcon && btn) {
+        if (notifEnabled && hasPermission) {
+            btnIcon.className = "fa-solid fa-bell text-[11px] text-amber-600 dark:text-amber-400";
+            btn.title = "Notifications: ON (Click to disable)";
+            btn.classList.add("border-amber-500/40");
+        } else if (notifEnabled && !hasPermission) {
+            btnIcon.className = "fa-regular fa-bell text-[11px] text-amber-700/70 dark:text-zinc-400 animate-pulse";
+            btn.title = "Notifications: Enable browser permission";
+            btn.classList.remove("border-amber-500/40");
+        } else {
+            btnIcon.className = "fa-solid fa-bell-slash text-[11px] text-[#857666] dark:text-zinc-500";
+            btn.title = "Notifications: OFF (Click to enable)";
+            btn.classList.remove("border-amber-500/40");
+        }
+    }
+
+    if (banner) {
+        if (!hasPermission && notifEnabled) {
+            banner.classList.remove("hidden");
+        } else {
+            banner.classList.add("hidden");
+        }
+    }
+}
+window.updateNotifToggleUI = updateNotifToggleUI;
+
+async function toggleGlobalNotifications() {
+    if (!("Notification" in window)) {
+        showToast("Browser notifications are not supported in this environment.", "warning");
+        return;
+    }
+
+    if (!notifEnabled) {
+        // Turning ON
+        if (Notification.permission !== "granted") {
+            const perm = await Notification.requestPermission();
+            if (perm !== "granted") {
+                showToast("Please allow notification permission in your browser.", "warning");
+                return;
+            }
+        }
+        notifEnabled = true;
+        try { localStorage.setItem("sunchart_notifications_enabled", "true"); } catch (_) {}
+        updateNotifToggleUI();
+        showToast("🔔 Notifications enabled for ±5% movers & watchlist!", "success");
+    } else {
+        // Turning OFF
+        notifEnabled = false;
+        try { localStorage.setItem("sunchart_notifications_enabled", "false"); } catch (_) {}
+        updateNotifToggleUI();
+        showToast("🔕 Notifications muted.", "info");
+    }
+}
+window.toggleGlobalNotifications = toggleGlobalNotifications;
 
 // ─── Auto-refresh (leak-free, 60s interval) ───────────────────────────────────
 function startAutoRefresh(intervalMs = 60000) {
@@ -92,14 +161,14 @@ async function fetchMarket() {
         }
         const data = await res.json();
 
-        // ── Process prices ──
+        // Process prices
         const rawPrices = Array.isArray(data.prices) ? data.prices : [];
         allItems = rawPrices.map(item => ({
             name:  item.name  || item.item_name || "Unknown",
             price: parseFloat(item.price || 0),
         }));
 
-        // ── Process movers ──
+        // Process movers
         const moversData = data.movers || {};
         movers12hMap     = moversData.changesMap || {};
         const gainers    = Array.isArray(moversData.gainers) ? moversData.gainers : [];
@@ -138,120 +207,69 @@ async function fetchMarket() {
     }
 }
 
-// Keep old names as aliases for any external callers
-window.fetchPrices  = fetchMarket;
-window.fetchMovers  = fetchMarket;
-window.fetchMarket  = fetchMarket;
+window.fetchPrices = fetchMarket;
+window.fetchMovers = fetchMarket;
+window.fetchMarket = fetchMarket;
 
-// ─── Movers Renderer (all items, with filter) ─────────────────────────────────
-function setMoversFilter(filter) {
-    currentMoversFilter = filter;
-    ["all", "5pct", "gainers", "losers"].forEach(f => {
-        const btn = document.getElementById(`moverFilter-${f}`);
-        if (!btn) return;
-        btn.className = f === filter
-            ? "px-2 py-0.5 rounded-lg transition bg-[#fbf8f2] dark:bg-zinc-800 text-amber-900 dark:text-amber-400 shadow-xs"
-            : "px-2 py-0.5 rounded-lg transition text-[#6d5e4d] dark:text-zinc-400 hover:text-black dark:hover:text-white";
-    });
-    renderMovers(_lastGainers, _lastLosers);
-}
-window.setMoversFilter = setMoversFilter;
-
+// ─── Movers Renderer (Shows ALL Items by Default) ─────────────────────────────
 function renderMovers(allGainers, allLosers) {
-    _lastGainers = allGainers;
-    _lastLosers  = allLosers;
+    _lastGainers = allGainers || [];
+    _lastLosers  = allLosers || [];
 
     const gainersList = document.getElementById("gainersList");
     const losersList  = document.getElementById("losersList");
     const badge       = document.getElementById("moversCountBadge");
 
-    // Apply filter
-    let gainers, losers;
-    switch (currentMoversFilter) {
-        case "5pct":
-            gainers = allGainers.filter(g => g.changePct >= 5);
-            losers  = allLosers.filter(l => l.changePct <= -5);
-            break;
-        case "gainers":
-            gainers = allGainers;
-            losers  = [];
-            break;
-        case "losers":
-            gainers = [];
-            losers  = allLosers;
-            break;
-        default: // 'all'
-            gainers = allGainers;
-            losers  = allLosers;
-    }
-
-    const total = gainers.length + losers.length;
+    const total = _lastGainers.length + _lastLosers.length;
     if (badge) {
         badge.innerText = total;
         badge.classList.toggle("hidden", total === 0);
     }
 
-    const buildGainerRow = item => {
-        const isBig = item.changePct >= 5;
-        return `
-            <button data-action="mover-select" data-item-name="${escapeHtml(item.name)}"
-                class="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-[#fbf8f2] dark:bg-black/40 hover:bg-[#ede3d1] dark:hover:bg-zinc-900 border ${isBig ? 'border-emerald-500/50 dark:border-emerald-500/30' : 'border-emerald-600/20 dark:border-emerald-500/10'} transition shadow-2xs active:scale-[0.98] cursor-pointer text-left">
-                <div class="min-w-0 flex items-center gap-1.5">
-                    <span class="w-1.5 h-1.5 rounded-full ${isBig ? 'bg-emerald-500 animate-pulse' : 'bg-emerald-700/50 dark:bg-emerald-600/50'} shrink-0"></span>
-                    <span class="text-xs font-black text-[#1f1710] dark:text-zinc-100 truncate">${escapeHtml(item.name)}</span>
-                </div>
-                <div class="flex items-center gap-2 shrink-0 ml-2">
-                    <span class="text-[10px] font-mono font-bold text-[#423425] dark:text-zinc-400">${formatDisplayPrice(item.price)} SFL</span>
-                    <span class="text-[10px] font-mono font-black text-emerald-900 dark:text-emerald-400 bg-emerald-500/15 dark:bg-emerald-500/10 px-1.5 py-0.5 rounded-md border border-emerald-600/30 dark:border-emerald-500/20">
-                        +${parseFloat(item.changePct).toFixed(1)}%
-                    </span>
-                </div>
-            </button>`;
-    };
+    const buildMoverRow = (item, isGainer) => {
+        const isSignificant = Math.abs(item.changePct) >= 5;
+        const colorPrefix = isGainer ? "emerald" : "rose";
+        const sign = isGainer && item.changePct > 0 ? "+" : "";
 
-    const buildLoserRow = item => {
-        const isBig = item.changePct <= -5;
         return `
             <button data-action="mover-select" data-item-name="${escapeHtml(item.name)}"
-                class="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-[#fbf8f2] dark:bg-black/40 hover:bg-[#ede3d1] dark:hover:bg-zinc-900 border ${isBig ? 'border-rose-500/50 dark:border-rose-500/30' : 'border-rose-600/20 dark:border-rose-500/10'} transition shadow-2xs active:scale-[0.98] cursor-pointer text-left">
+                class="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-[#fbf8f2] dark:bg-black/40 hover:bg-[#ede3d1] dark:hover:bg-zinc-900 border ${isSignificant ? `border-${colorPrefix}-500/40 dark:border-${colorPrefix}-500/30` : `border-${colorPrefix}-600/15 dark:border-${colorPrefix}-500/10`} transition shadow-2xs active:scale-[0.98] cursor-pointer text-left">
                 <div class="min-w-0 flex items-center gap-1.5">
-                    <span class="w-1.5 h-1.5 rounded-full ${isBig ? 'bg-rose-500 animate-pulse' : 'bg-rose-700/50 dark:bg-rose-600/50'} shrink-0"></span>
+                    <span class="w-1.5 h-1.5 rounded-full ${isSignificant ? `bg-${colorPrefix}-500 animate-pulse` : `bg-${colorPrefix}-700/60 dark:bg-${colorPrefix}-500/60`} shrink-0"></span>
                     <span class="text-xs font-black text-[#1f1710] dark:text-zinc-100 truncate">${escapeHtml(item.name)}</span>
                 </div>
                 <div class="flex items-center gap-2 shrink-0 ml-2">
                     <span class="text-[10px] font-mono font-bold text-[#423425] dark:text-zinc-400">${formatDisplayPrice(item.price)} SFL</span>
-                    <span class="text-[10px] font-mono font-black text-rose-900 dark:text-rose-400 bg-rose-500/15 dark:bg-rose-500/10 px-1.5 py-0.5 rounded-md border border-rose-600/30 dark:border-rose-500/20">
-                        ${parseFloat(item.changePct).toFixed(1)}%
+                    <span class="text-[10px] font-mono font-black text-${colorPrefix}-900 dark:text-${colorPrefix}-400 bg-${colorPrefix}-500/15 dark:bg-${colorPrefix}-500/10 px-1.5 py-0.5 rounded-md border border-${colorPrefix}-600/30 dark:border-${colorPrefix}-500/20">
+                        ${sign}${parseFloat(item.changePct).toFixed(1)}%
                     </span>
                 </div>
             </button>`;
     };
 
     if (gainersList) {
-        gainersList.innerHTML = gainers.length === 0
-            ? `<span class="text-[11px] text-[#6d5e4d] dark:text-zinc-400 font-bold italic py-1">No gainers to show</span>`
-            : gainers.map(buildGainerRow).join("");
+        gainersList.innerHTML = _lastGainers.length === 0
+            ? `<span class="text-[11px] text-[#6d5e4d] dark:text-zinc-400 font-bold italic py-1">No gainers available</span>`
+            : _lastGainers.map(item => buildMoverRow(item, true)).join("");
     }
 
     if (losersList) {
-        losersList.innerHTML = losers.length === 0
-            ? `<span class="text-[11px] text-[#6d5e4d] dark:text-zinc-400 font-bold italic py-1">No losers to show</span>`
-            : losers.map(buildLoserRow).join("");
+        losersList.innerHTML = _lastLosers.length === 0
+            ? `<span class="text-[11px] text-[#6d5e4d] dark:text-zinc-400 font-bold italic py-1">No losers available</span>`
+            : _lastLosers.map(item => buildMoverRow(item, false)).join("");
     }
 }
 
 // ─── Mover Notifications ─────────────────────────────────────────────────────
-// Fires at most once per session per item-direction pair.
-// ±5% threshold for ALL items; ±2% threshold for watchlist items.
 function checkMoverNotifications(changesMap) {
-    if (!changesMap || Object.keys(changesMap).length === 0) return;
+    if (!notifEnabled || !changesMap || Object.keys(changesMap).length === 0) return;
 
     let notified = {};
     try { notified = JSON.parse(sessionStorage.getItem("sunchart_mover_notifs") || "{}"); } catch (_) {}
 
     const toFire = [];
 
-    // ── 1. Any item ±5%+ ──
+    // 1. Any item ±5%+
     Object.values(changesMap).forEach(item => {
         if (Math.abs(item.changePct) < 5) return;
         const key = `any:${item.name.toLowerCase()}:${item.changePct > 0 ? "up" : "down"}`;
@@ -261,30 +279,29 @@ function checkMoverNotifications(changesMap) {
             item,
             toastType: item.changePct > 0 ? "success" : "alert",
             icon:  item.changePct > 0 ? "🚀" : "📉",
-            label: "Mover",
+            label: "Market Mover",
         });
     });
 
-    // ── 2. Watchlist items ±2%+ (lower threshold — user specifically pins these) ──
+    // 2. Watchlist items ±2%+
     watchlist.forEach(name => {
         const mover = changesMap[name.toLowerCase()];
         if (!mover || Math.abs(mover.changePct) < 2) return;
         const key = `watchlist:${name.toLowerCase()}:${mover.changePct > 0 ? "up" : "down"}`;
         if (notified[key]) return;
         notified[key] = true;
-        // Skip if already in the ±5% list to avoid duplicate toast
         const duplicate = toFire.some(n => n.item.name.toLowerCase() === name.toLowerCase());
         if (!duplicate) {
             toFire.push({
                 item: mover,
                 toastType: mover.changePct > 0 ? "success" : "warning",
                 icon:  mover.changePct > 0 ? "⭐" : "⚠️",
-                label: "Watchlist",
+                label: "Watchlist Item",
             });
         }
     });
 
-    // Fire
+    // Fire notifications
     toFire.forEach(({ item, toastType, icon, label }) => {
         const sign = item.changePct > 0 ? "+" : "";
         showToast(
@@ -304,12 +321,6 @@ function checkMoverNotifications(changesMap) {
 
     try { sessionStorage.setItem("sunchart_mover_notifs", JSON.stringify(notified)); } catch (_) {}
 }
-
-// Delegate clicks for movers
-document.addEventListener("click", e => {
-    const el = e.target.closest("[data-action='mover-select']");
-    if (el) onMoverSelect(el.dataset.itemName);
-});
 
 // ─── Calculator State ─────────────────────────────────────────────────────────
 function saveItemCalcState(itemName, qty, buyPrice) {
@@ -451,14 +462,14 @@ function renderWatchlist() {
     }).join("");
 }
 
-// Watchlist event delegation
+// Watchlist & Movers click delegation
 document.addEventListener("click", e => {
     const el     = e.target.closest("[data-action]");
     if (!el) return;
     const name   = el.dataset.itemName;
     const action = el.dataset.action;
     if (!name) return;
-    if (action === "select") onMoverSelect(name);
+    if (action === "select" || action === "mover-select") onMoverSelect(name);
     if (action === "remove") toggleWatchlist(name);
 });
 
@@ -511,24 +522,9 @@ function clearActiveAlerts() {
 }
 window.clearActiveAlerts = clearActiveAlerts;
 
-function requestNotifPermission() {
-    if (!("Notification" in window)) { showToast("Browser notifications not supported.", "warning"); return; }
-    Notification.requestPermission().then(perm => {
-        notifPermission = perm;
-        const btn = document.getElementById("notifPermBtn");
-        if (perm === "granted") {
-            showToast("🔔 Notifications enabled! You'll get alerts for ±5% movers and watchlist items.", "success");
-            if (btn) { btn.innerText = "Alerts ON"; btn.disabled = true; }
-        } else {
-            showToast("Notifications blocked. Enable them in browser settings.", "warning");
-        }
-    });
-}
-window.requestNotifPermission = requestNotifPermission;
-
-// Price-threshold alerts (from manual alert inputs)
 const _triggeredAlerts = new Set();
 function checkPriceAlerts() {
+    if (!notifEnabled) return;
     allItems.forEach(item => {
         const key   = item.name.toLowerCase();
         const alert = priceAlerts[key];
@@ -537,14 +533,14 @@ function checkPriceAlerts() {
             const ak = `${key}:above:${alert.above}`;
             if (!_triggeredAlerts.has(ak)) {
                 _triggeredAlerts.add(ak);
-                _fireAlert(item.name, item.price, `🚀 ${item.name} hit ${formatDisplayPrice(alert.above)} SFL (above target)`, "alert");
+                _fireAlert(item.name, item.price, `🚀 ${item.name} reached ${formatDisplayPrice(alert.above)} SFL (target reached)`, "alert");
             }
         }
         if (alert.below && item.price <= alert.below) {
             const ak = `${key}:below:${alert.below}`;
             if (!_triggeredAlerts.has(ak)) {
                 _triggeredAlerts.add(ak);
-                _fireAlert(item.name, item.price, `📉 ${item.name} dropped to ${formatDisplayPrice(alert.below)} SFL (below target)`, "warning");
+                _fireAlert(item.name, item.price, `📉 ${item.name} dropped to ${formatDisplayPrice(alert.below)} SFL (target reached)`, "warning");
             }
         }
     });
@@ -739,11 +735,8 @@ function calculateCustomStack(shouldSave = true) {
 document.addEventListener("DOMContentLoaded", () => {
     syncTaxSelectorUI();
     updateWatchlistBadge();
+    updateNotifToggleUI();
     switchTab("movers");
-
-    notifPermission = Notification?.permission ?? "default";
-    const notifBtn = document.getElementById("notifPermBtn");
-    if (notifBtn && notifPermission === "granted") { notifBtn.innerText = "Alerts ON"; notifBtn.disabled = true; }
 
     fetchMarket();
     startAutoRefresh(60000);
