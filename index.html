@@ -61,11 +61,6 @@
                     </select>
                 </div>
 
-                <!-- Global Notifications Toggle Button in Header -->
-                <button id="globalNotifBtn" onclick="toggleGlobalNotifications()" aria-label="Toggle Notifications" class="w-7 h-7 rounded-xl bg-[#dfd4c0] dark:glass-panel border border-[#c5b59f] dark:border-white/10 flex items-center justify-center text-[#4a3c2e] dark:text-zinc-300 hover:text-amber-700 transition active:scale-95">
-                    <i id="globalNotifIcon" class="fa-solid fa-bell text-[11px]"></i>
-                </button>
-
                 <!-- Theme Toggle -->
                 <button onclick="toggleTheme()" aria-label="Toggle Theme" class="w-7 h-7 rounded-xl bg-[#dfd4c0] dark:glass-panel border border-[#c5b59f] dark:border-white/10 flex items-center justify-center text-[#4a3c2e] dark:text-zinc-300 hover:text-amber-700 transition active:scale-95">
                     <i class="fa-solid fa-moon text-[11px] block dark:hidden"></i>
@@ -133,16 +128,12 @@
         <div id="moversTabContent" class="space-y-2.5">
             <div class="glass-panel rounded-2xl p-3 space-y-2.5">
 
-                <!-- Header with Permanent Toggle -->
+                <!-- Header -->
                 <div class="flex items-center justify-between gap-2 pb-2 border-b border-[#dfd4c0] dark:border-white/5">
                     <span class="text-[11px] font-black uppercase tracking-wider text-[#241a12] dark:text-zinc-300 flex items-center gap-1.5">
                         <i class="fa-solid fa-bolt text-amber-600 dark:text-amber-500 text-xs"></i> 12H Market Movers
                     </span>
-                    <!-- Permanent Notification Toggle in Movers -->
-                    <button id="moversNotifToggleBtn" onclick="toggleGlobalNotifications()" class="flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[9px] font-black transition border">
-                        <i id="moversNotifIcon" class="fa-solid fa-bell text-[10px]"></i>
-                        <span id="moversNotifText">Alerts ON (±5%)</span>
-                    </button>
+                    <span class="text-[9px] text-[#7d6e5d] dark:text-zinc-400 font-bold">All catalog assets</span>
                 </div>
 
                 <!-- Two-column all items mover lists (both scrollable) -->
@@ -303,36 +294,6 @@
                             <span id="target10Label">+10% Target:</span>
                             <span id="target10Price" class="font-mono font-black text-[#1f1710] dark:text-zinc-200">- SFL</span>
                         </span>
-                    </div>
-                </div>
-
-                <!-- Price Alert Panel -->
-                <div class="glass-panel rounded-2xl p-3 space-y-2">
-                    <div class="flex items-center justify-between pb-1 border-b border-[#dfd4c0] dark:border-white/5">
-                        <span class="text-[11px] font-black uppercase tracking-wider text-[#241a12] dark:text-zinc-300 flex items-center gap-1.5">
-                            <i class="fa-solid fa-bell text-amber-600 dark:text-amber-500 text-xs"></i> Price Target Alert
-                        </span>
-                        <!-- Permanent Notification Toggle in Chart tab -->
-                        <button id="chartNotifToggleBtn" onclick="toggleGlobalNotifications()"
-                            class="text-[8px] font-black px-2 py-0.5 rounded-lg border transition">
-                            <span id="chartNotifText">🔔 Alerts ON</span>
-                        </button>
-                    </div>
-                    <div class="grid grid-cols-2 gap-2">
-                        <div>
-                            <label class="text-[8px] uppercase font-black text-[#6d5e4d] dark:text-zinc-400 block mb-0.5">Alert Above (SFL)</label>
-                            <input type="number" id="alertAbove" step="any" placeholder="e.g. 1.50" oninput="onAlertInput()"
-                                class="w-full bg-[#fbf8f2] dark:bg-black border border-[#cbbeaa] dark:border-white/10 rounded-lg px-2 py-1 text-xs font-black font-mono text-[#1f1710] dark:text-white focus:outline-none focus:ring-1 focus:ring-amber-500">
-                        </div>
-                        <div>
-                            <label class="text-[8px] uppercase font-black text-[#6d5e4d] dark:text-zinc-400 block mb-0.5">Alert Below (SFL)</label>
-                            <input type="number" id="alertBelow" step="any" placeholder="e.g. 0.50" oninput="onAlertInput()"
-                                class="w-full bg-[#fbf8f2] dark:bg-black border border-[#cbbeaa] dark:border-white/10 rounded-lg px-2 py-1 text-xs font-black font-mono text-[#1f1710] dark:text-white focus:outline-none focus:ring-1 focus:ring-amber-500">
-                        </div>
-                    </div>
-                    <div class="flex items-center justify-between">
-                        <div id="alertStatus" class="text-[9px] font-bold text-[#6d5e4d] dark:text-zinc-500">No alerts set for this item.</div>
-                        <button onclick="clearActiveAlerts()" class="text-[8px] font-black px-2 py-0.5 rounded-lg bg-rose-500/15 border border-rose-300 dark:border-transparent text-rose-800 dark:text-rose-400 transition active:scale-95">Clear</button>
                     </div>
                 </div>
 
