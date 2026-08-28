@@ -13,7 +13,7 @@ export default async function handler(req, res) {
   const startTime = Date.now();
 
   try {
-    // 1. Ensure database tables exist
+    // 1. Ensure required database tables exist
     await db.execute(`
       CREATE TABLE IF NOT EXISTS resource_prices (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -31,70 +31,68 @@ export default async function handler(req, res) {
       );
     `);
 
-    // 2. Fetch live prices with browser-like headers to pass Cloudflare filters
+    // 2. Fetch from the official Sunflower Land community API
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000);
 
-    const sflResponse = await fetch("https://sfl.world/api/prices", {
+    const sflResponse = await fetch("https://api.sunflower-land.com/community/prices", {
       signal: controller.signal,
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-        "Accept": "application/json, text/plain, */*",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Referer": "https://sfl.world/",
+        "Accept": "application/json",
         "Cache-Control": "no-cache"
       }
     });
     clearTimeout(timeoutId);
 
-    // 3. Read raw text first to avoid parsing crashes on HTML
     const responseText = await sflResponse.text();
 
     if (!sflResponse.ok) {
-      throw new Error(`Upstream SFL status ${sflResponse.status}: ${responseText.slice(0, 150)}`);
+      throw new Error(`Upstream API error (${sflResponse.status}): ${responseText.slice(0, 150)}`);
     }
 
-    if (responseText.trim().startsWith("<") || responseText.includes("<!DOCTYPE html>")) {
-      throw new Error(`Upstream SFL returned HTML instead of JSON. Cloudflare Challenge or invalid URL. Preview: ${responseText.slice(0, 180)}`);
+    if (responseText.trim().startsWith("<")) {
+      throw new Error(`Received HTML instead of JSON: ${responseText.slice(0, 150)}`);
     }
 
     let rawData;
     try {
       rawData = JSON.parse(responseText);
     } catch (_) {
-      throw new Error(`Invalid JSON received from SFL. Snippet: ${responseText.slice(0, 150)}`);
+      throw new Error(`Invalid JSON received: ${responseText.slice(0, 150)}`);
     }
 
-    // 4. Parse response into standard array
+    // 3. Normalize parsed data into standardized item array
     const currentPrices = [];
+    
     if (Array.isArray(rawData)) {
       rawData.forEach(item => {
-        const name = item.name || item.item_name;
-        const price = parseFloat(item.price || item.current_price || 0);
+        const name = item.name || item.item_name || item.token;
+        const price = parseFloat(item.price || item.current_price || item.sfl || 0);
         if (name && !isNaN(price)) currentPrices.push({ name, price });
       });
     } else if (typeof rawData === 'object' && rawData !== null) {
-      const listKey = Object.keys(rawData).find(k => Array.isArray(rawData[k]));
-      if (listKey) {
-        rawData[listKey].forEach(item => {
-          const name = item.name || item.item_name;
-          const price = parseFloat(item.price || item.current_price || 0);
-          if (name && !isNaN(price)) currentPrices.push({ name, price });
-        });
-      } else {
-        Object.entries(rawData).forEach(([name, val]) => {
-          if (name === 'error' || name === 'status') return;
-          const price = typeof val === 'object' && val !== null ? parseFloat(val.price || 0) : parseFloat(val || 0);
-          if (name && !isNaN(price)) currentPrices.push({ name, price });
-        });
-      }
+      const dataObj = rawData.prices || rawData.data || rawData;
+      
+      Object.entries(dataObj).forEach(([name, val]) => {
+        if (name === 'error' || name === 'status') return;
+        let price = 0;
+        if (typeof val === 'object' && val !== null) {
+          price = parseFloat(val.price || val.sfl || val.floor || 0);
+        } else {
+          price = parseFloat(val || 0);
+        }
+        if (name && !isNaN(price)) {
+          currentPrices.push({ name, price });
+        }
+      });
     }
 
     if (currentPrices.length === 0) {
-      throw new Error("Parsed price list is empty. Verify SFL API response format.");
+      throw new Error("No valid price entries could be parsed from the API response.");
     }
 
-    // 5. Batch Insert new prices into resource_prices
+    // 4. Batch Insert new records into resource_prices
     const nowIso = new Date().toISOString();
     const insertStatements = currentPrices.map(item => ({
       sql: `INSERT INTO resource_prices (item_name, price, recorded_at) VALUES (?, ?, datetime(?));`,
@@ -103,7 +101,7 @@ export default async function handler(req, res) {
 
     await db.batch(insertStatements);
 
-    // 6. Fetch past prices (~12h ago) to compute movers in memory
+    // 5. Query 12-hour baseline records to calculate percentage movers
     const pastRes = await db.execute(`
       SELECT item_name, price, MIN(recorded_at) as earliest_time
       FROM resource_prices
@@ -145,7 +143,7 @@ export default async function handler(req, res) {
     gainers.sort((a, b) => b.changePct - a.changePct);
     losers.sort((a, b) => a.changePct - b.changePct);
 
-    // 7. Save precomputed snapshots to market_cache
+    // 6. Save updated snapshots to market_cache (1-row reads for frontend)
     await db.batch([
       {
         sql: `INSERT INTO market_cache (key, payload, updated_at) VALUES ('prices', ?, datetime('now'))
@@ -168,7 +166,7 @@ export default async function handler(req, res) {
     });
 
   } catch (error) {
-    console.error("Cron Error:", error);
+    console.error("Cron Execution Failed:", error);
     return res.status(500).json({
       success: false,
       error: error.message
