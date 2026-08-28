@@ -61,7 +61,7 @@
                     </select>
                 </div>
 
-                <!-- Global Notifications Toggle Button -->
+                <!-- Global Notifications Toggle Button in Header -->
                 <button id="globalNotifBtn" onclick="toggleGlobalNotifications()" aria-label="Toggle Notifications" class="w-7 h-7 rounded-xl bg-[#dfd4c0] dark:glass-panel border border-[#c5b59f] dark:border-white/10 flex items-center justify-center text-[#4a3c2e] dark:text-zinc-300 hover:text-amber-700 transition active:scale-95">
                     <i id="globalNotifIcon" class="fa-solid fa-bell text-[11px]"></i>
                 </button>
@@ -133,23 +133,15 @@
         <div id="moversTabContent" class="space-y-2.5">
             <div class="glass-panel rounded-2xl p-3 space-y-2.5">
 
-                <!-- Header -->
+                <!-- Header with Permanent Toggle -->
                 <div class="flex items-center justify-between gap-2 pb-2 border-b border-[#dfd4c0] dark:border-white/5">
                     <span class="text-[11px] font-black uppercase tracking-wider text-[#241a12] dark:text-zinc-300 flex items-center gap-1.5">
                         <i class="fa-solid fa-bolt text-amber-600 dark:text-amber-500 text-xs"></i> 12H Market Movers
                     </span>
-                    <span class="text-[9px] text-[#7d6e5d] dark:text-zinc-400 font-bold">All catalog assets</span>
-                </div>
-
-                <!-- Notification prompt banner -->
-                <div id="notifBanner" class="hidden flex items-center justify-between gap-2 bg-amber-500/10 dark:bg-amber-500/5 border border-amber-600/25 dark:border-amber-500/20 rounded-xl px-3 py-2">
-                    <span class="text-[10px] font-bold text-amber-900 dark:text-amber-400 flex items-center gap-1.5">
-                        <i class="fa-solid fa-bell text-xs"></i>
-                        Get alerts for ±5% movers &amp; watchlist updates
-                    </span>
-                    <button onclick="toggleGlobalNotifications()"
-                        class="text-[8px] font-black px-2 py-0.5 rounded-lg bg-amber-500/30 border border-amber-600/30 text-amber-900 dark:text-amber-400 whitespace-nowrap shrink-0">
-                        Enable
+                    <!-- Permanent Notification Toggle in Movers -->
+                    <button id="moversNotifToggleBtn" onclick="toggleGlobalNotifications()" class="flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[9px] font-black transition border">
+                        <i id="moversNotifIcon" class="fa-solid fa-bell text-[10px]"></i>
+                        <span id="moversNotifText">Alerts ON (±5%)</span>
                     </button>
                 </div>
 
@@ -320,9 +312,10 @@
                         <span class="text-[11px] font-black uppercase tracking-wider text-[#241a12] dark:text-zinc-300 flex items-center gap-1.5">
                             <i class="fa-solid fa-bell text-amber-600 dark:text-amber-500 text-xs"></i> Price Target Alert
                         </span>
-                        <button id="notifPermBtn" onclick="toggleGlobalNotifications()"
-                            class="text-[8px] font-black px-2 py-0.5 rounded-lg bg-amber-500/20 border border-amber-600/30 text-amber-900 dark:text-amber-400 transition hover:bg-amber-500/30 active:scale-95">
-                            Notification Toggle
+                        <!-- Permanent Notification Toggle in Chart tab -->
+                        <button id="chartNotifToggleBtn" onclick="toggleGlobalNotifications()"
+                            class="text-[8px] font-black px-2 py-0.5 rounded-lg border transition">
+                            <span id="chartNotifText">🔔 Alerts ON</span>
                         </button>
                     </div>
                     <div class="grid grid-cols-2 gap-2">
