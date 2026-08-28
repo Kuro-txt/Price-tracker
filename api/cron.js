@@ -13,7 +13,7 @@ export default async function handler(req, res) {
   const startTime = Date.now();
 
   try {
-    // 1. Ensure required database tables exist
+    // 1. Ensure database tables exist
     await db.execute(`
       CREATE TABLE IF NOT EXISTS resource_prices (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -31,7 +31,7 @@ export default async function handler(req, res) {
       );
     `);
 
-    // 2. Fetch live prices from the active v1 endpoint
+    // 2. Fetch live prices from sfl.world v1 endpoint
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000);
 
@@ -62,46 +62,52 @@ export default async function handler(req, res) {
       throw new Error(`Invalid JSON received from SFL. Snippet: ${responseText.slice(0, 150)}`);
     }
 
-    // 3. Normalize parsed data into standardized item array: [{ name: "Sunflower", price: 0.0012 }, ...]
+    // 3. Extract items from data.p2p dictionary structure
     const currentPrices = [];
 
-    if (Array.isArray(rawData)) {
+    const addPriceEntry = (name, val) => {
+      let price = 0;
+      if (typeof val === 'number') {
+        price = val;
+      } else if (typeof val === 'string') {
+        price = parseFloat(val);
+      } else if (typeof val === 'object' && val !== null) {
+        price = parseFloat(val.price || val.sfl || val.floor || val.value || 0);
+      }
+
+      if (name && typeof name === 'string' && !isNaN(price) && price > 0) {
+        currentPrices.push({ name: name.trim(), price });
+      }
+    };
+
+    // Check direct data.p2p mapping
+    if (rawData?.data?.p2p && typeof rawData.data.p2p === 'object') {
+      Object.entries(rawData.data.p2p).forEach(([name, val]) => addPriceEntry(name, val));
+    } 
+    // Fallback: Check data.prices or direct data object
+    else if (rawData?.data && typeof rawData.data === 'object') {
+      Object.entries(rawData.data).forEach(([key, val]) => {
+        if (typeof val === 'object' && val !== null && !val.price && !val.sfl) {
+          // Nested subgroup (e.g. data.crops or data.minerals)
+          Object.entries(val).forEach(([subName, subVal]) => addPriceEntry(subName, subVal));
+        } else {
+          addPriceEntry(key, val);
+        }
+      });
+    } 
+    // Array format fallback
+    else if (Array.isArray(rawData)) {
       rawData.forEach(item => {
         const name = item.name || item.item_name || item.item;
         const price = parseFloat(item.price || item.current_price || item.sfl || 0);
         if (name && !isNaN(price) && price > 0) {
-          currentPrices.push({ name, price });
+          currentPrices.push({ name: name.trim(), price });
         }
       });
-    } else if (typeof rawData === 'object' && rawData !== null) {
-      const targetObj = rawData.prices || rawData.data || rawData;
-
-      if (Array.isArray(targetObj)) {
-        targetObj.forEach(item => {
-          const name = item.name || item.item_name || item.item;
-          const price = parseFloat(item.price || item.current_price || item.sfl || 0);
-          if (name && !isNaN(price) && price > 0) {
-            currentPrices.push({ name, price });
-          }
-        });
-      } else {
-        Object.entries(targetObj).forEach(([name, val]) => {
-          if (name === 'error' || name === 'status' || name === 'message') return;
-          let price = 0;
-          if (typeof val === 'object' && val !== null) {
-            price = parseFloat(val.price || val.sfl || val.floor || 0);
-          } else {
-            price = parseFloat(val || 0);
-          }
-          if (name && !isNaN(price) && price > 0) {
-            currentPrices.push({ name, price });
-          }
-        });
-      }
     }
 
     if (currentPrices.length === 0) {
-      throw new Error(`Parsed price list is empty. Verify SFL API response format: ${responseText.slice(0, 200)}`);
+      throw new Error(`Could not parse price entries from response: ${responseText.slice(0, 200)}`);
     }
 
     // 4. Batch Insert new records into resource_prices
@@ -156,7 +162,7 @@ export default async function handler(req, res) {
     gainers.sort((a, b) => b.changePct - a.changePct);
     losers.sort((a, b) => a.changePct - b.changePct);
 
-    // 7. Save updated snapshots to market_cache (1-row reads for frontend)
+    // 7. Save precomputed snapshots to market_cache (1-row reads for frontend)
     await db.batch([
       {
         sql: `INSERT INTO market_cache (key, payload, updated_at) VALUES ('prices', ?, datetime('now'))
