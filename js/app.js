@@ -10,15 +10,6 @@ let movers12hMap     = {};
 let _lastGainers     = [];
 let _lastLosers      = [];
 
-// ─── Notifications Toggle State ───────────────────────────────────────────────
-let notifEnabled = true;
-try {
-    const savedNotif = localStorage.getItem("sunchart_notifications_enabled");
-    notifEnabled = savedNotif !== null ? JSON.parse(savedNotif) : true;
-} catch (_) {
-    notifEnabled = true;
-}
-
 // ─── Persisted Settings ───────────────────────────────────────────────────────
 try {
     const savedTax = localStorage.getItem("sunchart_tax_rate");
@@ -30,11 +21,6 @@ try {
     const saved = localStorage.getItem("sunchart_watchlist");
     watchlist = saved ? JSON.parse(saved) : ["Sunflower", "Iron", "Egg", "Gold"];
 } catch (_) { watchlist = ["Sunflower", "Iron", "Egg", "Gold"]; }
-
-let priceAlerts = {};
-try {
-    priceAlerts = JSON.parse(localStorage.getItem("sunchart_alerts") || "{}");
-} catch (_) {}
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
 function escapeHtml(str) {
@@ -52,96 +38,7 @@ function formatDisplayPrice(price) {
 }
 window.formatDisplayPrice = formatDisplayPrice;
 
-function showToast(message, type = "info", durationMs = 4500) {
-    const toast = document.createElement("div");
-    toast.className = `toast ${type}`;
-    toast.innerHTML = message;
-    document.body.appendChild(toast);
-    setTimeout(() => {
-        toast.style.opacity = "0";
-        setTimeout(() => toast.remove(), 350);
-    }, durationMs);
-}
-window.showToast = showToast;
-
-// ─── Permanent Notification Toggle System ─────────────────────────────────────
-function updateNotifToggleUI() {
-    const headerBtn     = document.getElementById("globalNotifBtn");
-    const headerIcon    = document.getElementById("globalNotifIcon");
-    const moversBtn     = document.getElementById("moversNotifToggleBtn");
-    const moversIcon    = document.getElementById("moversNotifIcon");
-    const moversText    = document.getElementById("moversNotifText");
-    const chartBtn      = document.getElementById("chartNotifToggleBtn");
-    const chartText     = document.getElementById("chartNotifText");
-
-    const hasPermission = "Notification" in window && Notification.permission === "granted";
-
-    if (notifEnabled) {
-        // ON State
-        if (headerBtn && headerIcon) {
-            headerBtn.className = "w-7 h-7 rounded-xl bg-amber-500/20 dark:bg-amber-500/10 border border-amber-600/30 dark:border-amber-500/20 text-amber-900 dark:text-amber-400 flex items-center justify-center transition active:scale-95 shadow-2xs";
-            headerIcon.className = "fa-solid fa-bell text-[11px]";
-            headerBtn.title = "Notifications: ON (Click to disable)";
-        }
-        if (moversBtn && moversIcon && moversText) {
-            moversBtn.className = "flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[9px] font-black transition border bg-amber-500/20 dark:bg-amber-500/10 text-amber-900 dark:text-amber-400 border-amber-600/30 dark:border-amber-500/20 active:scale-95 shadow-2xs cursor-pointer";
-            moversIcon.className = "fa-solid fa-bell text-[10px]";
-            moversText.innerText = "Alerts ON (±5%)";
-        }
-        if (chartBtn && chartText) {
-            chartBtn.className = "text-[8px] font-black px-2 py-0.5 rounded-lg border transition bg-amber-500/20 dark:bg-amber-500/10 text-amber-900 dark:text-amber-400 border-amber-600/30 dark:border-amber-500/20 active:scale-95 cursor-pointer";
-            chartText.innerText = "🔔 Alerts ON";
-        }
-    } else {
-        // OFF State
-        if (headerBtn && headerIcon) {
-            headerBtn.className = "w-7 h-7 rounded-xl bg-[#dfd4c0] dark:glass-panel border border-[#c5b59f] dark:border-white/10 text-[#857666] dark:text-zinc-500 flex items-center justify-center transition active:scale-95";
-            headerIcon.className = "fa-solid fa-bell-slash text-[11px]";
-            headerBtn.title = "Notifications: OFF (Click to enable)";
-        }
-        if (moversBtn && moversIcon && moversText) {
-            moversBtn.className = "flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[9px] font-black transition border bg-[#dfd4c0] dark:bg-white/5 text-[#857666] dark:text-zinc-400 border-[#c5b59f] dark:border-white/10 active:scale-95 cursor-pointer";
-            moversIcon.className = "fa-solid fa-bell-slash text-[10px]";
-            moversText.innerText = "Alerts OFF";
-        }
-        if (chartBtn && chartText) {
-            chartBtn.className = "text-[8px] font-black px-2 py-0.5 rounded-lg border transition bg-[#dfd4c0] dark:bg-white/5 text-[#857666] dark:text-zinc-400 border-[#c5b59f] dark:border-white/10 active:scale-95 cursor-pointer";
-            chartText.innerText = "🔕 Alerts OFF";
-        }
-    }
-}
-window.updateNotifToggleUI = updateNotifToggleUI;
-
-async function toggleGlobalNotifications() {
-    if (!("Notification" in window)) {
-        showToast("Browser notifications are not supported in this environment.", "warning");
-        return;
-    }
-
-    if (!notifEnabled) {
-        // Toggle to ON
-        if (Notification.permission !== "granted") {
-            const perm = await Notification.requestPermission();
-            if (perm !== "granted") {
-                showToast("Please allow notification permission in browser settings.", "warning");
-                return;
-            }
-        }
-        notifEnabled = true;
-        try { localStorage.setItem("sunchart_notifications_enabled", "true"); } catch (_) {}
-        updateNotifToggleUI();
-        showToast("🔔 Market alerts ENABLED for ±5% movers & watchlist!", "success");
-    } else {
-        // Toggle to OFF
-        notifEnabled = false;
-        try { localStorage.setItem("sunchart_notifications_enabled", "false"); } catch (_) {}
-        updateNotifToggleUI();
-        showToast("🔕 Market alerts MUTED.", "info");
-    }
-}
-window.toggleGlobalNotifications = toggleGlobalNotifications;
-
-// ─── Auto-refresh (leak-free, 60s interval) ───────────────────────────────────
+// ─── Auto-refresh (60s interval) ──────────────────────────────────────────────
 function startAutoRefresh(intervalMs = 60000) {
     stopAutoRefresh();
     autoRefreshTimer = setInterval(() => fetchMarket(), intervalMs);
@@ -159,7 +56,7 @@ document.addEventListener("visibilitychange", () => {
     }
 });
 
-// ─── Combined Market Fetch (1 DB read instead of 2) ───────────────────────────
+// ─── Combined Market Fetch (1 DB read) ─────────────────────────────────────────
 async function fetchMarket() {
     const refreshIcon  = document.getElementById("refreshIcon");
     const loadingState = document.getElementById("loadingState");
@@ -193,8 +90,6 @@ async function fetchMarket() {
 
         populateDropdown();
         renderMovers(gainers, losers);
-        checkMoverNotifications(movers12hMap);
-        checkPriceAlerts();
         renderWatchlist();
 
         if (window.activeItem) {
@@ -225,7 +120,7 @@ window.fetchPrices = fetchMarket;
 window.fetchMovers = fetchMarket;
 window.fetchMarket = fetchMarket;
 
-// ─── Movers Renderer (Shows ALL Items by Default) ─────────────────────────────
+// ─── Movers Renderer (Shows ALL Items) ────────────────────────────────────────
 function renderMovers(allGainers, allLosers) {
     _lastGainers = allGainers || [];
     _lastLosers  = allLosers || [];
@@ -274,68 +169,6 @@ function renderMovers(allGainers, allLosers) {
     }
 }
 
-// ─── Mover Notifications ─────────────────────────────────────────────────────
-function checkMoverNotifications(changesMap) {
-    if (!notifEnabled || !changesMap || Object.keys(changesMap).length === 0) return;
-
-    let notified = {};
-    try { notified = JSON.parse(sessionStorage.getItem("sunchart_mover_notifs") || "{}"); } catch (_) {}
-
-    const toFire = [];
-
-    // 1. Any item ±5%+
-    Object.values(changesMap).forEach(item => {
-        if (Math.abs(item.changePct) < 5) return;
-        const key = `any:${item.name.toLowerCase()}:${item.changePct > 0 ? "up" : "down"}`;
-        if (notified[key]) return;
-        notified[key] = true;
-        toFire.push({
-            item,
-            toastType: item.changePct > 0 ? "success" : "alert",
-            icon:  item.changePct > 0 ? "🚀" : "📉",
-            label: "Market Mover",
-        });
-    });
-
-    // 2. Watchlist items ±2%+
-    watchlist.forEach(name => {
-        const mover = changesMap[name.toLowerCase()];
-        if (!mover || Math.abs(mover.changePct) < 2) return;
-        const key = `watchlist:${name.toLowerCase()}:${mover.changePct > 0 ? "up" : "down"}`;
-        if (notified[key]) return;
-        notified[key] = true;
-        const duplicate = toFire.some(n => n.item.name.toLowerCase() === name.toLowerCase());
-        if (!duplicate) {
-            toFire.push({
-                item: mover,
-                toastType: mover.changePct > 0 ? "success" : "warning",
-                icon:  mover.changePct > 0 ? "⭐" : "⚠️",
-                label: "Watchlist Item",
-            });
-        }
-    });
-
-    // Fire notifications
-    toFire.forEach(({ item, toastType, icon, label }) => {
-        const sign = item.changePct > 0 ? "+" : "";
-        showToast(
-            `${icon} <strong>${escapeHtml(item.name)}</strong> ${sign}${item.changePct.toFixed(1)}% · ${formatDisplayPrice(item.price)} SFL <span class="opacity-60">(${label})</span>`,
-            toastType,
-            7000
-        );
-        if (Notification?.permission === "granted") {
-            try {
-                new Notification(`SunChart: ${item.name} ${sign}${item.changePct.toFixed(1)}%`, {
-                    body: `Price: ${formatDisplayPrice(item.price)} SFL · ${label}`,
-                    icon: "/favicon.ico",
-                });
-            } catch (_) {}
-        }
-    });
-
-    try { sessionStorage.setItem("sunchart_mover_notifs", JSON.stringify(notified)); } catch (_) {}
-}
-
 // ─── Calculator State ─────────────────────────────────────────────────────────
 function saveItemCalcState(itemName, qty, buyPrice) {
     if (!itemName) return;
@@ -366,7 +199,7 @@ function syncTaxSelectorUI() {
     if (select) select.value = currentTaxRate.toString();
 }
 
-// ─── Tab Switcher ─────────────────────────────────────────────────────
+// ─── Tab Switcher ─────────────────────────────────────────────────────────────
 function switchTab(tab) {
     currentTab = tab;
     const INACTIVE = "py-1 rounded-lg transition text-[#6d5e4d] dark:text-zinc-400 hover:text-black dark:hover:text-white flex items-center justify-center gap-1";
@@ -487,86 +320,6 @@ document.addEventListener("click", e => {
     if (action === "remove") toggleWatchlist(name);
 });
 
-// ─── Price Alerts ─────────────────────────────────────────────────────────────
-function saveAlerts() {
-    try { localStorage.setItem("sunchart_alerts", JSON.stringify(priceAlerts)); } catch (_) {}
-}
-function loadAlertsForItem(itemName) {
-    const key   = itemName.toLowerCase();
-    const alert = priceAlerts[key] || {};
-    const aboveInput = document.getElementById("alertAbove");
-    const belowInput = document.getElementById("alertBelow");
-    if (aboveInput) aboveInput.value = alert.above ?? "";
-    if (belowInput) belowInput.value = alert.below ?? "";
-    updateAlertStatus(itemName);
-}
-function updateAlertStatus(itemName) {
-    const statusEl = document.getElementById("alertStatus");
-    if (!statusEl) return;
-    const alert = priceAlerts[itemName?.toLowerCase()];
-    const parts = [];
-    if (alert?.above) parts.push(`🔔 Above ${formatDisplayPrice(alert.above)} SFL`);
-    if (alert?.below) parts.push(`🔕 Below ${formatDisplayPrice(alert.below)} SFL`);
-    statusEl.innerHTML = parts.length > 0 ? parts.join("  ·  ") : "No alerts set for this item.";
-    statusEl.className = parts.length > 0
-        ? "text-[9px] font-bold text-center text-amber-800 dark:text-amber-400"
-        : "text-[9px] font-bold text-center text-[#6d5e4d] dark:text-zinc-500";
-}
-function onAlertInput() {
-    if (!window.activeItem) return;
-    const key      = window.activeItem.name.toLowerCase();
-    const aboveVal = parseFloat(document.getElementById("alertAbove")?.value);
-    const belowVal = parseFloat(document.getElementById("alertBelow")?.value);
-    priceAlerts[key] = {
-        above: isNaN(aboveVal) || aboveVal <= 0 ? null : aboveVal,
-        below: isNaN(belowVal) || belowVal <= 0 ? null : belowVal,
-    };
-    if (!priceAlerts[key].above && !priceAlerts[key].below) delete priceAlerts[key];
-    saveAlerts();
-    updateAlertStatus(window.activeItem.name);
-}
-window.onAlertInput = onAlertInput;
-
-function clearActiveAlerts() {
-    if (!window.activeItem) return;
-    delete priceAlerts[window.activeItem.name.toLowerCase()];
-    saveAlerts();
-    loadAlertsForItem(window.activeItem.name);
-    showToast("Alert cleared.", "info");
-}
-window.clearActiveAlerts = clearActiveAlerts;
-
-const _triggeredAlerts = new Set();
-function checkPriceAlerts() {
-    if (!notifEnabled) return;
-    allItems.forEach(item => {
-        const key   = item.name.toLowerCase();
-        const alert = priceAlerts[key];
-        if (!alert) return;
-        if (alert.above && item.price >= alert.above) {
-            const ak = `${key}:above:${alert.above}`;
-            if (!_triggeredAlerts.has(ak)) {
-                _triggeredAlerts.add(ak);
-                _fireAlert(item.name, item.price, `🚀 ${item.name} reached ${formatDisplayPrice(alert.above)} SFL (target reached)`, "alert");
-            }
-        }
-        if (alert.below && item.price <= alert.below) {
-            const ak = `${key}:below:${alert.below}`;
-            if (!_triggeredAlerts.has(ak)) {
-                _triggeredAlerts.add(ak);
-                _fireAlert(item.name, item.price, `📉 ${item.name} dropped to ${formatDisplayPrice(alert.below)} SFL (target reached)`, "warning");
-            }
-        }
-    });
-}
-function _fireAlert(itemName, price, message, toastType) {
-    showToast(message, toastType, 8000);
-    if (Notification?.permission === "granted") {
-        try { new Notification(`SunChart Alert: ${itemName}`, { body: `Price: ${formatDisplayPrice(price)} SFL`, icon: "/favicon.ico" }); }
-        catch (_) {}
-    }
-}
-
 // ─── Dropdown / Search ────────────────────────────────────────────────────────
 function populateDropdown() {
     const dropdown = document.getElementById("itemDropdown");
@@ -665,7 +418,6 @@ function selectItem(item, loadGraph = true) {
     if (qtyInput) qtyInput.value = saved.qty || 50;
     if (buyInput) buyInput.value = (saved.buyPrice != null && saved.buyPrice !== "") ? saved.buyPrice : "";
 
-    loadAlertsForItem(item.name);
     updateActiveItemStar();
     calculateCustomStack(false);
     if (loadGraph && typeof window.loadItemHistoryGraph === "function") window.loadItemHistoryGraph(item.name);
@@ -749,7 +501,6 @@ function calculateCustomStack(shouldSave = true) {
 document.addEventListener("DOMContentLoaded", () => {
     syncTaxSelectorUI();
     updateWatchlistBadge();
-    updateNotifToggleUI();
     switchTab("movers");
 
     fetchMarket();
