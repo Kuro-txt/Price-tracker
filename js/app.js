@@ -41,44 +41,6 @@ try {
     watchlist = saved ? JSON.parse(saved) : ["Sunflower", "Iron", "Egg", "Gold"];
 } catch (_) { watchlist = ["Sunflower", "Iron", "Egg", "Gold"]; }
 
-// ─── Web Audio Chime Generator ────────────────────────────────────────────────
-function playNotificationSound() {
-    try {
-        const AudioCtx = window.AudioContext || window.webkitAudioContext;
-        if (!AudioCtx) return;
-        const ctx = new AudioCtx();
-        if (ctx.state === "suspended") ctx.resume();
-
-        const now = ctx.currentTime;
-        const osc1 = ctx.createOscillator();
-        const osc2 = ctx.createOscillator();
-        const gain = ctx.createGain();
-
-        osc1.type = "sine";
-        osc2.type = "triangle";
-
-        // Pleasant melodic chime: E5 (659Hz) -> A5 (880Hz)
-        osc1.frequency.setValueAtTime(659.25, now);
-        osc1.frequency.exponentialRampToValueAtTime(880.00, now + 0.12);
-
-        osc2.frequency.setValueAtTime(329.63, now);
-        osc2.frequency.exponentialRampToValueAtTime(440.00, now + 0.12);
-
-        gain.gain.setValueAtTime(0.001, now);
-        gain.gain.linearRampToValueAtTime(0.2, now + 0.04);
-        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.55);
-
-        osc1.connect(gain);
-        osc2.connect(gain);
-        gain.connect(ctx.destination);
-
-        osc1.start(now);
-        osc2.start(now);
-        osc1.stop(now + 0.6);
-        osc2.stop(now + 0.6);
-    } catch (_) {}
-}
-
 // ─── PWA Service Worker Registration ──────────────────────────────────────────
 if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => {
@@ -114,17 +76,14 @@ function showToast(message, type = "info", durationMs = 4500) {
 }
 window.showToast = showToast;
 
-// ─── Notification Trigger Dispatcher ──────────────────────────────────────────
+// ─── Notification Trigger Dispatcher (Silent / Push & Toast Only) ─────────────
 function dispatchAlertNotification(title, body, type = "info") {
     if (!masterNotifEnabled) return;
 
-    // 1. Play Audio Chime
-    playNotificationSound();
-
-    // 2. Show in-app Toast
+    // 1. Show in-app Toast
     showToast(`<strong>${escapeHtml(title)}</strong><br><span class="text-[9px] opacity-90">${escapeHtml(body)}</span>`, type, 7000);
 
-    // 3. Native Browser / Phone Push (Service Worker or Notification API)
+    // 2. Native Browser / Phone Push (Service Worker or Notification API)
     if ("Notification" in window && Notification.permission === "granted") {
         if (navigator.serviceWorker && navigator.serviceWorker.controller) {
             navigator.serviceWorker.ready.then(reg => {
@@ -425,8 +384,8 @@ function updateModalUI() {
 
     if (statusText) {
         statusText.innerText = hasPerm
-            ? "Status: Browser Push Enabled"
-            : ("Notification" in window ? `Status: Permission ${Notification.permission}` : "Status: Audio / In-App Chimes");
+            ? "Status: Push Enabled"
+            : ("Notification" in window ? `Status: Permission ${Notification.permission}` : "Status: In-App Alerts");
     }
 
     if (toggleBtn && toggleText) {
@@ -465,7 +424,7 @@ async function toggleMasterNotifications() {
 window.toggleMasterNotifications = toggleMasterNotifications;
 
 function testNotificationAlert() {
-    dispatchAlertNotification("🔔 Test Alert: Sunflower", "Price shifted +5.2% · Chime & Push working!", "success");
+    dispatchAlertNotification("🔔 Test Alert: Sunflower", "Price shifted +5.2% · Push alert working!", "success");
 }
 window.testNotificationAlert = testNotificationAlert;
 
