@@ -6,14 +6,14 @@ const db = createClient({
 });
 
 export const config = {
-  maxDuration: 30, // Extends timeout limit if supported
+  maxDuration: 30,
 };
 
 export default async function handler(req, res) {
   const startTime = Date.now();
 
   try {
-    // 1. Ensure all required tables exist
+    // 1. Ensure database tables exist
     await db.execute(`
       CREATE TABLE IF NOT EXISTS resource_prices (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -31,26 +31,41 @@ export default async function handler(req, res) {
       );
     `);
 
-    // 2. Fetch live prices from SFL World API with timeout safety
+    // 2. Fetch live prices with browser-like headers to pass Cloudflare filters
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
 
     const sflResponse = await fetch("https://sfl.world/api/prices", {
       signal: controller.signal,
       headers: {
-        "User-Agent": "SunChart-Terminal/1.0",
-        "Accept": "application/json"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Accept": "application/json, text/plain, */*",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Referer": "https://sfl.world/",
+        "Cache-Control": "no-cache"
       }
     });
     clearTimeout(timeoutId);
 
+    // 3. Read raw text first to avoid parsing crashes on HTML
+    const responseText = await sflResponse.text();
+
     if (!sflResponse.ok) {
-      throw new Error(`SFL API responded with status: ${sflResponse.status}`);
+      throw new Error(`Upstream SFL status ${sflResponse.status}: ${responseText.slice(0, 150)}`);
     }
 
-    const rawData = await sflResponse.json();
-    
-    // Parse response into a standardized array: [{ name: "Sunflower", price: 0.0012 }, ...]
+    if (responseText.trim().startsWith("<") || responseText.includes("<!DOCTYPE html>")) {
+      throw new Error(`Upstream SFL returned HTML instead of JSON. Cloudflare Challenge or invalid URL. Preview: ${responseText.slice(0, 180)}`);
+    }
+
+    let rawData;
+    try {
+      rawData = JSON.parse(responseText);
+    } catch (_) {
+      throw new Error(`Invalid JSON received from SFL. Snippet: ${responseText.slice(0, 150)}`);
+    }
+
+    // 4. Parse response into standard array
     const currentPrices = [];
     if (Array.isArray(rawData)) {
       rawData.forEach(item => {
@@ -76,10 +91,10 @@ export default async function handler(req, res) {
     }
 
     if (currentPrices.length === 0) {
-      throw new Error("Parsed price list is empty. Check API response format.");
+      throw new Error("Parsed price list is empty. Verify SFL API response format.");
     }
 
-    // 3. Batch Insert new prices into resource_prices
+    // 5. Batch Insert new prices into resource_prices
     const nowIso = new Date().toISOString();
     const insertStatements = currentPrices.map(item => ({
       sql: `INSERT INTO resource_prices (item_name, price, recorded_at) VALUES (?, ?, datetime(?));`,
@@ -88,7 +103,7 @@ export default async function handler(req, res) {
 
     await db.batch(insertStatements);
 
-    // 4. Fetch past prices (~12 hours ago) to compute movers
+    // 6. Fetch past prices (~12h ago) to compute movers in memory
     const pastRes = await db.execute(`
       SELECT item_name, price, MIN(recorded_at) as earliest_time
       FROM resource_prices
@@ -101,7 +116,6 @@ export default async function handler(req, res) {
       pastMap[r.item_name.toLowerCase()] = parseFloat(r.price);
     });
 
-    // 5. Compute Movers in Node.js Memory (Lightning Fast & Zero SQL Timeout Risk)
     const gainers = [];
     const losers = [];
     const changesMap = {};
@@ -131,7 +145,7 @@ export default async function handler(req, res) {
     gainers.sort((a, b) => b.changePct - a.changePct);
     losers.sort((a, b) => a.changePct - b.changePct);
 
-    // 6. Save precomputed JSON snapshots into market_cache
+    // 7. Save precomputed snapshots to market_cache
     await db.batch([
       {
         sql: `INSERT INTO market_cache (key, payload, updated_at) VALUES ('prices', ?, datetime('now'))
@@ -154,11 +168,10 @@ export default async function handler(req, res) {
     });
 
   } catch (error) {
-    console.error("Cron Execution Failed:", error);
+    console.error("Cron Error:", error);
     return res.status(500).json({
       success: false,
-      error: error.message,
-      stack: process.env.NODE_ENV === "development" ? error.stack : undefined
+      error: error.message
     });
   }
 }
