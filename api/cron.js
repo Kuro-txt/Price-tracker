@@ -48,56 +48,48 @@ export default async function handler(req, res) {
       args: [JSON.stringify(latestPrices)],
     });
 
-    // 4. Compute and cache 12H Movers
-    const moversRes = await db.execute(`
-      WITH Latest AS (
-        SELECT rp.item_name, rp.price AS current_price
-        FROM resource_prices rp
-        JOIN (
-          SELECT item_name, MAX(recorded_at) AS max_at
-          FROM resource_prices
-          WHERE recorded_at >= datetime('now', '-6 hours')
-          GROUP BY item_name
-        ) m ON rp.item_name = m.item_name AND rp.recorded_at = m.max_at
-      ),
-      Past AS (
-        SELECT rp.item_name, rp.price AS past_price
-        FROM resource_prices rp
-        JOIN (
-          SELECT item_name, MIN(recorded_at) AS min_at
-          FROM resource_prices
-          WHERE recorded_at >= datetime('now', '-14 hours')
-          GROUP BY item_name
-        ) m ON rp.item_name = m.item_name AND rp.recorded_at = m.min_at
+    // 4. Compute 12H Movers with Ultra-Lean Query (Zero full-table scans)
+    // Uses latestPrices from memory + gets only the 12H earliest baseline using window function
+    const pastRes = await db.execute(`
+      SELECT item_name, price AS past_price
+      FROM (
+        SELECT item_name, price,
+               ROW_NUMBER() OVER (PARTITION BY item_name ORDER BY recorded_at ASC) as rn
+        FROM resource_prices
+        WHERE recorded_at >= datetime('now', '-13 hours')
       )
-      SELECT
-        l.item_name,
-        l.current_price,
-        p.past_price,
-        ROUND(((l.current_price - p.past_price) / p.past_price) * 100, 2) AS change_pct,
-        ROUND(l.current_price - p.past_price, 6) AS change_amt
-      FROM Latest l
-      JOIN Past p ON LOWER(l.item_name) = LOWER(p.item_name)
-      WHERE p.past_price > 0
-      ORDER BY change_pct DESC;
+      WHERE rn = 1;
     `);
+
+    const pastMap = {};
+    pastRes.rows.forEach(r => {
+      pastMap[r.item_name.toLowerCase()] = parseFloat(r.past_price);
+    });
 
     const gainers = [];
     const losers  = [];
     const changesMap = {};
 
-    moversRes.rows.forEach(row => {
-      const item = {
-        name: row.item_name,
-        price: parseFloat(row.current_price),
-        pastPrice: parseFloat(row.past_price),
-        changePct: parseFloat(row.change_pct),
-        changeAmt: parseFloat(row.change_amt),
+    latestPrices.forEach(item => {
+      const lower = item.name.toLowerCase();
+      const pastPrice = pastMap[lower] || item.price;
+      const changeAmt = item.price - pastPrice;
+      const changePct = pastPrice > 0 ? parseFloat(((changeAmt / pastPrice) * 100).toFixed(2)) : 0;
+
+      const moverItem = {
+        name: item.name,
+        price: item.price,
+        pastPrice: pastPrice,
+        changePct: changePct,
+        changeAmt: parseFloat(changeAmt.toFixed(6))
       };
-      changesMap[row.item_name.toLowerCase()] = item;
-      if (item.changePct > 0) gainers.push(item);
-      else if (item.changePct < 0) losers.push(item);
+
+      changesMap[lower] = moverItem;
+      if (changePct > 0) gainers.push(moverItem);
+      else if (changePct < 0) losers.push(moverItem);
     });
+
+    gainers.sort((a, b) => b.changePct - a.changePct);
     losers.sort((a, b) => a.changePct - b.changePct);
 
     const moversPayload = { gainers, losers, changesMap };
@@ -205,7 +197,7 @@ async function evaluateAndSendPushNotifications(db, pricesList, changesMap) {
       }
 
       if (triggered) {
-        // Cooldown check (only alert every 4 hours per rule unless price moved further)
+        // Cooldown: alert max once every 4 hours per item
         const lastTriggered = rule.last_triggered_at ? new Date(rule.last_triggered_at) : null;
         const fourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1000);
         if (lastTriggered && lastTriggered > fourHoursAgo) {
@@ -232,7 +224,6 @@ async function evaluateAndSendPushNotifications(db, pricesList, changesMap) {
           triggeredRuleIds.push(rule.rule_id);
         } catch (sendErr) {
           failedCount++;
-          // If subscription is expired/unregistered (404/410), clean it up
           if (sendErr.statusCode === 404 || sendErr.statusCode === 410) {
             await db.execute({
               sql: `DELETE FROM push_subscriptions WHERE id = ?;`,
@@ -244,7 +235,6 @@ async function evaluateAndSendPushNotifications(db, pricesList, changesMap) {
     }
   }
 
-  // Update last_triggered_at for all triggered rules
   if (triggeredRuleIds.length > 0) {
     for (const rid of triggeredRuleIds) {
       await db.execute({
