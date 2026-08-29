@@ -58,8 +58,9 @@ export async function ensureTablesExist(db) {
     );
   `);
 
+  // High-performance index matching COLLATE NOCASE queries (eliminates full-table scans)
   await db.execute(`
-    CREATE INDEX IF NOT EXISTS idx_item_time ON resource_prices(item_name, recorded_at);
+    CREATE INDEX IF NOT EXISTS idx_item_time_nocase ON resource_prices(item_name COLLATE NOCASE, recorded_at ASC);
   `);
 
   await db.execute(`
