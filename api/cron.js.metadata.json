@@ -1,4 +1,0 @@
-{
-  "summary": "Optimized cron.js reducing query rows scanned from 84000 to < 100 rows per run",
-  "updatedAt": "2026-08-29T06:23:58.347626200Z"
-}
