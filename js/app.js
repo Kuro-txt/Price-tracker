@@ -1,5 +1,7 @@
 "use strict";
 
+const VAPID_PUBLIC_KEY = "BGTWgsnm27jVc2pRAODjCmromFVEVV0wKuIarpdyRiTz8na-WO1ugBEBUuT-C1v3sBvMVsY7PGE1wRqQTEMULdw";
+
 // ─── State ────────────────────────────────────────────────────────────────────
 let allItems         = [];
 window.activeItem    = null;
@@ -41,11 +43,59 @@ try {
     watchlist = saved ? JSON.parse(saved) : ["Sunflower", "Iron", "Egg", "Gold"];
 } catch (_) { watchlist = ["Sunflower", "Iron", "Egg", "Gold"]; }
 
-// ─── PWA Service Worker Registration ──────────────────────────────────────────
-if ("serviceWorker" in navigator) {
-    window.addEventListener("load", () => {
-        navigator.serviceWorker.register("/sw.js").catch(() => {});
+// ─── VAPID Key Converter ──────────────────────────────────────────────────────
+function urlBase64ToUint8Array(base64String) {
+    const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+    const base64 = (base64String + padding).replace(/\-/g, "+").replace(/_/g, "/");
+    const rawData = window.atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; ++i) {
+        outputArray[i] = rawData.charCodeAt(i);
+    }
+    return outputArray;
+}
+
+// ─── PWA Service Worker & Server Push Sync ────────────────────────────────────
+let swRegistration = null;
+
+if ("serviceWorker" in navigator && "PushManager" in window) {
+    window.addEventListener("load", async () => {
+        try {
+            swRegistration = await navigator.serviceWorker.register("/sw.js");
+            if (Notification.permission === "granted" && masterNotifEnabled) {
+                syncSubscriptionWithServer();
+            }
+        } catch (_) {}
     });
+}
+
+async function syncSubscriptionWithServer() {
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
+    try {
+        const reg = await navigator.serviceWorker.ready;
+        let sub = await reg.pushManager.getSubscription();
+
+        if (!sub && masterNotifEnabled && Notification.permission === "granted") {
+            const convertedVapidKey = urlBase64ToUint8Array(VAPID_PUBLIC_KEY);
+            sub = await reg.pushManager.subscribe({
+                userVisibleOnly: true,
+                applicationServerKey: convertedVapidKey
+            });
+        }
+
+        if (sub) {
+            await fetch("/api/subscribe", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    subscription: sub,
+                    rules: masterNotifEnabled ? alertRules : []
+                })
+            });
+        }
+    } catch (err) {
+        console.error("Error syncing push subscription:", err);
+    }
 }
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
@@ -76,106 +126,10 @@ function showToast(message, type = "info", durationMs = 4500) {
 }
 window.showToast = showToast;
 
-// ─── Notification Trigger Dispatcher (Silent / Push & Toast Only) ─────────────
+// ─── Notification Trigger Dispatcher (Client-side Active Tab) ─────────────────
 function dispatchAlertNotification(title, body, type = "info") {
     if (!masterNotifEnabled) return;
-
-    // 1. Show in-app Toast
     showToast(`<strong>${escapeHtml(title)}</strong><br><span class="text-[9px] opacity-90">${escapeHtml(body)}</span>`, type, 7000);
-
-    // 2. Native Browser / Phone Push (Service Worker or Notification API)
-    if ("Notification" in window && Notification.permission === "granted") {
-        if (navigator.serviceWorker && navigator.serviceWorker.controller) {
-            navigator.serviceWorker.ready.then(reg => {
-                reg.showNotification(title, {
-                    body: body,
-                    icon: "https://sfl.world/favicon.ico",
-                    badge: "https://sfl.world/favicon.ico",
-                    tag: title,
-                    renotify: true
-                });
-            }).catch(() => {
-                try { new Notification(title, { body, icon: "https://sfl.world/favicon.ico" }); } catch (_) {}
-            });
-        } else {
-            try { new Notification(title, { body, icon: "https://sfl.world/favicon.ico" }); } catch (_) {}
-        }
-    }
-}
-
-// ─── Alert Rules Engine ───────────────────────────────────────────────────────
-function evaluateAlertRules(pricesList, changesMap) {
-    if (!masterNotifEnabled || !alertRules || alertRules.length === 0) return;
-
-    let firedHistory = {};
-    try { firedHistory = JSON.parse(sessionStorage.getItem("sunchart_alert_fired") || "{}"); } catch (_) {}
-
-    const pricesMap = {};
-    pricesList.forEach(p => { pricesMap[p.name.toLowerCase()] = p.price; });
-
-    alertRules.forEach(rule => {
-        const targetItems = rule.item === "*"
-            ? pricesList.map(p => p.name)
-            : [rule.item];
-
-        targetItems.forEach(itemName => {
-            const lowerName = itemName.toLowerCase();
-            const currentPrice = pricesMap[lowerName];
-            const mover = changesMap[lowerName];
-
-            if (currentPrice === undefined) return;
-
-            let shouldFire = false;
-            let title = "";
-            let body = "";
-            let toastType = "info";
-            let cooldownKey = "";
-
-            if (rule.type === "percent" && mover && typeof mover.changePct === "number") {
-                const threshold = parseFloat(rule.value) || 5;
-                if (Math.abs(mover.changePct) >= threshold) {
-                    const direction = mover.changePct >= 0 ? "up" : "down";
-                    cooldownKey = `${rule.id}:${lowerName}:${direction}:${threshold}`;
-                    if (!firedHistory[cooldownKey]) {
-                        shouldFire = true;
-                        const sign = mover.changePct >= 0 ? "+" : "";
-                        title = `${mover.changePct >= 0 ? "🚀 Surging" : "📉 Dipping"}: ${itemName}`;
-                        body = `Moved ${sign}${mover.changePct.toFixed(1)}% (12H) · Now ${formatDisplayPrice(currentPrice)} SFL`;
-                        toastType = mover.changePct >= 0 ? "success" : "alert";
-                    }
-                }
-            } else if (rule.type === "above") {
-                const targetVal = parseFloat(rule.value);
-                if (!isNaN(targetVal) && currentPrice >= targetVal) {
-                    cooldownKey = `${rule.id}:${lowerName}:above:${targetVal}`;
-                    if (!firedHistory[cooldownKey]) {
-                        shouldFire = true;
-                        title = `🎯 Target Reached: ${itemName}`;
-                        body = `Price reached ${formatDisplayPrice(currentPrice)} SFL (Target: ≥ ${formatDisplayPrice(targetVal)} SFL)`;
-                        toastType = "success";
-                    }
-                }
-            } else if (rule.type === "below") {
-                const targetVal = parseFloat(rule.value);
-                if (!isNaN(targetVal) && currentPrice <= targetVal) {
-                    cooldownKey = `${rule.id}:${lowerName}:below:${targetVal}`;
-                    if (!firedHistory[cooldownKey]) {
-                        shouldFire = true;
-                        title = `⚠️ Price Drop: ${itemName}`;
-                        body = `Price fell to ${formatDisplayPrice(currentPrice)} SFL (Target: ≤ ${formatDisplayPrice(targetVal)} SFL)`;
-                        toastType = "warning";
-                    }
-                }
-            }
-
-            if (shouldFire) {
-                firedHistory[cooldownKey] = true;
-                dispatchAlertNotification(title, body, toastType);
-            }
-        });
-    });
-
-    try { sessionStorage.setItem("sunchart_alert_fired", JSON.stringify(firedHistory)); } catch (_) {}
 }
 
 // ─── Modal Management & UI ────────────────────────────────────────────────────
@@ -273,7 +227,7 @@ function setPresetPercent(val) {
 }
 window.setPresetPercent = setPresetPercent;
 
-function addNewAlertRule() {
+async function addNewAlertRule() {
     const itemSelect = document.getElementById("ruleItemSelect");
     const valInput = document.getElementById("ruleValueInput");
     if (!itemSelect || !valInput) return;
@@ -286,6 +240,14 @@ function addNewAlertRule() {
         return;
     }
 
+    if ("Notification" in window && Notification.permission !== "granted") {
+        const perm = await Notification.requestPermission();
+        if (perm !== "granted") {
+            showToast("Please allow notification permission to receive alerts.", "warning");
+            return;
+        }
+    }
+
     const newRule = {
         id: `rule_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
         item: item,
@@ -296,12 +258,9 @@ function addNewAlertRule() {
     alertRules.push(newRule);
     saveAlertRules();
     renderAlertRules();
+    syncSubscriptionWithServer();
     showToast(`🔔 Alert created for ${item === "*" ? "Any Asset" : item}!`, "success");
-
-    // Request permission if not yet granted
-    if ("Notification" in window && Notification.permission === "default") {
-        Notification.requestPermission().then(() => updateModalUI());
-    }
+    updateModalUI();
 }
 window.addNewAlertRule = addNewAlertRule;
 
@@ -309,6 +268,7 @@ function removeAlertRule(ruleId) {
     alertRules = alertRules.filter(r => r.id !== ruleId);
     saveAlertRules();
     renderAlertRules();
+    syncSubscriptionWithServer();
 }
 window.removeAlertRule = removeAlertRule;
 
@@ -316,6 +276,7 @@ function clearAllAlertRules() {
     alertRules = [];
     saveAlertRules();
     renderAlertRules();
+    syncSubscriptionWithServer();
     showToast("All alert rules cleared.", "info");
 }
 window.clearAllAlertRules = clearAllAlertRules;
@@ -384,7 +345,7 @@ function updateModalUI() {
 
     if (statusText) {
         statusText.innerText = hasPerm
-            ? "Status: Push Enabled"
+            ? "Status: Server-Side Push Active"
             : ("Notification" in window ? `Status: Permission ${Notification.permission}` : "Status: In-App Alerts");
     }
 
@@ -410,21 +371,39 @@ function updateModalUI() {
 async function toggleMasterNotifications() {
     if (!masterNotifEnabled) {
         if ("Notification" in window && Notification.permission !== "granted") {
-            await Notification.requestPermission();
+            const perm = await Notification.requestPermission();
+            if (perm !== "granted") {
+                showToast("Please allow notification permissions in browser settings.", "warning");
+                return;
+            }
         }
         masterNotifEnabled = true;
-        showToast("🔔 Master notifications enabled!", "success");
+        syncSubscriptionWithServer();
+        showToast("🔔 Server push notifications enabled!", "success");
     } else {
         masterNotifEnabled = false;
-        showToast("🔕 Master notifications muted.", "info");
+        syncSubscriptionWithServer();
+        showToast("🔕 Notifications muted.", "info");
     }
     try { localStorage.setItem("sunchart_master_notif", JSON.stringify(masterNotifEnabled)); } catch (_) {}
     updateModalUI();
 }
 window.toggleMasterNotifications = toggleMasterNotifications;
 
-function testNotificationAlert() {
-    dispatchAlertNotification("🔔 Test Alert: Sunflower", "Price shifted +5.2% · Push alert working!", "success");
+async function testNotificationAlert() {
+    if ("Notification" in window && Notification.permission !== "granted") {
+        await Notification.requestPermission();
+    }
+    dispatchAlertNotification("🔔 Test Alert: Sunflower", "Lockscreen push notification verified!", "success");
+    if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.ready.then(reg => {
+            reg.showNotification("🔔 SunChart Server Push Test", {
+                body: "Background lockscreen push notification is working!",
+                icon: "https://sfl.world/favicon.ico",
+                badge: "https://sfl.world/favicon.ico"
+            });
+        });
+    }
 }
 window.testNotificationAlert = testNotificationAlert;
 
@@ -481,7 +460,6 @@ async function fetchMarket() {
         populateDropdown();
         populateRuleItemDropdown();
         renderMovers(gainers, losers);
-        evaluateAlertRules(allItems, movers12hMap);
         renderWatchlist();
 
         if (window.activeItem) {
