@@ -1,11 +1,13 @@
+import { getDb } from "./lib/db.js";
+
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Cache-Control", "s-maxage=30, stale-while-revalidate");
+  // Edge CDN caching: Vercel serves repeated history requests without querying Turso DB
+  res.setHeader("Cache-Control", "public, s-maxage=60, stale-while-revalidate=120");
 
   try {
     if (!process.env.TURSO_DATABASE_URL) {
-      console.error("[history] TURSO_DATABASE_URL is not set.");
-      return res.status(500).json({ error: "Server misconfiguration: TURSO_DATABASE_URL missing." });
+      return res.status(500).json({ error: "TURSO_DATABASE_URL missing." });
     }
 
     const item  = req.query.item  || "Sunflower";
@@ -18,21 +20,9 @@ export default async function handler(req, res) {
     };
     const timeModifier = timeModifiers[range] ?? "-24 hours";
 
-    const { createClient } = await import("@libsql/client");
-    const db = createClient({
-      url: process.env.TURSO_DATABASE_URL,
-      authToken: process.env.TURSO_AUTH_TOKEN,
-    });
+    const db = getDb();
 
-    await db.execute(`
-      CREATE TABLE IF NOT EXISTS resource_prices (
-        id          INTEGER PRIMARY KEY AUTOINCREMENT,
-        item_name   TEXT    NOT NULL,
-        price       REAL    NOT NULL,
-        recorded_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
-
+    // Uses idx_item_time_nocase index for instant O(log N) lookup without scanning other items
     const result = await db.execute({
       sql: `
         SELECT price, recorded_at
@@ -46,7 +36,7 @@ export default async function handler(req, res) {
 
     return res.status(200).json(result.rows);
   } catch (error) {
-    console.error("[history] Error:", error.message, error.stack);
+    console.error("[history] Error:", error.message);
     return res.status(500).json({ error: error.message, rows: [] });
   }
 }
