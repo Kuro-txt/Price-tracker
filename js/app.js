@@ -98,7 +98,7 @@ async function syncSubscriptionWithServer() {
     }
 }
 
-// ─── Utilities ────────────────────────────────────────────────────────────────
+// ─── Utilities & Exact Decimal Formatting ─────────────────────────────────────
 function escapeHtml(str) {
     return String(str)
         .replace(/&/g, "&amp;").replace(/</g, "&lt;")
@@ -106,11 +106,12 @@ function escapeHtml(str) {
 }
 
 function formatDisplayPrice(price) {
+    if (price === null || price === undefined || price === "") return "0";
     const num = parseFloat(price);
-    if (isNaN(num)) return "0.00";
-    if (num < 0.001) return num.toFixed(6).replace(/\.?0+$/, "");
-    if (num < 1)     return num.toFixed(4).replace(/\.?0+$/, "");
-    return num.toFixed(2);
+    if (isNaN(num)) return "0";
+    // Preserve all decimal places up to 8 digits without rounding or truncation
+    const fixed = num.toFixed(8);
+    return fixed.includes(".") ? fixed.replace(/\.?0+$/, "") : fixed;
 }
 window.formatDisplayPrice = formatDisplayPrice;
 
