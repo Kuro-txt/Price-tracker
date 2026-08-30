@@ -3,6 +3,7 @@
   "short_name": "SunChart",
   "description": "Real-time Sunflower Land price tracker and market analytics",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#dfd5c2",
   "theme_color": "#dfd5c2",
@@ -11,7 +12,8 @@
     {
       "src": "https://sfl.world/favicon.ico",
       "sizes": "64x64 32x32 24x24 16x16",
-      "type": "image/x-icon"
+      "type": "image/x-icon",
+      "purpose": "any maskable"
     }
   ]
 }
