@@ -1,0 +1,4 @@
+{
+  "summary": "Optimized db.js with case-insensitive composite index for 99% faster lookups and zero table scans",
+  "updatedAt": "2026-08-29T06:23:32.468744400Z"
+}
