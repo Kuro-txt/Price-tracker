@@ -61,7 +61,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ message: "No prices returned from source.", raw: data });
     }
 
-    // 2. Batch insert new prices
+    // 2. Batch insert new prices (preserving full raw decimal precision)
     const batchStatements = latestPrices.map(item => ({
       sql: `INSERT INTO resource_prices (item_name, price, recorded_at)
             VALUES (?, ?, datetime('now'));`,
@@ -113,7 +113,7 @@ export default async function handler(req, res) {
         price: item.price,
         pastPrice: pastPrice,
         changePct: changePct,
-        changeAmt: parseFloat(changeAmt.toFixed(6))
+        changeAmt: parseFloat(changeAmt.toFixed(8))
       };
 
       changesMap[lower] = moverItem;
@@ -154,6 +154,14 @@ export default async function handler(req, res) {
     console.error("[cron] Error:", error.message, error.stack);
     return res.status(500).json({ error: error.message });
   }
+}
+
+function formatPriceForPush(price) {
+  if (price === null || price === undefined) return "0";
+  const num = parseFloat(price);
+  if (isNaN(num)) return "0";
+  const fixed = num.toFixed(8);
+  return fixed.includes(".") ? fixed.replace(/\.?0+$/, "") : fixed;
 }
 
 async function evaluateAndSendPushNotifications(db, pricesList, changesMap) {
@@ -210,21 +218,21 @@ async function evaluateAndSendPushNotifications(db, pricesList, changesMap) {
           triggered = true;
           const sign = mover.changePct >= 0 ? "+" : "";
           title = `${mover.changePct >= 0 ? "🚀 Surging" : "📉 Dipping"}: ${itemName}`;
-          body = `Moved ${sign}${mover.changePct.toFixed(1)}% (12H) · Now ${currentPrice.toFixed(4).replace(/\\.?0+$/, '')} SFL`;
+          body = `Moved ${sign}${mover.changePct.toFixed(1)}% (12H) · Now ${formatPriceForPush(currentPrice)} SFL`;
         }
       } else if (rule.rule_type === "above") {
         const targetVal = parseFloat(rule.target_value);
         if (!isNaN(targetVal) && currentPrice >= targetVal) {
           triggered = true;
           title = `🎯 Target Reached: ${itemName}`;
-          body = `Price reached ${currentPrice.toFixed(4).replace(/\\.?0+$/, '')} SFL (Target: ≥ ${targetVal})`;
+          body = `Price reached ${formatPriceForPush(currentPrice)} SFL (Target: ≥ ${targetVal})`;
         }
       } else if (rule.rule_type === "below") {
         const targetVal = parseFloat(rule.target_value);
         if (!isNaN(targetVal) && currentPrice <= targetVal) {
           triggered = true;
           title = `⚠️ Price Drop: ${itemName}`;
-          body = `Price fell to ${currentPrice.toFixed(4).replace(/\\.?0+$/, '')} SFL (Target: ≤ ${targetVal})`;
+          body = `Price fell to ${formatPriceForPush(currentPrice)} SFL (Target: ≤ ${targetVal})`;
         }
       }
 
