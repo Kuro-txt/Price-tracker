@@ -49,11 +49,11 @@ function formatPrice(val) {
     if (typeof window.formatDisplayPrice === "function") {
         return window.formatDisplayPrice(val);
     }
+    if (val === null || val === undefined || val === "") return "0";
     const num = parseFloat(val);
-    if (isNaN(num)) return "0.00";
-    if (num < 0.001) return num.toFixed(6).replace(/\.?0+$/, "");
-    if (num < 1)     return num.toFixed(4).replace(/\.?0+$/, "");
-    return num.toFixed(2);
+    if (isNaN(num)) return "0";
+    const fixed = num.toFixed(8);
+    return fixed.includes(".") ? fixed.replace(/\.?0+$/, "") : fixed;
 }
 
 function getSeasonForDate(date) {
@@ -96,10 +96,10 @@ function updatePriceChangeBadge(startPrice, currentPrice) {
     const percent = startPrice > 0 ? (diff / startPrice) * 100 : 0;
     const rangeLabel = selectedRange.toUpperCase();
 
-    if (diff > 0.000001) {
+    if (diff > 0.00000001) {
         badge.className = "text-[9px] font-black px-2 py-0.5 rounded-full border bg-emerald-500/15 dark:bg-emerald-500/10 text-emerald-900 dark:text-emerald-400 border-emerald-600/30 dark:border-emerald-500/20";
         badge.innerHTML = `+${percent.toFixed(2)}% (${rangeLabel})`;
-    } else if (diff < -0.000001) {
+    } else if (diff < -0.00000001) {
         badge.className = "text-[9px] font-black px-2 py-0.5 rounded-full border bg-rose-500/15 dark:bg-rose-500/10 text-rose-900 dark:text-rose-400 border-rose-600/30 dark:border-rose-500/20";
         badge.innerHTML = `${percent.toFixed(2)}% (${rangeLabel})`;
     } else {
@@ -228,7 +228,7 @@ function renderChart() {
 
     const minPrice   = Math.min(...prices);
     const maxPrice   = Math.max(...prices);
-    const priceRange = Math.max(maxPrice - minPrice, 0.0001);
+    const priceRange = Math.max(maxPrice - minPrice, 0.000001);
     const margin     = priceRange * 0.15 * yPaddingMultiplier;
     const yMin       = Math.max(0, minPrice - margin);
     const yMax       = maxPrice + margin;
