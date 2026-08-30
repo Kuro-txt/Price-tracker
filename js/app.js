@@ -11,6 +11,7 @@ let currentTaxRate   = 10.0;
 let movers12hMap     = {};
 let _lastGainers     = [];
 let _lastLosers      = [];
+let deferredInstallPrompt = null;
 
 // ─── Notification System State ────────────────────────────────────────────────
 let currentRuleType = "percent"; // 'percent' | 'above' | 'below'
@@ -69,6 +70,86 @@ if ("serviceWorker" in navigator && "PushManager" in window) {
     });
 }
 
+// ─── PWA Install Prompt Handler ───────────────────────────────────────────────
+window.addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault();
+    deferredInstallPrompt = e;
+    updatePwaInstallUI();
+});
+
+window.addEventListener("appinstalled", () => {
+    deferredInstallPrompt = null;
+    updatePwaInstallUI();
+    showToast("🎉 SunChart app installed successfully!", "success");
+});
+
+function isRunningStandalone() {
+    return window.matchMedia("(display-mode: standalone)").matches ||
+           window.navigator.standalone === true ||
+           document.referrer.includes("android-app://");
+}
+
+function updatePwaInstallUI() {
+    const btn       = document.getElementById("installPwaBtn");
+    const subtext   = document.getElementById("pwaInstallSubtext");
+    const tag       = document.getElementById("pwaStatusTag");
+    const iosCard   = document.getElementById("iosInstallStepCard");
+    const isIos     = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    const isInstalled = isRunningStandalone();
+
+    if (isInstalled) {
+        if (tag) {
+            tag.className = "text-[8px] font-black px-1.5 py-0.5 rounded-md bg-emerald-500/20 text-emerald-900 dark:text-emerald-400";
+            tag.innerText = "App Installed";
+        }
+        if (subtext) subtext.innerText = "Running in native standalone app mode";
+        if (btn) {
+            btn.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-600 dark:text-emerald-400"></i> App Installed &amp; Ready`;
+            btn.className = "w-full py-2 px-3 rounded-xl bg-emerald-500/15 border border-emerald-600/30 text-emerald-900 dark:text-emerald-400 font-black text-xs cursor-default flex items-center justify-center gap-1.5";
+            btn.onclick = null;
+        }
+        if (iosCard) iosCard.classList.add("hidden");
+        return;
+    }
+
+    if (isIos) {
+        if (iosCard) iosCard.classList.remove("hidden");
+        if (btn) btn.classList.add("hidden");
+        if (tag) {
+            tag.className = "text-[8px] font-black px-1.5 py-0.5 rounded-md bg-amber-500/20 text-amber-900 dark:text-amber-400";
+            tag.innerText = "Safari Tab";
+        }
+    } else {
+        if (iosCard) iosCard.classList.add("hidden");
+        if (btn) {
+            btn.classList.remove("hidden");
+            btn.innerHTML = `<i class="fa-solid fa-download text-[10px]"></i> <span>Install App to Phone</span>`;
+            btn.onclick = installPWA;
+        }
+        if (tag) {
+            tag.className = "text-[8px] font-black px-1.5 py-0.5 rounded-md bg-amber-500/20 text-amber-900 dark:text-amber-400";
+            tag.innerText = "Browser Tab";
+        }
+    }
+}
+
+async function installPWA() {
+    if (deferredInstallPrompt) {
+        deferredInstallPrompt.prompt();
+        const { outcome } = await deferredInstallPrompt.userChoice;
+        if (outcome === "accepted") {
+            showToast("Installing SunChart app...", "info");
+        }
+        deferredInstallPrompt = null;
+        updatePwaInstallUI();
+    } else if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
+        showToast("Tap Safari Share ⎋ -> Add to Home Screen", "info", 6000);
+    } else {
+        showToast("Tap the 3 dots (⋮) in your browser -> 'Install App'", "info", 6000);
+    }
+}
+window.installPWA = installPWA;
+
 async function syncSubscriptionWithServer() {
     if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
     try {
@@ -109,7 +190,6 @@ function formatDisplayPrice(price) {
     if (price === null || price === undefined || price === "") return "0";
     const num = parseFloat(price);
     if (isNaN(num)) return "0";
-    // Preserve all decimal places up to 8 digits without rounding or truncation
     const fixed = num.toFixed(8);
     return fixed.includes(".") ? fixed.replace(/\.?0+$/, "") : fixed;
 }
@@ -141,6 +221,7 @@ function openNotifModal() {
     renderRuleValueInput();
     renderAlertRules();
     updateModalUI();
+    updatePwaInstallUI();
     modal.classList.remove("hidden");
 }
 window.openNotifModal = openNotifModal;
@@ -873,6 +954,7 @@ document.addEventListener("DOMContentLoaded", () => {
     syncTaxSelectorUI();
     updateWatchlistBadge();
     updateModalUI();
+    updatePwaInstallUI();
     switchTab("movers");
 
     fetchMarket();
