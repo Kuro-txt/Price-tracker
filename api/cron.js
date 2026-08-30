@@ -4,42 +4,75 @@ const DEFAULT_VAPID_PUBLIC = "BGTWgsnm27jVc2pRAODjCmromFVEVV0wKuIarpdyRiTz8na-WO
 const DEFAULT_VAPID_PRIVATE = "e9yw9CYkfZZBFeMBy8MuBXzLI9V7pqaQILWc3yWHuX0";
 const DEFAULT_VAPID_SUBJECT = "mailto:admin@sunchart.app";
 
+function parseSflPrices(json) {
+  const result = [];
+  if (!json) return result;
+
+  // Case 1: Array of { name, price } or { item_name, price }
+  if (Array.isArray(json)) {
+    return json.map(i => ({ name: i.name || i.item_name, price: parseFloat(i.price) })).filter(i => i.name && !isNaN(i.price));
+  }
+
+  // Case 2: Array in data
+  if (Array.isArray(json.data)) {
+    return json.data.map(i => ({ name: i.name || i.item_name, price: parseFloat(i.price) })).filter(i => i.name && !isNaN(i.price));
+  }
+
+  // Case 3: Array in prices
+  if (Array.isArray(json.prices)) {
+    return json.prices.map(i => ({ name: i.name || i.item_name, price: parseFloat(i.price) })).filter(i => i.name && !isNaN(i.price));
+  }
+
+  // Case 4: sfl.world standard structure { data: { p2p: { "Sunflower": 0.00029, ... } } }
+  const sourceObj = (json.data && json.data.p2p) || (json.p2p) || (json.data) || json;
+  if (typeof sourceObj === "object" && sourceObj !== null) {
+    for (const [name, price] of Object.entries(sourceObj)) {
+      const numPrice = typeof price === "object" && price !== null ? parseFloat(price.price || price.value) : parseFloat(price);
+      if (name && !isNaN(numPrice) && typeof name === "string") {
+        result.push({ name, price: numPrice });
+      }
+    }
+  }
+
+  return result;
+}
+
 export default async function handler(req, res) {
   try {
     const db = getDb();
     await ensureTablesExist(db);
 
     // 1. Fetch live prices from sfl.world
-    const response = await fetch("https://sfl.world/api/v1/prices");
+    const response = await fetch("https://sfl.world/api/v1/prices", {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; SunChart/1.0; +https://sunchart.app)",
+        "Accept": "application/json"
+      }
+    });
+
     if (!response.ok) {
       throw new Error(`SFL API responded with status ${response.status}`);
     }
-    const data = await response.json();
-    const pricesArray = Array.isArray(data) ? data : (data.prices || data.data || []);
 
-    if (!Array.isArray(pricesArray) || pricesArray.length === 0) {
-      return res.status(200).json({ message: "No prices returned from source." });
+    const data = await response.json();
+    const latestPrices = parseSflPrices(data);
+
+    if (latestPrices.length === 0) {
+      return res.status(200).json({ message: "No prices returned from source.", raw: data });
     }
 
     // 2. Batch insert new prices
-    const batchStatements = pricesArray
-      .filter(item => item && (item.name || item.item_name) && item.price !== undefined)
-      .map(item => ({
-        sql: `INSERT INTO resource_prices (item_name, price, recorded_at)
-              VALUES (?, ?, datetime('now'));`,
-        args: [item.name || item.item_name, parseFloat(item.price)],
-      }));
+    const batchStatements = latestPrices.map(item => ({
+      sql: `INSERT INTO resource_prices (item_name, price, recorded_at)
+            VALUES (?, ?, datetime('now'));`,
+      args: [item.name, parseFloat(item.price)],
+    }));
 
     if (batchStatements.length > 0) {
       await db.batch(batchStatements, "write");
     }
 
     // 3. Update market_cache with latest prices
-    const latestPrices = pricesArray.map(item => ({
-      name: item.name || item.item_name,
-      price: parseFloat(item.price)
-    }));
-
     await db.execute({
       sql: `INSERT INTO market_cache (key, payload, updated_at)
             VALUES ('prices', ?, datetime('now'))
@@ -49,7 +82,6 @@ export default async function handler(req, res) {
     });
 
     // 4. Compute 12H Movers with Ultra-Lean Query (Zero full-table scans)
-    // Uses latestPrices from memory + gets only the 12H earliest baseline using window function
     const pastRes = await db.execute(`
       SELECT item_name, price AS past_price
       FROM (
