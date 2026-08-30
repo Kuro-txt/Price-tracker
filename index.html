@@ -8,7 +8,10 @@
     <link rel="manifest" href="manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="SunChart">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="theme-color" content="#dfd5c2">
+    <link rel="apple-touch-icon" href="https://sfl.world/favicon.ico">
 
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -433,11 +436,11 @@
             <!-- Mobile Phone Installation & Tips -->
             <div class="p-3 rounded-2xl bg-amber-500/10 dark:bg-amber-950/20 border border-amber-600/20 dark:border-amber-500/20 space-y-1.5 text-[9px] font-bold text-[#423425] dark:text-zinc-300">
                 <div class="flex items-center gap-1.5 font-black text-amber-900 dark:text-amber-400 text-[10px]">
-                    <i class="fa-solid fa-mobile-screen text-xs"></i> How it works on mobile phones:
+                    <i class="fa-solid fa-mobile-screen text-xs"></i> Why you need to Add to Home Screen (PWA):
                 </div>
-                <ul class="space-y-1 list-disc pl-4 text-[9px]">
-                    <li><strong>Android (Chrome/Edge):</strong> Tap "Enable" above when prompted to get standard web push notifications.</li>
-                    <li><strong>iPhone (iOS 16.4+):</strong> Tap Safari's <strong>Share</strong> button <i class="fa-solid fa-arrow-up-from-bracket text-[8px]"></i> &rarr; select <strong>"Add to Home Screen"</strong> &rarr; open SunChart from Home Screen to receive native iOS notifications.</li>
+                <ul class="space-y-1.5 list-disc pl-4 text-[9px]">
+                    <li><strong>iPhone (iOS 16.4+ Requirement):</strong> Apple requires web apps to be installed to your Home Screen before it allows background lockscreen push notifications. Tap Safari's <strong>Share</strong> button <i class="fa-solid fa-arrow-up-from-bracket text-[8px]"></i> &rarr; select <strong>"Add to Home Screen"</strong> &rarr; open SunChart from your Home Screen &rarr; tap the Bell icon &rarr; <strong>Allow</strong>.</li>
+                    <li><strong>Android (Chrome/Edge):</strong> Tap the 3 dots (⋮) &rarr; select <strong>"Install App"</strong> (or "Add to Home Screen") &rarr; allow notifications so Android's battery saver doesn't freeze background alerts.</li>
                 </ul>
             </div>
 
