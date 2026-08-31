@@ -16,6 +16,7 @@ let gesturesAttached = false;
 
 const LOCKED_STRETCH_RANGES = ["6h", "12h", "24h", "7d"];
 
+// ─── 4 Seasons in Exact Order: Spring -> Summer -> Autumn -> Winter ──────────
 const SEASONS = [
     {
         name: "Spring", icon: "🌱", color: "#10b981", lightColor: "#047857",
@@ -44,6 +45,11 @@ const SEASONS = [
 ];
 
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+const ONE_DAY_MS    = 24 * 60 * 60 * 1000;
+
+// Anchor: Monday, August 31, 2026 00:00:00 UTC is Summer (season index 1)
+const ANCHOR_DATE = Date.UTC(2026, 7, 31, 0, 0, 0); // Month 7 = August
+const ANCHOR_SEASON_INDEX = 1; // Summer
 
 function formatPrice(val) {
     if (typeof window.formatDisplayPrice === "function") {
@@ -57,27 +63,25 @@ function formatPrice(val) {
 }
 
 function getSeasonForDate(date) {
-    const now      = new Date();
-    const nowDay   = now.getUTCDay();
-    const diffToMon       = (nowDay + 6) % 7;
-    const currentWeekStart = Date.UTC(
-        now.getUTCFullYear(),
-        now.getUTCMonth(),
-        now.getUTCDate() - diffToMon
-    );
-
-    const targetTime = date.getTime();
-    const diffTime   = targetTime - currentWeekStart;
+    const targetTime = (date instanceof Date ? date : new Date(date)).getTime();
+    
+    // Difference in ms from Anchor Monday (Aug 31, 2026 00:00 UTC)
+    const diffTime = targetTime - ANCHOR_DATE;
+    
+    // Number of full 7-day Monday-to-Sunday weeks
     const weekOffset = Math.floor(diffTime / SEVEN_DAYS_MS);
-
-    const targetWeekStart = currentWeekStart + weekOffset * SEVEN_DAYS_MS;
-
-    const dayIndex   = Math.floor((targetTime - targetWeekStart) / (24 * 60 * 60 * 1000));
-    const seasonDay  = Math.min(Math.max(dayIndex + 1, 1), 7);
-
-    const seasonIndex = ((weekOffset % 4) + 4) % 4;
-
-    return { ...SEASONS[seasonIndex], day: seasonDay };
+    
+    // Exact Monday 00:00 UTC start of this target week
+    const weekStart = ANCHOR_DATE + weekOffset * SEVEN_DAYS_MS;
+    
+    // Day of the week (Day 1 = Monday ... Day 7 = Sunday)
+    const dayIndex = Math.floor((targetTime - weekStart) / ONE_DAY_MS);
+    const day = Math.min(Math.max(dayIndex + 1, 1), 7);
+    
+    // Exact modulo 4 season index: Spring(0) -> Summer(1) -> Autumn(2) -> Winter(3)
+    const seasonIndex = ((ANCHOR_SEASON_INDEX + (weekOffset % 4)) % 4 + 4) % 4;
+    
+    return { ...SEASONS[seasonIndex], day };
 }
 
 function updateActiveSeasonBadge() {
@@ -359,6 +363,10 @@ function attachDirectGestures() {
 
 window.addEventListener("resize", () => {
     if (fullHistoryData.length > 0) renderChart();
+});
+
+document.addEventListener("DOMContentLoaded", () => {
+    updateActiveSeasonBadge();
 });
 
 window.fullHistoryData        = fullHistoryData;
