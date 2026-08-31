@@ -116,21 +116,26 @@ async function fetchMarket() {
     let moversData = { gainers: [], losers: [], changesMap: {} };
 
     try {
-        // Step 1: Try our backend /api/market endpoint
+        // Step 1: Try our backend /api/market endpoint safely
         try {
             const res = await fetch("/api/market");
             if (res.ok) {
-                const data = await res.json();
-                if (data.prices && data.prices.length > 0) {
-                    rawPrices = data.prices;
-                    if (data.movers) moversData = data.movers;
+                const text = await res.text();
+                try {
+                    const data = JSON.parse(text);
+                    if (data && Array.isArray(data.prices) && data.prices.length > 0) {
+                        rawPrices = data.prices;
+                        if (data.movers) moversData = data.movers;
+                    }
+                } catch (_) {
+                    console.warn("[fetchMarket] /api/market returned non-JSON response.");
                 }
             }
         } catch (apiErr) {
-            console.warn("[fetchMarket] Backend /api/market unreachable, falling back to sfl.world:", apiErr.message);
+            console.warn("[fetchMarket] Backend /api/market unreachable:", apiErr.message);
         }
 
-        // Step 2: If backend returned empty or failed, fetch directly from sfl.world
+        // Step 2: If backend returned empty or was redirected by SSO, fetch directly from sfl.world
         if (!rawPrices || rawPrices.length === 0) {
             console.log("[fetchMarket] Fetching directly from sfl.world API...");
             const sflRes = await fetch("https://sfl.world/api/v1/prices");
