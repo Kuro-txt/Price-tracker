@@ -14,20 +14,45 @@ export default async function handler(req, res) {
 
     const db = getDb();
 
-    // ─── ONE QUERY for both cache keys (Reads exactly 2 rows from Turso) ──
-    const cacheRes = await db.execute(
-      "SELECT key, payload FROM market_cache WHERE key IN ('prices', 'movers');"
-    );
-
+    // ─── Fast Cache Query ──────────────────────────────────────────────────
     let prices = [];
     let movers = { gainers: [], losers: [], changesMap: {} };
 
-    cacheRes.rows.forEach(row => {
+    try {
+      const cacheRes = await db.execute(
+        "SELECT key, payload FROM market_cache WHERE key IN ('prices', 'movers');"
+      );
+
+      cacheRes.rows.forEach(row => {
+        try {
+          if (row.key === "prices") prices = JSON.parse(row.payload);
+          if (row.key === "movers") movers = JSON.parse(row.payload);
+        } catch (_) {}
+      });
+    } catch (cacheErr) {
+      console.warn("[market] Cache read warning:", cacheErr.message);
+    }
+
+    // Fallback: If cache is empty, fetch latest prices from resource_prices table
+    if (prices.length === 0) {
       try {
-        if (row.key === "prices") prices = JSON.parse(row.payload);
-        if (row.key === "movers") movers = JSON.parse(row.payload);
-      } catch (_) {}
-    });
+        const fallbackRes = await db.execute(`
+          SELECT item_name AS name, price
+          FROM (
+            SELECT item_name, price,
+                   ROW_NUMBER() OVER (PARTITION BY item_name ORDER BY recorded_at DESC) as rn
+            FROM resource_prices
+          )
+          WHERE rn = 1;
+        `);
+        prices = fallbackRes.rows.map(r => ({
+          name: r.name,
+          price: parseFloat(r.price)
+        }));
+      } catch (fallbackErr) {
+        console.warn("[market] Fallback read warning:", fallbackErr.message);
+      }
+    }
 
     return res.status(200).json({ prices, movers });
   } catch (error) {
