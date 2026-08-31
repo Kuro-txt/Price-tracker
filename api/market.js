@@ -1,4 +1,4 @@
-import { getDb } from "./lib/db.js";
+import { getDb, ensureTablesExist } from "./lib/db.js";
 
 function parseSflPrices(json) {
   const result = [];
@@ -33,6 +33,7 @@ export default async function handler(req, res) {
 
   let prices = [];
   let movers = { gainers: [], losers: [], changesMap: {} };
+  let neededLiveFetch = false;
 
   // ─── Tier 1: Fast Turso Cache Query ──────────────────────────────────────────
   try {
@@ -81,6 +82,7 @@ export default async function handler(req, res) {
 
   // ─── Tier 3: Direct SFL API Fallback (Guarantees data is ALWAYS returned) ────
   if (!prices || prices.length === 0) {
+    neededLiveFetch = true;
     try {
       console.log("[market] Tier 3: Fetching live from sfl.world API...");
       const sflRes = await fetch("https://sfl.world/api/v1/prices", {
@@ -95,6 +97,31 @@ export default async function handler(req, res) {
       }
     } catch (sflErr) {
       console.error("[market] Live SFL API fallback error:", sflErr.message);
+    }
+  }
+
+  // ─── Self-Healing Auto-Sync: Persist live prices if cache was cold ───────────
+  if (neededLiveFetch && prices && prices.length > 0 && process.env.TURSO_DATABASE_URL) {
+    try {
+      const db = getDb();
+      await ensureTablesExist(db);
+
+      const batchStatements = prices.map(item => ({
+        sql: `INSERT INTO resource_prices (item_name, price, recorded_at) VALUES (?, ?, datetime('now'));`,
+        args: [item.name, parseFloat(item.price)],
+      }));
+
+      if (batchStatements.length > 0) {
+        await db.batch(batchStatements, "write");
+      }
+
+      await db.execute({
+        sql: `INSERT INTO market_cache (key, payload, updated_at) VALUES ('prices', ?, datetime('now'))
+              ON CONFLICT(key) DO UPDATE SET payload = excluded.payload, updated_at = excluded.updated_at;`,
+        args: [JSON.stringify(prices)],
+      });
+    } catch (persistErr) {
+      console.warn("[market] Self-healing persist warning:", persistErr.message);
     }
   }
 
