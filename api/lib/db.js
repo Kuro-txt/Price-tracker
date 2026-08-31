@@ -35,35 +35,8 @@ export async function ensureTablesExist(db) {
     );
   `);
 
-  await db.execute(`
-    CREATE TABLE IF NOT EXISTS push_subscriptions (
-      id         TEXT PRIMARY KEY,
-      endpoint   TEXT NOT NULL UNIQUE,
-      p256dh     TEXT NOT NULL,
-      auth       TEXT NOT NULL,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-  `);
-
-  await db.execute(`
-    CREATE TABLE IF NOT EXISTS push_alert_rules (
-      id                 TEXT PRIMARY KEY,
-      subscription_id    TEXT NOT NULL,
-      item_name          TEXT NOT NULL,
-      rule_type          TEXT NOT NULL,
-      target_value       REAL NOT NULL,
-      last_triggered_at  DATETIME,
-      created_at         DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-  `);
-
   // High-performance index matching COLLATE NOCASE queries (eliminates full-table scans)
   await db.execute(`
     CREATE INDEX IF NOT EXISTS idx_item_time_nocase ON resource_prices(item_name COLLATE NOCASE, recorded_at ASC);
-  `);
-
-  await db.execute(`
-    CREATE INDEX IF NOT EXISTS idx_push_sub ON push_alert_rules(subscription_id);
   `);
 }

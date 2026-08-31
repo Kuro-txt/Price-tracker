@@ -1,10 +1,14 @@
 {
   "name": "sfl-price-tracker",
   "version": "1.0.0",
+  "description": "Sunflower Land real-time price tracker and floor calculator",
+  "main": "api/cron.js",
   "type": "module",
+  "scripts": {
+    "dev": "vercel dev",
+    "start": "vercel dev"
+  },
   "dependencies": {
-    "@libsql/client": "^0.14.0",
-    "web-push": "^3.6.7"
+    "@libsql/client": "^0.6.0"
   }
-} 
- 
+}
