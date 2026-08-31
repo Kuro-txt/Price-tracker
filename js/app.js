@@ -77,7 +77,34 @@ document.addEventListener("visibilitychange", () => {
     }
 });
 
-// ─── Combined Market Fetch (1 DB read) ─────────────────────────────────────────
+// Helper: Parse SFL prices from any API response structure
+function parsePricesFromResponse(json) {
+    const result = [];
+    if (!json) return result;
+
+    if (Array.isArray(json)) {
+        return json.map(i => ({ name: i.name || i.item_name, price: parseFloat(i.price) })).filter(i => i.name && !isNaN(i.price));
+    }
+    if (Array.isArray(json.data)) {
+        return json.data.map(i => ({ name: i.name || i.item_name, price: parseFloat(i.price) })).filter(i => i.name && !isNaN(i.price));
+    }
+    if (Array.isArray(json.prices)) {
+        return json.prices.map(i => ({ name: i.name || i.item_name, price: parseFloat(i.price) })).filter(i => i.name && !isNaN(i.price));
+    }
+
+    const sourceObj = (json.data && json.data.p2p) || json.p2p || json.data || json;
+    if (typeof sourceObj === "object" && sourceObj !== null) {
+        for (const [name, price] of Object.entries(sourceObj)) {
+            const numPrice = typeof price === "object" && price !== null ? parseFloat(price.price || price.value) : parseFloat(price);
+            if (name && !isNaN(numPrice) && typeof name === "string") {
+                result.push({ name, price: numPrice });
+            }
+        }
+    }
+    return result;
+}
+
+// ─── Combined Market Fetch (with Direct Client Fallback) ───────────────────────
 async function fetchMarket() {
     const refreshIcon  = document.getElementById("refreshIcon");
     const loadingState = document.getElementById("loadingState");
@@ -85,26 +112,89 @@ async function fetchMarket() {
 
     if (refreshIcon) refreshIcon.classList.add("fa-spin");
 
+    let rawPrices = [];
+    let moversData = { gainers: [], losers: [], changesMap: {} };
+
     try {
-        const res = await fetch("/api/market");
-        if (!res.ok) {
-            const errData = await res.json().catch(() => ({}));
-            throw new Error(errData.error || `Status: ${res.status}`);
+        // Step 1: Try our backend /api/market endpoint
+        try {
+            const res = await fetch("/api/market");
+            if (res.ok) {
+                const data = await res.json();
+                if (data.prices && data.prices.length > 0) {
+                    rawPrices = data.prices;
+                    if (data.movers) moversData = data.movers;
+                }
+            }
+        } catch (apiErr) {
+            console.warn("[fetchMarket] Backend /api/market unreachable, falling back to sfl.world:", apiErr.message);
         }
-        const data = await res.json();
+
+        // Step 2: If backend returned empty or failed, fetch directly from sfl.world
+        if (!rawPrices || rawPrices.length === 0) {
+            console.log("[fetchMarket] Fetching directly from sfl.world API...");
+            const sflRes = await fetch("https://sfl.world/api/v1/prices");
+            if (sflRes.ok) {
+                const sflData = await sflRes.json();
+                rawPrices = parsePricesFromResponse(sflData);
+            }
+        }
+
+        if (!rawPrices || rawPrices.length === 0) {
+            throw new Error("Unable to retrieve prices from market source.");
+        }
 
         // Process prices
-        const rawPrices = Array.isArray(data.prices) ? data.prices : [];
         allItems = rawPrices.map(item => ({
             name:  item.name  || item.item_name || "Unknown",
             price: parseFloat(item.price || 0),
         }));
 
-        // Process movers
-        const moversData = data.movers || {};
-        movers12hMap     = moversData.changesMap || {};
-        const gainers    = Array.isArray(moversData.gainers) ? moversData.gainers : [];
-        const losers     = Array.isArray(moversData.losers)  ? moversData.losers  : [];
+        // Compute client movers if backend movers are empty
+        if (!moversData.gainers || (moversData.gainers.length === 0 && moversData.losers.length === 0)) {
+            let pastMap = {};
+            try {
+                pastMap = JSON.parse(localStorage.getItem("sunchart_past_prices_cache") || "{}");
+            } catch (_) {}
+
+            const gainers = [];
+            const losers  = [];
+            const changesMap = {};
+
+            allItems.forEach(item => {
+                const lower = item.name.toLowerCase();
+                const past = pastMap[lower] || item.price;
+                const changeAmt = item.price - past;
+                const changePct = past > 0 ? parseFloat(((changeAmt / past) * 100).toFixed(2)) : 0;
+
+                const moverItem = {
+                    name: item.name,
+                    price: item.price,
+                    pastPrice: past,
+                    changePct: changePct,
+                    changeAmt: parseFloat(changeAmt.toFixed(8))
+                };
+
+                changesMap[lower] = moverItem;
+                if (changePct > 0) gainers.push(moverItem);
+                else if (changePct < 0) losers.push(moverItem);
+            });
+
+            gainers.sort((a, b) => b.changePct - a.changePct);
+            losers.sort((a, b) => a.changePct - b.changePct);
+            moversData = { gainers, losers, changesMap };
+
+            // Save snapshot for next delta comparison
+            try {
+                const snapshot = {};
+                allItems.forEach(i => { snapshot[i.name.toLowerCase()] = i.price; });
+                localStorage.setItem("sunchart_past_prices_cache", JSON.stringify(snapshot));
+            } catch (_) {}
+        }
+
+        movers12hMap = moversData.changesMap || {};
+        const gainers = Array.isArray(moversData.gainers) ? moversData.gainers : [];
+        const losers  = Array.isArray(moversData.losers)  ? moversData.losers  : [];
 
         loadingState?.classList.add("hidden");
         errorState?.classList.add("hidden");

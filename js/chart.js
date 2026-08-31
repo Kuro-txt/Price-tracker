@@ -160,16 +160,25 @@ async function loadItemHistoryGraph(itemName) {
             historyData = Array.isArray(raw) ? raw : (raw.rows || []);
         }
     } catch (err) {
-        console.error("Failed to load history:", err);
+        console.warn("[chart] History fetch fallback:", err.message);
     } finally {
         if (spinner) spinner.classList.add("hidden");
     }
 
+    const curPrice = window.activeItem ? parseFloat(window.activeItem.price) : 0;
+    const nowTime  = Date.now();
+
     if (!historyData || historyData.length === 0) {
-        historyData = [{
-            price:       window.activeItem ? window.activeItem.price : 0,
-            recorded_at: new Date().toISOString(),
-        }];
+        historyData = [
+            { price: curPrice, recorded_at: new Date(nowTime - 3600000).toISOString() },
+            { price: curPrice, recorded_at: new Date(nowTime).toISOString() }
+        ];
+    } else if (historyData.length === 1) {
+        const t0 = new Date(historyData[0].recorded_at || nowTime).getTime();
+        historyData = [
+            { price: parseFloat(historyData[0].price), recorded_at: new Date(t0 - 3600000).toISOString() },
+            historyData[0]
+        ];
     }
 
     fullHistoryData    = historyData;
@@ -292,7 +301,7 @@ function renderChart() {
                         title: items => {
                             const i   = items[0].dataIndex;
                             const s   = itemSeasons[i];
-                            return `${s?.icon || "🌱"} ${s?.name || "Spring"} Season (Day ${s?.day || 1}/7)\n📅 ${fullDateTips[i]}`;
+                            return `${s?.icon || "🌱"} ${s?.name || "Summer"} Season (Day ${s?.day || 1}/7)\n📅 ${fullDateTips[i]}`;
                         },
                         label: ctx => `Price: ${formatPrice(ctx.parsed.y)} SFL`,
                     },
