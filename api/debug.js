@@ -1,4 +1,4 @@
-import { createClient } from "@libsql/client/web";
+import { getDb, ensureTablesExist } from "./lib/db.js";
 
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -22,11 +22,8 @@ export default async function handler(req, res) {
       return res.status(200).json(report);
     }
 
-    const url = process.env.TURSO_DATABASE_URL.trim().replace(/^libsql:\/\//i, "https://");
-    const db = createClient({
-      url,
-      authToken: (process.env.TURSO_AUTH_TOKEN || "").trim(),
-    });
+    const db = getDb();
+    await ensureTablesExist(db);
 
     // Test basic query
     const tablesRes = await db.execute(
