@@ -1,16 +1,21 @@
-import { createClient } from "@libsql/client";
+import { createClient } from "@libsql/client/web";
 
 let dbInstance = null;
 
 export function getDb() {
-  if (!process.env.TURSO_DATABASE_URL) {
+  const rawUrl = process.env.TURSO_DATABASE_URL;
+  if (!rawUrl) {
     throw new Error("Missing environment variable: TURSO_DATABASE_URL");
   }
 
+  // Ensure proper https/libsql scheme for serverless HTTP client
+  const url = rawUrl.trim();
+  const authToken = (process.env.TURSO_AUTH_TOKEN || "").trim();
+
   if (!dbInstance) {
     dbInstance = createClient({
-      url: process.env.TURSO_DATABASE_URL,
-      authToken: process.env.TURSO_AUTH_TOKEN,
+      url,
+      authToken,
     });
   }
 

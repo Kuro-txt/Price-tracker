@@ -1,3 +1,5 @@
+import { createClient } from "@libsql/client/web";
+
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
 
@@ -12,16 +14,14 @@ export default async function handler(req, res) {
   };
 
   try {
-    const { createClient } = await import("@libsql/client");
-
     if (!process.env.TURSO_DATABASE_URL) {
       report.db_connection = "skipped - TURSO_DATABASE_URL not set";
       return res.status(200).json(report);
     }
 
     const db = createClient({
-      url: process.env.TURSO_DATABASE_URL,
-      authToken: process.env.TURSO_AUTH_TOKEN,
+      url: process.env.TURSO_DATABASE_URL.trim(),
+      authToken: (process.env.TURSO_AUTH_TOKEN || "").trim(),
     });
 
     // Test basic query
