@@ -22,8 +22,9 @@ export default async function handler(req, res) {
       return res.status(200).json(report);
     }
 
+    const url = process.env.TURSO_DATABASE_URL.trim().replace(/^libsql:\/\//i, "https://");
     const db = createClient({
-      url: process.env.TURSO_DATABASE_URL.trim(),
+      url,
       authToken: (process.env.TURSO_AUTH_TOKEN || "").trim(),
     });
 

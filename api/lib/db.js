@@ -8,8 +8,8 @@ export function getDb() {
     throw new Error("Missing environment variable: TURSO_DATABASE_URL");
   }
 
-  // Ensure proper https/libsql scheme for serverless HTTP client
-  const url = rawUrl.trim();
+  // Pure HTTPS scheme required for @libsql/client/web serverless HTTP pipeline
+  const url = rawUrl.trim().replace(/^libsql:\/\//i, "https://");
   const authToken = (process.env.TURSO_AUTH_TOKEN || "").trim();
 
   if (!dbInstance) {
