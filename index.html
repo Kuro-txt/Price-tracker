@@ -71,13 +71,6 @@
                     </select>
                 </div>
 
-                <!-- Dedicated Notification Settings Modal Button -->
-                <button id="openNotifModalBtn" onclick="openNotifModal()" title="Notification Settings"
-                    class="relative w-7 h-7 rounded-xl bg-[#d8c8af] hover:bg-[#cfbda0] dark:bg-zinc-900 dark:hover:bg-zinc-800 border border-[#bfae95] dark:border-zinc-700/80 flex items-center justify-center text-amber-950 dark:text-amber-400 transition active:scale-95 shadow-2xs">
-                    <i id="notifBellIcon" class="fa-solid fa-bell text-[11px] text-amber-900 dark:text-amber-400"></i>
-                    <span id="activeNotifBadge" class="hidden absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-amber-500 text-stone-950 font-black text-[8px] flex items-center justify-center border border-[#ede3d1] dark:border-black shadow-xs">0</span>
-                </button>
-
                 <!-- Theme Toggle Button -->
                 <button onclick="toggleTheme()" aria-label="Toggle Theme"
                     class="w-7 h-7 rounded-xl bg-[#d8c8af] hover:bg-[#cfbda0] dark:bg-zinc-900 dark:hover:bg-zinc-800 border border-[#bfae95] dark:border-zinc-700/80 flex items-center justify-center text-[#301f11] dark:text-amber-400 transition active:scale-95 shadow-2xs">
@@ -151,9 +144,7 @@
                     <span class="text-[11px] font-black uppercase tracking-wider text-[#241a12] dark:text-zinc-300 flex items-center gap-1.5">
                         <i class="fa-solid fa-bolt text-amber-600 dark:text-amber-500 text-xs"></i> 12H Market Movers
                     </span>
-                    <button onclick="openNotifModal()" class="text-[9px] font-black text-amber-950 dark:text-amber-400 flex items-center gap-1 bg-[#d8c8af] dark:bg-zinc-900 px-2.5 py-1 rounded-xl border border-[#bfae95] dark:border-zinc-700/80 hover:bg-[#cfbda0] dark:hover:bg-zinc-800 transition active:scale-95 shadow-2xs">
-                        <i class="fa-solid fa-bell text-[8px] text-amber-900 dark:text-amber-400"></i> Configure Alerts
-                    </button>
+                    <span class="text-[9px] text-[#6d5e4d] dark:text-zinc-400 font-bold">12-Hour shifts</span>
                 </div>
 
                 <!-- Two-column all items mover lists (both scrollable) -->
@@ -206,11 +197,6 @@
                                 <button id="watchlistStarBtn" onclick="toggleActiveItemWatchlist()" title="Toggle Watchlist"
                                     class="w-7 h-7 rounded-xl flex items-center justify-center transition active:scale-90 bg-[#d8c8af] hover:bg-[#cfbda0] dark:bg-zinc-900 dark:hover:bg-zinc-800 border border-[#bfae95] dark:border-zinc-700/80 text-[#301f11] dark:text-zinc-300 shadow-2xs">
                                     <i class="fa-regular fa-star text-xs" id="watchlistStarIcon"></i>
-                                </button>
-                                <!-- Quick Add Alert from Active Item -->
-                                <button onclick="openNotifModalForActiveItem()" title="Set Alert for this Resource"
-                                    class="w-7 h-7 rounded-xl flex items-center justify-center transition active:scale-90 bg-[#d8c8af] hover:bg-[#cfbda0] dark:bg-zinc-900 dark:hover:bg-zinc-800 border border-[#bfae95] dark:border-zinc-700/80 text-amber-900 dark:text-amber-400 shadow-2xs">
-                                    <i class="fa-solid fa-bell text-xs"></i>
                                 </button>
                             </div>
                         </div>
@@ -339,134 +325,6 @@
         </div>
 
     </main>
-
-    <!-- ═══════════════════════════════════════════════════════════════════════ -->
-    <!-- ── Dedicated Notification Settings Modal ────────────────────────────── -->
-    <!-- ═══════════════════════════════════════════════════════════════════════ -->
-    <div id="notifModal" class="hidden fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-xs transition-opacity duration-200">
-        <div class="w-full sm:max-w-lg max-h-[90vh] overflow-y-auto rounded-t-3xl sm:rounded-3xl glass-panel border border-[#cbbeaa] dark:border-white/10 shadow-2xl p-4 sm:p-5 space-y-3.5 animate-in fade-in slide-in-from-bottom-6 duration-200">
-            
-            <!-- Modal Header -->
-            <div class="flex items-center justify-between pb-2 border-b border-[#dfd4c0] dark:border-white/10">
-                <div class="flex items-center gap-2">
-                    <div class="w-7 h-7 rounded-xl bg-amber-500/20 text-amber-800 dark:text-amber-400 flex items-center justify-center text-xs">
-                        <i class="fa-solid fa-bell"></i>
-                    </div>
-                    <div>
-                        <h3 class="text-sm font-extrabold text-[#1a130c] dark:text-white">Alerts &amp; Notifications</h3>
-                        <p class="text-[10px] text-[#6d5e4d] dark:text-zinc-400 font-bold">Customize price &amp; shift triggers</p>
-                    </div>
-                </div>
-                <button onclick="closeNotifModal()" class="w-7 h-7 rounded-xl flex items-center justify-center bg-[#ede3d1] dark:bg-white/5 hover:bg-rose-500/20 text-[#6d5e4d] hover:text-rose-700 transition active:scale-95">
-                    <i class="fa-solid fa-xmark text-xs"></i>
-                </button>
-            </div>
-
-            <!-- 📲 1-Tap App Install Card (for Phone Lockscreen Alerts) -->
-            <div id="pwaInstallCard" class="p-3 rounded-2xl bg-gradient-to-br from-amber-500/20 via-amber-500/10 to-transparent border border-amber-600/30 dark:border-amber-500/25 space-y-2">
-                <div class="flex items-center justify-between">
-                    <div class="flex items-center gap-2">
-                        <div class="w-6 h-6 rounded-lg bg-amber-500 text-stone-950 flex items-center justify-center font-black text-xs">
-                            <i class="fa-solid fa-mobile-screen-button"></i>
-                        </div>
-                        <div>
-                            <span class="text-xs font-black text-[#1a130c] dark:text-white block">Install SunChart App</span>
-                            <span class="text-[9px] text-[#6d5e4d] dark:text-zinc-400 font-bold" id="pwaInstallSubtext">Required for closed-browser lockscreen alerts</span>
-                        </div>
-                    </div>
-                    <span id="pwaStatusTag" class="text-[8px] font-black px-1.5 py-0.5 rounded-md bg-amber-500/20 text-amber-900 dark:text-amber-400">
-                        Browser Tab
-                    </span>
-                </div>
-
-                <!-- 1-Tap Action Button (Android / Chrome / Desktop) -->
-                <button id="installPwaBtn" onclick="installPWA()" class="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-stone-950 font-black text-xs transition shadow-sm active:scale-98 flex items-center justify-center gap-1.5">
-                    <i class="fa-solid fa-download text-[10px]"></i> <span>Install App to Phone</span>
-                </button>
-
-                <!-- iOS Safari Step-by-Step Helper (Shown on iPhone/iPad) -->
-                <div id="iosInstallStepCard" class="hidden text-[9px] font-bold text-[#423425] dark:text-zinc-300 bg-[#ede3d1] dark:bg-zinc-900/90 p-2.5 rounded-xl border border-[#cbbeaa] dark:border-zinc-700/80 space-y-1">
-                    <p class="font-extrabold text-[#1a130c] dark:text-white text-[10px] flex items-center gap-1">
-                        <i class="fa-brands fa-apple text-xs"></i> 2-Step iPhone Setup:
-                    </p>
-                    <p>1. Tap Safari's <strong>Share</strong> button <i class="fa-solid fa-arrow-up-from-bracket text-[8px] px-0.5"></i> at the bottom.</p>
-                    <p>2. Tap <strong>"Add to Home Screen"</strong> <i class="fa-solid fa-plus-square text-[8px] px-0.5"></i> &rarr; open SunChart from Home Screen.</p>
-                </div>
-            </div>
-
-            <!-- Master Toggle & Test -->
-            <div class="flex items-center justify-between p-3 rounded-2xl bg-[#ede3d1] dark:bg-white/5 border border-[#cbbeaa] dark:border-transparent">
-                <div>
-                    <span class="text-xs font-black text-[#1f1710] dark:text-white block">Master Notifications</span>
-                    <span id="notifPermStatusText" class="text-[9px] text-[#6d5e4d] dark:text-zinc-400 font-bold">Status: Ready</span>
-                </div>
-                <div class="flex items-center gap-2">
-                    <button onclick="testNotificationAlert()" title="Test Alert" class="px-2.5 py-1 rounded-xl text-[9px] font-black bg-[#d8c8af] dark:bg-zinc-800 text-amber-950 dark:text-amber-400 border border-[#bfae95] dark:border-transparent hover:bg-amber-500/20 active:scale-95 transition">
-                        Test
-                    </button>
-                    <button id="modalMasterToggleBtn" onclick="toggleMasterNotifications()" class="px-3 py-1 rounded-xl text-[10px] font-black border transition active:scale-95 shadow-2xs">
-                        <span id="modalMasterToggleText">ON</span>
-                    </button>
-                </div>
-            </div>
-
-            <!-- Add New Rule Section -->
-            <div class="space-y-2.5 p-3 rounded-2xl bg-[#f4ebd9] dark:bg-black/40 border border-[#cbbeaa] dark:border-white/10">
-                <div class="flex items-center justify-between">
-                    <span class="text-[10px] font-black uppercase text-[#6d5e4d] dark:text-zinc-400 tracking-wider">
-                        <i class="fa-solid fa-plus text-amber-600 text-[9px]"></i> Add New Alert Rule
-                    </span>
-                </div>
-
-                <!-- Select Resource -->
-                <div>
-                    <label class="text-[8px] font-black uppercase text-[#6d5e4d] dark:text-zinc-400 block mb-1">Select Asset</label>
-                    <select id="ruleItemSelect" class="w-full bg-[#fbf8f2] dark:bg-zinc-900 border border-[#cbbeaa] dark:border-white/10 rounded-xl px-2.5 py-1.5 text-xs font-black text-[#1f1710] dark:text-white focus:outline-none cursor-pointer">
-                        <option value="*">🌍 Any Catalog Asset</option>
-                    </select>
-                </div>
-
-                <!-- Select Condition Type -->
-                <div class="grid grid-cols-3 gap-1 bg-[#ede3d1] dark:bg-white/5 p-0.5 rounded-xl border border-[#cbbeaa] dark:border-transparent text-[9px] font-black">
-                    <button type="button" onclick="setRuleType('percent')" id="ruleTypeBtn-percent" class="py-1 rounded-lg transition bg-[#fbf8f2] dark:bg-zinc-800 text-amber-900 dark:text-amber-400 shadow-xs">
-                        ±% Shift
-                    </button>
-                    <button type="button" onclick="setRuleType('above')" id="ruleTypeBtn-above" class="py-1 rounded-lg transition text-[#6d5e4d] dark:text-zinc-400 hover:text-black dark:hover:text-white">
-                        Rises Above
-                    </button>
-                    <button type="button" onclick="setRuleType('below')" id="ruleTypeBtn-below" class="py-1 rounded-lg transition text-[#6d5e4d] dark:text-zinc-400 hover:text-black dark:hover:text-white">
-                        Drops Below
-                    </button>
-                </div>
-
-                <!-- Condition Value Input -->
-                <div id="ruleValueContainer">
-                    <!-- Dynamic rendering based on selected ruleType -->
-                </div>
-
-                <!-- Add Button -->
-                <button onclick="addNewAlertRule()" class="w-full py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-stone-950 font-black text-xs transition shadow-sm active:scale-98 flex items-center justify-center gap-1.5">
-                    <i class="fa-solid fa-bell text-[10px]"></i> Create Alert Rule
-                </button>
-            </div>
-
-            <!-- Active Alert Rules List -->
-            <div class="space-y-2">
-                <div class="flex items-center justify-between">
-                    <span class="text-[10px] font-black uppercase text-[#6d5e4d] dark:text-zinc-400 tracking-wider">
-                        Active Alert Rules (<span id="rulesCountNum">0</span>)
-                    </span>
-                    <button onclick="clearAllAlertRules()" class="text-[8px] font-black text-rose-800 dark:text-rose-400 hover:underline">
-                        Clear All
-                    </button>
-                </div>
-                <div id="activeRulesList" class="space-y-1.5 max-h-48 overflow-y-auto no-scrollbar">
-                    <!-- Dynamically rendered -->
-                </div>
-            </div>
-
-        </div>
-    </div>
 
     <!-- Footer -->
     <footer class="py-2 text-center text-[9px] font-extrabold text-[#6d5e4d] dark:text-zinc-500">
