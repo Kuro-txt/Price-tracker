@@ -59,6 +59,32 @@ function showToast(message, type = "info", durationMs = 3500) {
 }
 window.showToast = showToast;
 
+// ─── Local Time-Series Price History Logger ───────────────────────────────────
+function recordLocalPriceHistory(items) {
+    if (!Array.isArray(items) || items.length === 0) return;
+    try {
+        const store = JSON.parse(localStorage.getItem("sunchart_local_history_series") || "[]");
+        const now = Date.now();
+        const snap = { t: now, p: {} };
+        items.forEach(i => {
+            if (i.name && typeof i.price === "number") {
+                snap.p[i.name.toLowerCase()] = i.price;
+            }
+        });
+
+        // Don't record duplicate timestamps within 30 seconds
+        if (store.length > 0 && (now - store[store.length - 1].t) < 30000) {
+            store[store.length - 1] = snap;
+        } else {
+            store.push(snap);
+        }
+
+        // Retain rolling history of 300 snapshots
+        if (store.length > 300) store.splice(0, store.length - 300);
+        localStorage.setItem("sunchart_local_history_series", JSON.stringify(store));
+    } catch (_) {}
+}
+
 // ─── Auto-refresh (60s interval) ──────────────────────────────────────────────
 function startAutoRefresh(intervalMs = 60000) {
     stopAutoRefresh();
@@ -154,6 +180,9 @@ async function fetchMarket() {
             name:  item.name  || item.item_name || "Unknown",
             price: parseFloat(item.price || 0),
         }));
+
+        // Record time-series snapshot locally for instant history graphing
+        recordLocalPriceHistory(allItems);
 
         // Compute client movers if backend movers are empty
         if (!moversData.gainers || (moversData.gainers.length === 0 && moversData.losers.length === 0)) {

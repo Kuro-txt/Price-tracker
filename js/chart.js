@@ -153,18 +153,45 @@ async function loadItemHistoryGraph(itemName) {
     if (spinner) spinner.classList.remove("hidden");
 
     let historyData = [];
+
+    // Step 1: Try fetching history from API
     try {
         const res = await fetch(`/api/history?item=${encodeURIComponent(itemName)}&range=${selectedRange}`);
         if (res.ok) {
-            const raw = await res.json();
-            historyData = Array.isArray(raw) ? raw : (raw.rows || []);
+            const text = await res.text();
+            try {
+                const raw = JSON.parse(text);
+                if (Array.isArray(raw)) historyData = raw;
+                else if (raw && Array.isArray(raw.rows)) historyData = raw.rows;
+            } catch (_) {}
         }
     } catch (err) {
-        console.warn("[chart] History fetch fallback:", err.message);
+        console.warn("[chart] History fetch warning:", err.message);
     } finally {
         if (spinner) spinner.classList.add("hidden");
     }
 
+    // Step 2: If API returned empty (e.g. initial setup or SSO active), load local series
+    if (!historyData || historyData.length <= 1) {
+        try {
+            const store = JSON.parse(localStorage.getItem("sunchart_local_history_series") || "[]");
+            const lower = (itemName || "").toLowerCase();
+            const series = [];
+            store.forEach(snap => {
+                if (snap.p && snap.p[lower] !== undefined) {
+                    series.push({
+                        price: parseFloat(snap.p[lower]),
+                        recorded_at: new Date(snap.t).toISOString()
+                    });
+                }
+            });
+            if (series.length > 0) {
+                historyData = series;
+            }
+        } catch (_) {}
+    }
+
+    // Step 3: Ensure at least 2 points so Chart.js renders a smooth line
     const curPrice = window.activeItem ? parseFloat(window.activeItem.price) : 0;
     const nowTime  = Date.now();
 
