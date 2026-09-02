@@ -64,6 +64,21 @@ export const MARKETPLACE_COLLECTIBLES_MAP = {
   "collectibles-742": "Bumpkin Emblem",
   "collectibles-743": "Sunflorian Emblem",
   "collectibles-744": "Nightshade Emblem",
+
+  // Exotic & Foraged Resources (8)
+  "collectibles-2631": "Ruffroot",
+  "collectibles-2632": "Chewed Bone",
+  "collectibles-2633": "Heart Leaf",
+  "collectibles-2634": "Moonfur",
+  "collectibles-2636": "Ribbon",
+  "collectibles-2637": "Dewberry",
+  "collectibles-2638": "Wild Grass",
+  "collectibles-2639": "Frost Pebble",
+
+  // Baits & Fishing (3)
+  "collectibles-2986": "Capsule Bait",
+  "collectibles-2987": "Umbrella Bait",
+  "collectibles-2988": "Crimson Baitfish",
 };
 
 const DEFAULT_API_KEY = "sfl.ODQ3Mjg4MzcwNjQwMzkxNA.v4YoA_Owx6hbEti3N0xcgEIFjPa1qvtXURVO013TYD4";
