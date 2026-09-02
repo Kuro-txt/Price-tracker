@@ -1,4 +1,4 @@
-import { createClient } from "@libsql/client/web";
+import { getDb } from "./lib/db.js";
 
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -17,10 +17,7 @@ export default async function handler(req, res) {
       return res.status(200).json(report);
     }
 
-    const db = createClient({
-      url: process.env.TURSO_DATABASE_URL.trim(),
-      authToken: (process.env.TURSO_AUTH_TOKEN || "").trim(),
-    });
+    const db = getDb();
 
     const tablesRes = await db.execute(
       `SELECT name FROM sqlite_master WHERE type='table' ORDER BY name;`
@@ -41,7 +38,7 @@ export default async function handler(req, res) {
     `);
 
     report.past_items_found = pastRes.rows.length;
-    report.sample_past_items = pastRes.rows.slice(0, 5);
+    report.sample_past_items = pastRes.rows.slice(0, 10);
 
   } catch (err) {
     report.db_connection = "failed";
