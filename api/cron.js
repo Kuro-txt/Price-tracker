@@ -6,7 +6,7 @@ export default async function handler(req, res) {
     const db = getDb();
     await ensureTablesExist(db);
 
-    // 1. Fetch live prices (Official Sunflower Land API if key set, else sfl.world)
+    // 1. Fetch live prices from official Sunflower Land Marketplace API
     const latestPrices = await fetchLiveMarketPrices();
 
     if (latestPrices.length === 0) {

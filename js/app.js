@@ -161,18 +161,8 @@ async function fetchMarket() {
             console.warn("[fetchMarket] Backend /api/market unreachable:", apiErr.message);
         }
 
-        // Step 2: If backend returned empty or was redirected by SSO, fetch directly from sfl.world
         if (!rawPrices || rawPrices.length === 0) {
-            console.log("[fetchMarket] Fetching directly from sfl.world API...");
-            const sflRes = await fetch("https://sfl.world/api/v1/prices");
-            if (sflRes.ok) {
-                const sflData = await sflRes.json();
-                rawPrices = parsePricesFromResponse(sflData);
-            }
-        }
-
-        if (!rawPrices || rawPrices.length === 0) {
-            throw new Error("Unable to retrieve prices from market source.");
+            throw new Error("Unable to retrieve prices from Sunflower Land market API.");
         }
 
         // Process prices

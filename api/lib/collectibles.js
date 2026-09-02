@@ -51,102 +51,65 @@ export const MARKETPLACE_COLLECTIBLES_MAP = {
   "collectibles-663": "Obsidian",
 };
 
-export function parseSflWorldPrices(json) {
-  const result = [];
-  if (!json) return result;
-
-  if (Array.isArray(json)) {
-    return json.map(i => ({ name: i.name || i.item_name, price: parseFloat(i.price) })).filter(i => i.name && !isNaN(i.price));
-  }
-  if (Array.isArray(json.data)) {
-    return json.data.map(i => ({ name: i.name || i.item_name, price: parseFloat(i.price) })).filter(i => i.name && !isNaN(i.price));
-  }
-  if (Array.isArray(json.prices)) {
-    return json.prices.map(i => ({ name: i.name || i.item_name, price: parseFloat(i.price) })).filter(i => i.name && !isNaN(i.price));
-  }
-
-  const sourceObj = (json.data && json.data.p2p) || (json.p2p) || (json.data) || json;
-  if (typeof sourceObj === "object" && sourceObj !== null) {
-    for (const [name, price] of Object.entries(sourceObj)) {
-      const numPrice = typeof price === "object" && price !== null ? parseFloat(price.price || price.value) : parseFloat(price);
-      if (name && !isNaN(numPrice) && typeof name === "string") {
-        result.push({ name, price: numPrice });
-      }
-    }
-  }
-  return result;
-}
+const DEFAULT_API_KEY = "sfl.ODQ3Mjg4MzcwNjQwMzkxNA.v4YoA_Owx6hbEti3N0xcgEIFjPa1qvtXURVO013TYD4";
 
 /**
- * Fetches market prices from official Sunflower Land Community API if key provided, with sfl.world fallback
+ * Fetches market prices exclusively from the official Sunflower Land Marketplace Activity API
  * @param {string} [apiKey]
  * @returns {Promise<Array<{name: string, price: number}>>}
  */
-export async function fetchLiveMarketPrices(apiKey = (process.env.SFL_COMMUNITY_API_KEY || process.env.SFL_API_KEY)) {
-  if (apiKey) {
-    try {
-      const url = "https://api.sunflower-land.com/community/data?type=marketplaceActivity";
-      const res = await fetch(url, {
-        headers: {
-          "x-api-key": apiKey.trim(),
-          "Accept": "application/json",
-          "User-Agent": "SunChart/1.0"
-        }
-      });
+export async function fetchLiveMarketPrices(apiKey = (process.env.SFL_COMMUNITY_API_KEY || process.env.SFL_API_KEY || DEFAULT_API_KEY)) {
+  const key = (apiKey || "").trim();
+  if (!key) {
+    throw new Error("Missing Sunflower Land Community API key.");
+  }
 
-      if (res.ok) {
-        const json = await res.json();
-        const reports = json.data?.reports || {};
-        const dates = Object.keys(reports).sort();
-        if (dates.length > 0) {
-          const latestReport = reports[dates[dates.length - 1]];
-          const items = latestReport.items || {};
-          const prices = [];
+  const url = "https://api.sunflower-land.com/community/data?type=marketplaceActivity";
+  const res = await fetch(url, {
+    headers: {
+      "x-api-key": key,
+      "Accept": "application/json",
+      "User-Agent": "SunChart/1.0"
+    }
+  });
 
-          for (const [colId, itemName] of Object.entries(MARKETPLACE_COLLECTIBLES_MAP)) {
-            const itemData = items[colId];
-            if (itemData) {
-              const unitPrice = itemData.floor !== undefined && itemData.floor !== null
-                ? parseFloat(itemData.floor)
-                : (itemData.latestSale !== undefined && itemData.latestSale !== null ? parseFloat(itemData.latestSale) : null);
+  if (!res.ok) {
+    const errorText = await res.text().catch(() => "");
+    throw new Error(`Sunflower Land API error ${res.status}: ${errorText}`);
+  }
 
-              if (unitPrice !== null && !isNaN(unitPrice) && unitPrice > 0) {
-                prices.push({
-                  name: itemName,
-                  price: unitPrice
-                });
-              }
-            }
-          }
+  const json = await res.json();
+  const reports = json.data?.reports || {};
+  const dates = Object.keys(reports).sort();
 
-          if (prices.length > 0) {
-            console.log(`[collectibles] Successfully loaded ${prices.length} items from official Sunflower Land API`);
-            return prices;
-          }
-        }
-      } else {
-        console.warn(`[collectibles] Official API returned status ${res.status}, falling back to sfl.world`);
+  if (dates.length === 0) {
+    throw new Error("Sunflower Land API returned empty reports data.");
+  }
+
+  const latestReport = reports[dates[dates.length - 1]];
+  const items = latestReport.items || {};
+  const prices = [];
+
+  for (const [colId, itemName] of Object.entries(MARKETPLACE_COLLECTIBLES_MAP)) {
+    const itemData = items[colId];
+    if (itemData) {
+      // Prioritize active floor price; fallback to latestSale
+      const unitPrice = itemData.floor !== undefined && itemData.floor !== null
+        ? parseFloat(itemData.floor)
+        : (itemData.latestSale !== undefined && itemData.latestSale !== null ? parseFloat(itemData.latestSale) : null);
+
+      if (unitPrice !== null && !isNaN(unitPrice) && unitPrice > 0) {
+        prices.push({
+          name: itemName,
+          price: unitPrice
+        });
       }
-    } catch (err) {
-      console.warn("[collectibles] Official API fetch failed, falling back to sfl.world:", err.message);
     }
   }
 
-  // Fallback: sfl.world
-  try {
-    const sflRes = await fetch("https://sfl.world/api/v1/prices", {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (compatible; SunChart/1.0; +https://sunchart.app)",
-        "Accept": "application/json"
-      }
-    });
-    if (sflRes.ok) {
-      const data = await sflRes.json();
-      return parseSflWorldPrices(data);
-    }
-  } catch (err) {
-    console.error("[collectibles] Fallback sfl.world error:", err.message);
+  if (prices.length === 0) {
+    throw new Error("No valid resource prices mapped from Sunflower Land API response.");
   }
 
-  return [];
+  return prices;
 }
