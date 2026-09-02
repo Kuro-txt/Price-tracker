@@ -112,7 +112,7 @@ export default async function handler(req, res) {
       }));
 
       if (batchStatements.length > 0) {
-        await db.batch(batchStatements, "write");
+        await db.batch(batchStatements);
       }
 
       await db.execute({

@@ -9,6 +9,6 @@
     "start": "vercel dev"
   },
   "dependencies": {
-    "@libsql/client": "latest"
+    "@libsql/client": "^0.18.0"
   }
 }

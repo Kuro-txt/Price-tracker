@@ -8,8 +8,11 @@ export function getDb() {
     throw new Error("Missing environment variable: TURSO_DATABASE_URL");
   }
 
-  // Ensure proper https/libsql scheme for serverless HTTP client
-  const url = rawUrl.trim();
+  // Ensure pure HTTPS scheme for stateless serverless HTTP client
+  let url = rawUrl.trim();
+  if (url.startsWith("libsql://")) {
+    url = url.replace("libsql://", "https://");
+  }
   const authToken = (process.env.TURSO_AUTH_TOKEN || "").trim();
 
   if (!dbInstance) {
@@ -40,7 +43,6 @@ export async function ensureTablesExist(db) {
     );
   `);
 
-  // High-performance index matching COLLATE NOCASE queries (eliminates full-table scans)
   await db.execute(`
     CREATE INDEX IF NOT EXISTS idx_item_time_nocase ON resource_prices(item_name COLLATE NOCASE, recorded_at ASC);
   `);
