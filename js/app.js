@@ -210,8 +210,8 @@ async function fetchMarket() {
                 };
 
                 changesMap[lower] = moverItem;
-                if (changePct > 0) gainers.push(moverItem);
-                else if (changePct < 0) losers.push(moverItem);
+                if (changePct >= 0) gainers.push(moverItem);
+                else losers.push(moverItem);
             });
 
             gainers.sort((a, b) => b.changePct - a.changePct);

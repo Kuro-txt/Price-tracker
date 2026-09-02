@@ -4,22 +4,16 @@ function parseSflPrices(json) {
   const result = [];
   if (!json) return result;
 
-  // Case 1: Array of { name, price } or { item_name, price }
   if (Array.isArray(json)) {
     return json.map(i => ({ name: i.name || i.item_name, price: parseFloat(i.price) })).filter(i => i.name && !isNaN(i.price));
   }
-
-  // Case 2: Array in data
   if (Array.isArray(json.data)) {
     return json.data.map(i => ({ name: i.name || i.item_name, price: parseFloat(i.price) })).filter(i => i.name && !isNaN(i.price));
   }
-
-  // Case 3: Array in prices
   if (Array.isArray(json.prices)) {
     return json.prices.map(i => ({ name: i.name || i.item_name, price: parseFloat(i.price) })).filter(i => i.name && !isNaN(i.price));
   }
 
-  // Case 4: sfl.world standard structure { data: { p2p: { "Sunflower": 0.00029, ... } } }
   const sourceObj = (json.data && json.data.p2p) || (json.p2p) || (json.data) || json;
   if (typeof sourceObj === "object" && sourceObj !== null) {
     for (const [name, price] of Object.entries(sourceObj)) {
@@ -29,7 +23,6 @@ function parseSflPrices(json) {
       }
     }
   }
-
   return result;
 }
 
@@ -77,22 +70,37 @@ export default async function handler(req, res) {
       args: [JSON.stringify(latestPrices)],
     });
 
-    // 4. Compute 12H Movers with Ultra-Lean Query (Zero full-table scans)
-    const pastRes = await db.execute(`
+    // 4. Compute Movers against baseline recorded >= 2 hours ago
+    let pastRes = await db.execute(`
       SELECT item_name, price AS past_price
       FROM (
         SELECT item_name, price,
-               ROW_NUMBER() OVER (PARTITION BY item_name ORDER BY recorded_at ASC) as rn
+               ROW_NUMBER() OVER (PARTITION BY item_name ORDER BY recorded_at DESC) as rn
         FROM resource_prices
-        WHERE recorded_at >= datetime('now', '-13 hours')
+        WHERE recorded_at <= datetime('now', '-2 hours')
       )
       WHERE rn = 1;
     `);
 
+    // Fallback if no records older than 2h exist yet
+    if (!pastRes.rows || pastRes.rows.length === 0) {
+      pastRes = await db.execute(`
+        SELECT item_name, price AS past_price
+        FROM (
+          SELECT item_name, price,
+                 ROW_NUMBER() OVER (PARTITION BY item_name ORDER BY recorded_at ASC) as rn
+          FROM resource_prices
+        )
+        WHERE rn = 1;
+      `);
+    }
+
     const pastMap = {};
-    pastRes.rows.forEach(r => {
-      pastMap[r.item_name.toLowerCase()] = parseFloat(r.past_price);
-    });
+    if (pastRes.rows) {
+      pastRes.rows.forEach(r => {
+        pastMap[r.item_name.toLowerCase()] = parseFloat(r.past_price);
+      });
+    }
 
     const gainers = [];
     const losers  = [];
@@ -100,7 +108,7 @@ export default async function handler(req, res) {
 
     latestPrices.forEach(item => {
       const lower = item.name.toLowerCase();
-      const pastPrice = pastMap[lower] || item.price;
+      const pastPrice = (pastMap[lower] !== undefined && pastMap[lower] !== null) ? pastMap[lower] : item.price;
       const changeAmt = item.price - pastPrice;
       const changePct = pastPrice > 0 ? parseFloat(((changeAmt / pastPrice) * 100).toFixed(2)) : 0;
 
@@ -113,8 +121,8 @@ export default async function handler(req, res) {
       };
 
       changesMap[lower] = moverItem;
-      if (changePct > 0) gainers.push(moverItem);
-      else if (changePct < 0) losers.push(moverItem);
+      if (changePct >= 0) gainers.push(moverItem);
+      else losers.push(moverItem);
     });
 
     gainers.sort((a, b) => b.changePct - a.changePct);

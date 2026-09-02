@@ -125,5 +125,81 @@ export default async function handler(req, res) {
     }
   }
 
+  // ─── Guarantee Movers Population: Compute if empty ───────────────────────────
+  if (!movers || !movers.gainers || (movers.gainers.length === 0 && movers.losers.length === 0)) {
+    if (prices && prices.length > 0 && process.env.TURSO_DATABASE_URL) {
+      try {
+        const db = getDb();
+        let pastRes = await db.execute(`
+          SELECT item_name, price AS past_price
+          FROM (
+            SELECT item_name, price,
+                   ROW_NUMBER() OVER (PARTITION BY item_name ORDER BY recorded_at DESC) as rn
+            FROM resource_prices
+            WHERE recorded_at <= datetime('now', '-2 hours')
+          )
+          WHERE rn = 1;
+        `);
+
+        if (!pastRes.rows || pastRes.rows.length === 0) {
+          pastRes = await db.execute(`
+            SELECT item_name, price AS past_price
+            FROM (
+              SELECT item_name, price,
+                     ROW_NUMBER() OVER (PARTITION BY item_name ORDER BY recorded_at ASC) as rn
+              FROM resource_prices
+            )
+            WHERE rn = 1;
+          `);
+        }
+
+        const pastMap = {};
+        if (pastRes.rows) {
+          pastRes.rows.forEach(r => {
+            pastMap[r.item_name.toLowerCase()] = parseFloat(r.past_price);
+          });
+        }
+
+        const gainers = [];
+        const losers  = [];
+        const changesMap = {};
+
+        prices.forEach(item => {
+          const lower = item.name.toLowerCase();
+          const pastPrice = (pastMap[lower] !== undefined && pastMap[lower] !== null) ? pastMap[lower] : item.price;
+          const changeAmt = item.price - pastPrice;
+          const changePct = pastPrice > 0 ? parseFloat(((changeAmt / pastPrice) * 100).toFixed(2)) : 0;
+
+          const moverItem = {
+            name: item.name,
+            price: item.price,
+            pastPrice: pastPrice,
+            changePct: changePct,
+            changeAmt: parseFloat(changeAmt.toFixed(8))
+          };
+
+          changesMap[lower] = moverItem;
+          if (changePct >= 0) gainers.push(moverItem);
+          else losers.push(moverItem);
+        });
+
+        gainers.sort((a, b) => b.changePct - a.changePct);
+        losers.sort((a, b) => a.changePct - b.changePct);
+
+        movers = { gainers, losers, changesMap };
+
+        // Write to cache asynchronously to prevent blocking response
+        db.execute({
+          sql: `INSERT INTO market_cache (key, payload, updated_at) VALUES ('movers', ?, datetime('now'))
+                ON CONFLICT(key) DO UPDATE SET payload = excluded.payload, updated_at = excluded.updated_at;`,
+          args: [JSON.stringify(movers)],
+        }).catch(() => {});
+
+      } catch (err) {
+        console.warn("[market] Auto movers calculation warning:", err.message);
+      }
+    }
+  }
+
   return res.status(200).json({ prices: prices || [], movers: movers || { gainers: [], losers: [], changesMap: {} } });
 }

@@ -7,10 +7,8 @@ export default async function handler(req, res) {
     node_version: process.version,
     env_turso_url_set: !!process.env.TURSO_DATABASE_URL,
     env_turso_token_set: !!process.env.TURSO_AUTH_TOKEN,
-    env_turso_url_prefix: process.env.TURSO_DATABASE_URL?.slice(0, 20) || "NOT SET",
     db_connection: "not tested",
     db_error: null,
-    tables: [],
   };
 
   try {
@@ -24,20 +22,26 @@ export default async function handler(req, res) {
       authToken: (process.env.TURSO_AUTH_TOKEN || "").trim(),
     });
 
-    // Test basic query
     const tablesRes = await db.execute(
       `SELECT name FROM sqlite_master WHERE type='table' ORDER BY name;`
     );
     report.tables = tablesRes.rows.map(r => r.name);
     report.db_connection = "success";
 
-    // Check row counts
-    for (const table of report.tables) {
-      try {
-        const countRes = await db.execute(`SELECT COUNT(*) as cnt FROM ${table};`);
-        report[`${table}_rows`] = countRes.rows[0].cnt;
-      } catch (_) {}
-    }
+    // Test pastRes baseline query:
+    const pastRes = await db.execute(`
+      SELECT item_name, price AS past_price, recorded_at
+      FROM (
+        SELECT item_name, price, recorded_at,
+               ROW_NUMBER() OVER (PARTITION BY item_name ORDER BY recorded_at DESC) as rn
+        FROM resource_prices
+        WHERE recorded_at <= datetime('now', '-2 hours')
+      )
+      WHERE rn = 1;
+    `);
+
+    report.past_items_found = pastRes.rows.length;
+    report.sample_past_items = pastRes.rows.slice(0, 5);
 
   } catch (err) {
     report.db_connection = "failed";
