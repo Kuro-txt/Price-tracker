@@ -53,7 +53,7 @@ export default async function handler(req, res) {
     // 2. Batch insert new prices for time-series charts (write only - 0 reads)
     const batchStatements = latestPrices.map(item => ({
       sql: `INSERT INTO resource_prices (item_name, price, recorded_at)
-            VALUES (?, ?, datetime('now'));`,
+            VALUES (?, ?, strftime('%Y-%m-%dT%H:%M:%SZ', 'now'));`,
       args: [item.name, parseFloat(item.price)],
     }));
 

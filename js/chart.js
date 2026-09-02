@@ -208,6 +208,23 @@ async function loadItemHistoryGraph(itemName) {
         ];
     }
 
+    // Always connect the graph to the LIVE current price at "now"
+    if (curPrice > 0 && historyData.length > 0) {
+        const lastPt = historyData[historyData.length - 1];
+        let lastPtRaw = (lastPt.recorded_at || "").trim();
+        if (lastPtRaw && !lastPtRaw.includes("Z") && !lastPtRaw.includes("+")) {
+            lastPtRaw = lastPtRaw.replace(" ", "T") + "Z";
+        }
+        const lastPtTime = new Date(lastPtRaw).getTime();
+        // If last recorded database point is older than 60 seconds, append live price at now
+        if (nowTime - lastPtTime > 60000) {
+            historyData.push({
+                price: curPrice,
+                recorded_at: new Date(nowTime).toISOString()
+            });
+        }
+    }
+
     fullHistoryData    = historyData;
     viewStart          = 0;
     viewEnd            = fullHistoryData.length - 1;
