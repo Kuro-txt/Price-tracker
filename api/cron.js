@@ -85,7 +85,7 @@ export default async function handler(req, res) {
     const now = Date.now();
     let pastMap = (baselineData && baselineData.prices) ? baselineData.prices : {};
 
-    // Check if pastMap is populated with real past prices (not identical to current)
+    // Check if pastMap has real differences
     let hasRealMovement = false;
     for (const item of latestPrices) {
       const p = pastMap[item.name.toLowerCase()];
@@ -95,15 +95,15 @@ export default async function handler(req, res) {
       }
     }
 
-    // If baseline is missing, older than 12h, or was flat/empty: query true baseline from database
+    // If baseline is flat or expired: query the real baseline from database
     if (!hasRealMovement || !baselineData || !baselineData.updated_at || (now - baselineData.updated_at) >= TWELVE_HOURS_MS) {
-      const pastQuery = await db.execute(`
+      let pastQuery = await db.execute(`
         SELECT item_name, price
         FROM (
           SELECT item_name, price,
-                 ROW_NUMBER() OVER (PARTITION BY item_name ORDER BY recorded_at ASC) as rn
+                 ROW_NUMBER() OVER (PARTITION BY item_name ORDER BY recorded_at DESC) as rn
           FROM resource_prices
-          WHERE recorded_at >= datetime('now', '-24 hours')
+          WHERE recorded_at <= datetime('now', '-12 hours')
         )
         WHERE rn = 1;
       `);
@@ -115,7 +115,6 @@ export default async function handler(req, res) {
         });
       }
 
-      // Check if 24h query had real differences
       let diffFound = false;
       for (const item of latestPrices) {
         const p = newPastMap[item.name.toLowerCase()];
@@ -125,7 +124,7 @@ export default async function handler(req, res) {
         }
       }
 
-      // If flat over 24h, query baseline from before 24h (up to 72h ago)
+      // If flat within 12h, query baseline before 36h
       if (!diffFound) {
         const olderQuery = await db.execute(`
           SELECT item_name, price
@@ -133,7 +132,7 @@ export default async function handler(req, res) {
             SELECT item_name, price,
                    ROW_NUMBER() OVER (PARTITION BY item_name ORDER BY recorded_at DESC) as rn
             FROM resource_prices
-            WHERE recorded_at <= datetime('now', '-24 hours')
+            WHERE recorded_at <= datetime('now', '-36 hours')
           )
           WHERE rn = 1;
         `);
@@ -179,9 +178,13 @@ export default async function handler(req, res) {
       };
 
       changesMap[lower] = moverItem;
-      // Only include true gainers (> 0%) and true losers (< 0%)
-      if (changePct > 0.001) gainers.push(moverItem);
-      else if (changePct < -0.001) losers.push(moverItem);
+
+      // Strict real movers classification (0% items never enter gainers or losers)
+      if (changePct > 0.001) {
+        gainers.push(moverItem);
+      } else if (changePct < -0.001) {
+        losers.push(moverItem);
+      }
     });
 
     gainers.sort((a, b) => b.changePct - a.changePct);

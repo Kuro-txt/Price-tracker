@@ -22,15 +22,19 @@ export default async function handler(req, res) {
 
     const db = getDb();
 
-    // Uses idx_item_time_nocase index with hard limit to prevent excessive row scans
+    // Selects the most recent 300 data points in the requested range, ordered chronologically
     const result = await db.execute({
       sql: `
         SELECT price, recorded_at
-        FROM resource_prices
-        WHERE item_name = ? COLLATE NOCASE
-          AND recorded_at >= datetime('now', ?)
-        ORDER BY recorded_at ASC
-        LIMIT 300;
+        FROM (
+          SELECT price, recorded_at
+          FROM resource_prices
+          WHERE item_name = ? COLLATE NOCASE
+            AND recorded_at >= datetime('now', ?)
+          ORDER BY recorded_at DESC
+          LIMIT 300
+        )
+        ORDER BY recorded_at ASC;
       `,
       args: [item, timeModifier],
     });
