@@ -70,26 +70,27 @@ export default async function handler(req, res) {
       args: [JSON.stringify(latestPrices)],
     });
 
-    // 4. Compute Movers against baseline recorded >= 2 hours ago
+    // 4. Compute Movers against 12H-24H baseline
     let pastRes = await db.execute(`
       SELECT item_name, price AS past_price
       FROM (
         SELECT item_name, price,
                ROW_NUMBER() OVER (PARTITION BY item_name ORDER BY recorded_at DESC) as rn
         FROM resource_prices
-        WHERE recorded_at <= datetime('now', '-2 hours')
+        WHERE recorded_at <= datetime('now', '-12 hours')
       )
       WHERE rn = 1;
     `);
 
-    // Fallback if no records older than 2h exist yet
+    // Fallback if no records older than 12h exist yet
     if (!pastRes.rows || pastRes.rows.length === 0) {
       pastRes = await db.execute(`
         SELECT item_name, price AS past_price
         FROM (
           SELECT item_name, price,
-                 ROW_NUMBER() OVER (PARTITION BY item_name ORDER BY recorded_at ASC) as rn
+                 ROW_NUMBER() OVER (PARTITION BY item_name ORDER BY recorded_at DESC) as rn
           FROM resource_prices
+          WHERE recorded_at <= datetime('now', '-2 hours')
         )
         WHERE rn = 1;
       `);
@@ -104,6 +105,7 @@ export default async function handler(req, res) {
 
     const gainers = [];
     const losers  = [];
+    const unchanged = [];
     const changesMap = {};
 
     latestPrices.forEach(item => {
@@ -121,12 +123,18 @@ export default async function handler(req, res) {
       };
 
       changesMap[lower] = moverItem;
-      if (changePct >= 0) gainers.push(moverItem);
-      else losers.push(moverItem);
+      if (changePct > 0) gainers.push(moverItem);
+      else if (changePct < 0) losers.push(moverItem);
+      else unchanged.push(moverItem);
     });
 
     gainers.sort((a, b) => b.changePct - a.changePct);
     losers.sort((a, b) => a.changePct - b.changePct);
+
+    // If market has low volatility, display stable items so dashboard is never empty
+    if (gainers.length === 0 && losers.length === 0 && unchanged.length > 0) {
+      gainers.push(...unchanged.slice(0, 15));
+    }
 
     const moversPayload = { gainers, losers, changesMap };
 

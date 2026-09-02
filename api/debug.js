@@ -32,7 +32,7 @@ export default async function handler(req, res) {
         SELECT item_name, price, recorded_at,
                ROW_NUMBER() OVER (PARTITION BY item_name ORDER BY recorded_at DESC) as rn
         FROM resource_prices
-        WHERE recorded_at <= datetime('now', '-2 hours')
+        WHERE recorded_at <= datetime('now', '-36 hours')
       )
       WHERE rn = 1;
     `);

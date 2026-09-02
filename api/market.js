@@ -125,7 +125,7 @@ export default async function handler(req, res) {
     }
   }
 
-  // ─── Guarantee Movers Population: Compute if empty ───────────────────────────
+  // ─── Guarantee Movers Population: Compute against 12H baseline if empty ──────
   if (!movers || !movers.gainers || (movers.gainers.length === 0 && movers.losers.length === 0)) {
     if (prices && prices.length > 0 && process.env.TURSO_DATABASE_URL) {
       try {
@@ -136,7 +136,7 @@ export default async function handler(req, res) {
             SELECT item_name, price,
                    ROW_NUMBER() OVER (PARTITION BY item_name ORDER BY recorded_at DESC) as rn
             FROM resource_prices
-            WHERE recorded_at <= datetime('now', '-2 hours')
+            WHERE recorded_at <= datetime('now', '-12 hours')
           )
           WHERE rn = 1;
         `);
@@ -146,8 +146,9 @@ export default async function handler(req, res) {
             SELECT item_name, price AS past_price
             FROM (
               SELECT item_name, price,
-                     ROW_NUMBER() OVER (PARTITION BY item_name ORDER BY recorded_at ASC) as rn
+                     ROW_NUMBER() OVER (PARTITION BY item_name ORDER BY recorded_at DESC) as rn
               FROM resource_prices
+              WHERE recorded_at <= datetime('now', '-2 hours')
             )
             WHERE rn = 1;
           `);
@@ -162,6 +163,7 @@ export default async function handler(req, res) {
 
         const gainers = [];
         const losers  = [];
+        const unchanged = [];
         const changesMap = {};
 
         prices.forEach(item => {
@@ -179,16 +181,21 @@ export default async function handler(req, res) {
           };
 
           changesMap[lower] = moverItem;
-          if (changePct >= 0) gainers.push(moverItem);
-          else losers.push(moverItem);
+          if (changePct > 0) gainers.push(moverItem);
+          else if (changePct < 0) losers.push(moverItem);
+          else unchanged.push(moverItem);
         });
 
         gainers.sort((a, b) => b.changePct - a.changePct);
         losers.sort((a, b) => a.changePct - b.changePct);
 
+        if (gainers.length === 0 && losers.length === 0 && unchanged.length > 0) {
+          gainers.push(...unchanged.slice(0, 15));
+        }
+
         movers = { gainers, losers, changesMap };
 
-        // Write to cache asynchronously to prevent blocking response
+        // Write to cache asynchronously
         db.execute({
           sql: `INSERT INTO market_cache (key, payload, updated_at) VALUES ('movers', ?, datetime('now'))
                 ON CONFLICT(key) DO UPDATE SET payload = excluded.payload, updated_at = excluded.updated_at;`,

@@ -282,8 +282,8 @@ function renderMovers(allGainers, allLosers) {
 
     const buildMoverRow = (item, isGainer) => {
         const isSignificant = Math.abs(item.changePct) >= 5;
-        const colorPrefix = isGainer ? "emerald" : "rose";
-        const sign = isGainer && item.changePct > 0 ? "+" : "";
+        const colorPrefix = item.changePct > 0 ? "emerald" : (item.changePct < 0 ? "rose" : "amber");
+        const sign = item.changePct > 0 ? "+" : "";
 
         return `
             <button data-action="mover-select" data-item-name="${escapeHtml(item.name)}"
@@ -303,13 +303,13 @@ function renderMovers(allGainers, allLosers) {
 
     if (gainersList) {
         gainersList.innerHTML = _lastGainers.length === 0
-            ? `<span class="text-[11px] text-[#6d5e4d] dark:text-zinc-400 font-bold italic py-1">No gainers available</span>`
+            ? `<span class="text-[11px] text-[#6d5e4d] dark:text-zinc-400 font-bold italic py-1">Market is stable (no gains)</span>`
             : _lastGainers.map(item => buildMoverRow(item, true)).join("");
     }
 
     if (losersList) {
         losersList.innerHTML = _lastLosers.length === 0
-            ? `<span class="text-[11px] text-[#6d5e4d] dark:text-zinc-400 font-bold italic py-1">No losers available</span>`
+            ? `<span class="text-[11px] text-[#6d5e4d] dark:text-zinc-400 font-bold italic py-1">Market is stable (no drops)</span>`
             : _lastLosers.map(item => buildMoverRow(item, false)).join("");
     }
 }
