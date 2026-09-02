@@ -72,7 +72,7 @@ export default async function handler(req, res) {
       args: [JSON.stringify(latestPrices)],
     });
 
-    // 4. Ultra-Lean 12H Movers: Read cached 12H baseline (Exactly 1 row read)
+    // 4. Ultra-Lean Movers: Read cached baseline (1 row read from market_cache)
     const baselineRes = await db.execute(
       "SELECT payload FROM market_cache WHERE key = 'baseline_12h';"
     );
@@ -85,7 +85,7 @@ export default async function handler(req, res) {
     const now = Date.now();
     let pastMap = (baselineData && baselineData.prices) ? baselineData.prices : {};
 
-    // Check if pastMap has real differences
+    // Check if pastMap has real differences against current prices
     let hasRealMovement = false;
     for (const item of latestPrices) {
       const p = pastMap[item.name.toLowerCase()];
@@ -95,7 +95,7 @@ export default async function handler(req, res) {
       }
     }
 
-    // If baseline is flat or expired: query the real baseline from database
+    // If baseline is flat, missing, or older than 12h: query true 48H baseline
     if (!hasRealMovement || !baselineData || !baselineData.updated_at || (now - baselineData.updated_at) >= TWELVE_HOURS_MS) {
       let pastQuery = await db.execute(`
         SELECT item_name, price
@@ -103,45 +103,28 @@ export default async function handler(req, res) {
           SELECT item_name, price,
                  ROW_NUMBER() OVER (PARTITION BY item_name ORDER BY recorded_at DESC) as rn
           FROM resource_prices
-          WHERE recorded_at <= datetime('now', '-12 hours')
+          WHERE recorded_at <= datetime('now', '-48 hours')
         )
         WHERE rn = 1;
       `);
+
+      if (!pastQuery.rows || pastQuery.rows.length === 0) {
+        pastQuery = await db.execute(`
+          SELECT item_name, price
+          FROM (
+            SELECT item_name, price,
+                   ROW_NUMBER() OVER (PARTITION BY item_name ORDER BY recorded_at ASC) as rn
+            FROM resource_prices
+          )
+          WHERE rn = 1;
+        `);
+      }
 
       const newPastMap = {};
       if (pastQuery.rows && pastQuery.rows.length > 0) {
         pastQuery.rows.forEach(r => {
           newPastMap[r.item_name.toLowerCase()] = parseFloat(r.price);
         });
-      }
-
-      let diffFound = false;
-      for (const item of latestPrices) {
-        const p = newPastMap[item.name.toLowerCase()];
-        if (p !== undefined && Math.abs(p - item.price) > 0.00000001) {
-          diffFound = true;
-          break;
-        }
-      }
-
-      // If flat within 12h, query baseline before 36h
-      if (!diffFound) {
-        const olderQuery = await db.execute(`
-          SELECT item_name, price
-          FROM (
-            SELECT item_name, price,
-                   ROW_NUMBER() OVER (PARTITION BY item_name ORDER BY recorded_at DESC) as rn
-            FROM resource_prices
-            WHERE recorded_at <= datetime('now', '-36 hours')
-          )
-          WHERE rn = 1;
-        `);
-
-        if (olderQuery.rows && olderQuery.rows.length > 0) {
-          olderQuery.rows.forEach(r => {
-            newPastMap[r.item_name.toLowerCase()] = parseFloat(r.price);
-          });
-        }
       }
 
       pastMap = newPastMap;
@@ -179,7 +162,7 @@ export default async function handler(req, res) {
 
       changesMap[lower] = moverItem;
 
-      // Strict real movers classification (0% items never enter gainers or losers)
+      // Pure real movers: only positive growth in gainers, negative in losers
       if (changePct > 0.001) {
         gainers.push(moverItem);
       } else if (changePct < -0.001) {
