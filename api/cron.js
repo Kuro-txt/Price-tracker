@@ -72,7 +72,7 @@ export default async function handler(req, res) {
       args: [JSON.stringify(latestPrices)],
     });
 
-    // 4. Ultra-Lean 12H Movers: Read cached 12H baseline (Exactly 1 row read from market_cache)
+    // 4. Ultra-Lean 12H Movers: Read cached 12H baseline (Exactly 1 row read)
     const baselineRes = await db.execute(
       "SELECT payload FROM market_cache WHERE key = 'baseline_12h';"
     );
@@ -83,15 +83,74 @@ export default async function handler(req, res) {
     }
 
     const now = Date.now();
-    const currentPriceMap = {};
-    latestPrices.forEach(i => { currentPriceMap[i.name.toLowerCase()] = i.price; });
+    let pastMap = (baselineData && baselineData.prices) ? baselineData.prices : {};
 
-    // Rotate or initialize baseline if missing or older than 12 hours
-    if (!baselineData || !baselineData.updated_at || (now - baselineData.updated_at) >= TWELVE_HOURS_MS) {
+    // Check if pastMap is populated with real past prices (not identical to current)
+    let hasRealMovement = false;
+    for (const item of latestPrices) {
+      const p = pastMap[item.name.toLowerCase()];
+      if (p !== undefined && Math.abs(p - item.price) > 0.00000001) {
+        hasRealMovement = true;
+        break;
+      }
+    }
+
+    // If baseline is missing, older than 12h, or was flat/empty: query true baseline from database
+    if (!hasRealMovement || !baselineData || !baselineData.updated_at || (now - baselineData.updated_at) >= TWELVE_HOURS_MS) {
+      const pastQuery = await db.execute(`
+        SELECT item_name, price
+        FROM (
+          SELECT item_name, price,
+                 ROW_NUMBER() OVER (PARTITION BY item_name ORDER BY recorded_at ASC) as rn
+          FROM resource_prices
+          WHERE recorded_at >= datetime('now', '-24 hours')
+        )
+        WHERE rn = 1;
+      `);
+
+      const newPastMap = {};
+      if (pastQuery.rows && pastQuery.rows.length > 0) {
+        pastQuery.rows.forEach(r => {
+          newPastMap[r.item_name.toLowerCase()] = parseFloat(r.price);
+        });
+      }
+
+      // Check if 24h query had real differences
+      let diffFound = false;
+      for (const item of latestPrices) {
+        const p = newPastMap[item.name.toLowerCase()];
+        if (p !== undefined && Math.abs(p - item.price) > 0.00000001) {
+          diffFound = true;
+          break;
+        }
+      }
+
+      // If flat over 24h, query baseline from before 24h (up to 72h ago)
+      if (!diffFound) {
+        const olderQuery = await db.execute(`
+          SELECT item_name, price
+          FROM (
+            SELECT item_name, price,
+                   ROW_NUMBER() OVER (PARTITION BY item_name ORDER BY recorded_at DESC) as rn
+            FROM resource_prices
+            WHERE recorded_at <= datetime('now', '-24 hours')
+          )
+          WHERE rn = 1;
+        `);
+
+        if (olderQuery.rows && olderQuery.rows.length > 0) {
+          olderQuery.rows.forEach(r => {
+            newPastMap[r.item_name.toLowerCase()] = parseFloat(r.price);
+          });
+        }
+      }
+
+      pastMap = newPastMap;
       baselineData = {
         updated_at: now,
-        prices: currentPriceMap
+        prices: newPastMap
       };
+
       await db.execute({
         sql: `INSERT INTO market_cache (key, payload, updated_at)
               VALUES ('baseline_12h', ?, datetime('now'))
@@ -101,10 +160,8 @@ export default async function handler(req, res) {
       });
     }
 
-    const pastMap = baselineData.prices || {};
     const gainers = [];
     const losers  = [];
-    const unchanged = [];
     const changesMap = {};
 
     latestPrices.forEach(item => {
@@ -122,17 +179,13 @@ export default async function handler(req, res) {
       };
 
       changesMap[lower] = moverItem;
-      if (changePct > 0) gainers.push(moverItem);
-      else if (changePct < 0) losers.push(moverItem);
-      else unchanged.push(moverItem);
+      // Only include true gainers (> 0%) and true losers (< 0%)
+      if (changePct > 0.001) gainers.push(moverItem);
+      else if (changePct < -0.001) losers.push(moverItem);
     });
 
     gainers.sort((a, b) => b.changePct - a.changePct);
     losers.sort((a, b) => a.changePct - b.changePct);
-
-    if (gainers.length === 0 && losers.length === 0 && unchanged.length > 0) {
-      gainers.push(...unchanged.slice(0, 15));
-    }
 
     const moversPayload = { gainers, losers, changesMap };
 
