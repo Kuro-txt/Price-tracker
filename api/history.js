@@ -2,8 +2,8 @@ import { getDb } from "./lib/db.js";
 
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
-  // Edge CDN caching: Vercel serves repeated history requests without querying Turso DB
-  res.setHeader("Cache-Control", "public, s-maxage=60, stale-while-revalidate=120");
+  // Global Edge CDN cache: Vercel serves repeated history requests for 2 minutes with 0 Turso DB reads
+  res.setHeader("Cache-Control", "public, s-maxage=120, stale-while-revalidate=300");
 
   const item  = req.query.item  || "Sunflower";
   const range = req.query.range || "24h";
@@ -22,14 +22,15 @@ export default async function handler(req, res) {
 
     const db = getDb();
 
-    // Uses idx_item_time_nocase index for instant O(log N) lookup without scanning other items
+    // Uses idx_item_time_nocase index with hard limit to prevent excessive row scans
     const result = await db.execute({
       sql: `
         SELECT price, recorded_at
         FROM resource_prices
         WHERE item_name = ? COLLATE NOCASE
           AND recorded_at >= datetime('now', ?)
-        ORDER BY recorded_at ASC;
+        ORDER BY recorded_at ASC
+        LIMIT 300;
       `,
       args: [item, timeModifier],
     });

@@ -26,12 +26,14 @@ function parseSflPrices(json) {
   return result;
 }
 
+const TWELVE_HOURS_MS = 12 * 60 * 60 * 1000;
+
 export default async function handler(req, res) {
   try {
     const db = getDb();
     await ensureTablesExist(db);
 
-    // 1. Fetch live prices from sfl.world
+    // 1. Fetch live prices from sfl.world (0 database reads)
     const response = await fetch("https://sfl.world/api/v1/prices", {
       headers: {
         "User-Agent": "Mozilla/5.0 (compatible; SunChart/1.0; +https://sunchart.app)",
@@ -50,7 +52,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ message: "No prices returned from source.", raw: data });
     }
 
-    // 2. Batch insert new prices (preserving full raw decimal precision)
+    // 2. Batch insert new prices for time-series charts (write only - 0 reads)
     const batchStatements = latestPrices.map(item => ({
       sql: `INSERT INTO resource_prices (item_name, price, recorded_at)
             VALUES (?, ?, datetime('now'));`,
@@ -61,7 +63,7 @@ export default async function handler(req, res) {
       await db.batch(batchStatements);
     }
 
-    // 3. Update market_cache with latest prices
+    // 3. Update market_cache with latest prices (write only - 0 reads)
     await db.execute({
       sql: `INSERT INTO market_cache (key, payload, updated_at)
             VALUES ('prices', ?, datetime('now'))
@@ -70,39 +72,36 @@ export default async function handler(req, res) {
       args: [JSON.stringify(latestPrices)],
     });
 
-    // 4. Compute Movers against 12H-24H baseline
-    let pastRes = await db.execute(`
-      SELECT item_name, price AS past_price
-      FROM (
-        SELECT item_name, price,
-               ROW_NUMBER() OVER (PARTITION BY item_name ORDER BY recorded_at DESC) as rn
-        FROM resource_prices
-        WHERE recorded_at <= datetime('now', '-12 hours')
-      )
-      WHERE rn = 1;
-    `);
+    // 4. Ultra-Lean 12H Movers: Read cached 12H baseline (Exactly 1 row read from market_cache)
+    const baselineRes = await db.execute(
+      "SELECT payload FROM market_cache WHERE key = 'baseline_12h';"
+    );
 
-    // Fallback if no records older than 12h exist yet
-    if (!pastRes.rows || pastRes.rows.length === 0) {
-      pastRes = await db.execute(`
-        SELECT item_name, price AS past_price
-        FROM (
-          SELECT item_name, price,
-                 ROW_NUMBER() OVER (PARTITION BY item_name ORDER BY recorded_at DESC) as rn
-          FROM resource_prices
-          WHERE recorded_at <= datetime('now', '-2 hours')
-        )
-        WHERE rn = 1;
-      `);
+    let baselineData = null;
+    if (baselineRes.rows.length > 0) {
+      try { baselineData = JSON.parse(baselineRes.rows[0].payload); } catch (_) {}
     }
 
-    const pastMap = {};
-    if (pastRes.rows) {
-      pastRes.rows.forEach(r => {
-        pastMap[r.item_name.toLowerCase()] = parseFloat(r.past_price);
+    const now = Date.now();
+    const currentPriceMap = {};
+    latestPrices.forEach(i => { currentPriceMap[i.name.toLowerCase()] = i.price; });
+
+    // Rotate or initialize baseline if missing or older than 12 hours
+    if (!baselineData || !baselineData.updated_at || (now - baselineData.updated_at) >= TWELVE_HOURS_MS) {
+      baselineData = {
+        updated_at: now,
+        prices: currentPriceMap
+      };
+      await db.execute({
+        sql: `INSERT INTO market_cache (key, payload, updated_at)
+              VALUES ('baseline_12h', ?, datetime('now'))
+              ON CONFLICT(key) DO UPDATE
+                SET payload = excluded.payload, updated_at = excluded.updated_at;`,
+        args: [JSON.stringify(baselineData)],
       });
     }
 
+    const pastMap = baselineData.prices || {};
     const gainers = [];
     const losers  = [];
     const unchanged = [];
@@ -131,13 +130,13 @@ export default async function handler(req, res) {
     gainers.sort((a, b) => b.changePct - a.changePct);
     losers.sort((a, b) => a.changePct - b.changePct);
 
-    // If market has low volatility, display stable items so dashboard is never empty
     if (gainers.length === 0 && losers.length === 0 && unchanged.length > 0) {
       gainers.push(...unchanged.slice(0, 15));
     }
 
     const moversPayload = { gainers, losers, changesMap };
 
+    // 5. Cache computed movers (write only - 0 reads)
     await db.execute({
       sql: `INSERT INTO market_cache (key, payload, updated_at)
             VALUES ('movers', ?, datetime('now'))
@@ -150,7 +149,8 @@ export default async function handler(req, res) {
       success: true,
       inserted: batchStatements.length,
       gainers: gainers.length,
-      losers: losers.length
+      losers: losers.length,
+      db_reads_used: 1
     });
 
   } catch (error) {
