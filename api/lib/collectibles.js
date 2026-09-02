@@ -50,9 +50,20 @@ export const MARKETPLACE_COLLECTIBLES_MAP = {
   "collectibles-665": "Salt",
   "collectibles-663": "Obsidian",
 
-  // Animal Resources (2)
+  // Animal Resources (7)
   "collectibles-605": "Egg",
   "collectibles-614": "Honey",
+  "collectibles-641": "Leather",
+  "collectibles-642": "Wool",
+  "collectibles-643": "Merino Wool",
+  "collectibles-644": "Feather",
+  "collectibles-645": "Milk",
+
+  // Faction Emblems (4)
+  "collectibles-741": "Goblin Emblem",
+  "collectibles-742": "Bumpkin Emblem",
+  "collectibles-743": "Sunflorian Emblem",
+  "collectibles-744": "Nightshade Emblem",
 };
 
 const DEFAULT_API_KEY = "sfl.ODQ3Mjg4MzcwNjQwMzkxNA.v4YoA_Owx6hbEti3N0xcgEIFjPa1qvtXURVO013TYD4";
