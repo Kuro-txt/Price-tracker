@@ -49,6 +49,10 @@ export const MARKETPLACE_COLLECTIBLES_MAP = {
   "collectibles-636": "Crimstone",
   "collectibles-665": "Salt",
   "collectibles-663": "Obsidian",
+
+  // Animal Resources (2)
+  "collectibles-605": "Egg",
+  "collectibles-614": "Honey",
 };
 
 const DEFAULT_API_KEY = "sfl.ODQ3Mjg4MzcwNjQwMzkxNA.v4YoA_Owx6hbEti3N0xcgEIFjPa1qvtXURVO013TYD4";
