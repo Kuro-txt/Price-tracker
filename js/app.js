@@ -303,13 +303,13 @@ function renderMovers(allGainers, allLosers) {
 
     if (gainersList) {
         gainersList.innerHTML = _lastGainers.length === 0
-            ? `<span class="text-[11px] text-[#6d5e4d] dark:text-zinc-400 font-bold italic py-1">Market is stable (no gains)</span>`
+            ? `<span class="text-[11px] text-[#6d5e4d] dark:text-zinc-400 font-bold italic py-1">No gainers in last 12h</span>`
             : _lastGainers.map(item => buildMoverRow(item, true)).join("");
     }
 
     if (losersList) {
         losersList.innerHTML = _lastLosers.length === 0
-            ? `<span class="text-[11px] text-[#6d5e4d] dark:text-zinc-400 font-bold italic py-1">Market is stable (no drops)</span>`
+            ? `<span class="text-[11px] text-[#6d5e4d] dark:text-zinc-400 font-bold italic py-1">No losers in last 12h</span>`
             : _lastLosers.map(item => buildMoverRow(item, false)).join("");
     }
 }
