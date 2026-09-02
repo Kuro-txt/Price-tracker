@@ -283,12 +283,20 @@ function renderChart() {
         updatePriceChangeBadge(startPrice, currentPrice);
     }
 
-    const minPrice   = Math.min(...prices);
-    const maxPrice   = Math.max(...prices);
-    const priceRange = Math.max(maxPrice - minPrice, 0.000001);
-    const margin     = priceRange * 0.15 * yPaddingMultiplier;
-    const yMin       = Math.max(0, minPrice - margin);
-    const yMax       = maxPrice + margin;
+    const minPrice = Math.min(...prices);
+    const maxPrice = Math.max(...prices);
+    let yMin, yMax;
+
+    if (minPrice === maxPrice || (maxPrice - minPrice) < 0.00000001) {
+        const pad = minPrice > 0 ? minPrice * 0.1 : 0.0001;
+        yMin = Math.max(0, minPrice - pad);
+        yMax = maxPrice + pad;
+    } else {
+        const priceRange = maxPrice - minPrice;
+        const margin     = priceRange * 0.15 * yPaddingMultiplier;
+        yMin = Math.max(0, minPrice - margin);
+        yMax = maxPrice + margin;
+    }
 
     if (chartInstance) chartInstance.destroy();
 
