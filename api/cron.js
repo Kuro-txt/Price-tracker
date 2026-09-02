@@ -26,8 +26,6 @@ function parseSflPrices(json) {
   return result;
 }
 
-const TWELVE_HOURS_MS = 12 * 60 * 60 * 1000;
-
 export default async function handler(req, res) {
   try {
     const db = getDb();
@@ -72,66 +70,38 @@ export default async function handler(req, res) {
       args: [JSON.stringify(latestPrices)],
     });
 
-    // 4. Ultra-Lean 12H Movers: Read cached 12H baseline (1 row read from market_cache)
-    const baselineRes = await db.execute(
-      "SELECT payload FROM market_cache WHERE key = 'baseline_12h';"
-    );
+    // 4. Strictly 12H Movers: Query baseline recorded between 12 and 16 hours ago
+    // Narrow time window minimizes database read scans
+    let pastQuery = await db.execute(`
+      SELECT item_name, price
+      FROM (
+        SELECT item_name, price,
+               ROW_NUMBER() OVER (PARTITION BY item_name ORDER BY recorded_at DESC) as rn
+        FROM resource_prices
+        WHERE recorded_at <= datetime('now', '-12 hours')
+          AND recorded_at >= datetime('now', '-16 hours')
+      )
+      WHERE rn = 1;
+    `);
 
-    let baselineData = null;
-    if (baselineRes.rows.length > 0) {
-      try { baselineData = JSON.parse(baselineRes.rows[0].payload); } catch (_) {}
-    }
-
-    const now = Date.now();
-    let pastMap = (baselineData && baselineData.prices) ? baselineData.prices : null;
-
-    // Refresh 12H baseline if missing or older than 12 hours
-    if (!pastMap || !baselineData || !baselineData.updated_at || (now - baselineData.updated_at) >= TWELVE_HOURS_MS) {
-      // Query exactly 12 hours ago with narrow window to minimize row scans
-      let pastQuery = await db.execute(`
+    // Fallback if there was a recording gap at exactly 12-16h ago
+    if (!pastQuery.rows || pastQuery.rows.length === 0) {
+      pastQuery = await db.execute(`
         SELECT item_name, price
         FROM (
           SELECT item_name, price,
                  ROW_NUMBER() OVER (PARTITION BY item_name ORDER BY recorded_at DESC) as rn
           FROM resource_prices
           WHERE recorded_at <= datetime('now', '-12 hours')
-            AND recorded_at >= datetime('now', '-16 hours')
         )
         WHERE rn = 1;
       `);
+    }
 
-      if (!pastQuery.rows || pastQuery.rows.length === 0) {
-        pastQuery = await db.execute(`
-          SELECT item_name, price
-          FROM (
-            SELECT item_name, price,
-                   ROW_NUMBER() OVER (PARTITION BY item_name ORDER BY recorded_at DESC) as rn
-            FROM resource_prices
-            WHERE recorded_at <= datetime('now', '-12 hours')
-          )
-          WHERE rn = 1;
-        `);
-      }
-
-      const newPastMap = {};
-      if (pastQuery.rows && pastQuery.rows.length > 0) {
-        pastQuery.rows.forEach(r => {
-          newPastMap[r.item_name.toLowerCase()] = parseFloat(r.price);
-        });
-      }
-
-      pastMap = newPastMap;
-      baselineData = {
-        updated_at: now,
-        prices: newPastMap
-      };
-
-      await db.execute({
-        sql: `INSERT INTO market_cache (key, payload, updated_at)
-              VALUES ('baseline_12h', ?, datetime('now'))
-              ON CONFLICT(key) DO UPDATE
-                SET payload = excluded.payload, updated_at = excluded.updated_at;`,
-        args: [JSON.stringify(baselineData)],
+    const pastMap = {};
+    if (pastQuery.rows && pastQuery.rows.length > 0) {
+      pastQuery.rows.forEach(r => {
+        pastMap[r.item_name.toLowerCase()] = parseFloat(r.price);
       });
     }
 
@@ -155,7 +125,7 @@ export default async function handler(req, res) {
 
       changesMap[lower] = moverItem;
 
-      // Strict 12H movers filter: only true gainers (> 0%) and true losers (< 0%)
+      // Strictly 12H movers: only positive gains in gainers, negative in losers
       if (changePct > 0.001) {
         gainers.push(moverItem);
       } else if (changePct < -0.001) {
@@ -168,7 +138,7 @@ export default async function handler(req, res) {
 
     const moversPayload = { gainers, losers, changesMap };
 
-    // 5. Cache computed movers (write only - 0 reads)
+    // 5. Cache computed 12H movers (write only - 0 reads)
     await db.execute({
       sql: `INSERT INTO market_cache (key, payload, updated_at)
             VALUES ('movers', ?, datetime('now'))
@@ -179,10 +149,10 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       success: true,
+      window: "12h",
       inserted: batchStatements.length,
       gainers: gainers.length,
-      losers: losers.length,
-      db_reads_used: 1
+      losers: losers.length
     });
 
   } catch (error) {
