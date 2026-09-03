@@ -38,6 +38,7 @@ export default async function handler(req, res) {
     let hourlySnapshots = [];
     let pastMap = {};
     let readsUsed = 1;
+    let snapshotsChanged = false;
 
     try {
       const snapRes = await db.execute(
@@ -95,6 +96,7 @@ export default async function handler(req, res) {
             timestamp: now - TWELVE_HOURS_MS,
             prices: pastMap
           });
+          snapshotsChanged = true;
         }
       } catch (seedErr) {
         console.warn("[cron] Seed baseline error:", seedErr.message);
@@ -123,6 +125,7 @@ export default async function handler(req, res) {
               pastMap[k] = parseFloat(r.price);
             }
           });
+          snapshotsChanged = true;
         }
       } catch (_) {}
     }
@@ -137,7 +140,10 @@ export default async function handler(req, res) {
         timestamp: now,
         prices: currentPriceMap
       });
+      snapshotsChanged = true;
+    }
 
+    if (snapshotsChanged) {
       // Keep only snapshots within the last 18 hours
       hourlySnapshots = hourlySnapshots.filter(s => (now - s.timestamp) <= EIGHTEEN_HOURS_MS);
 
