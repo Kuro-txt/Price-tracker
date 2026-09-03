@@ -34,10 +34,10 @@ export default async function handler(req, res) {
       currentPriceMap[item.name.toLowerCase()] = parseFloat(item.price);
     });
 
-    // 3. Ultra-Lean 12H Movers Engine (EXACTLY 1 DB READ via market_cache)
-    // Avoids scanning 35,000+ rows with window functions in resource_prices.
+    // 3. Ultra-Lean 12H Movers Engine (reads from cached snapshots buffer)
     let hourlySnapshots = [];
     let pastMap = {};
+    let readsUsed = 1;
 
     try {
       const snapRes = await db.execute(
@@ -50,23 +50,81 @@ export default async function handler(req, res) {
 
     const now = Date.now();
 
+    // Look for a snapshot that is genuinely around 12 hours old (between 8h and 16h)
     if (Array.isArray(hourlySnapshots) && hourlySnapshots.length > 0) {
-      // Find the snapshot closest to 12 hours ago
       const targetTime = now - TWELVE_HOURS_MS;
       let closestSnap = null;
       let minDiff = Infinity;
 
       for (const snap of hourlySnapshots) {
-        const diff = Math.abs(snap.timestamp - targetTime);
-        if (diff < minDiff) {
-          minDiff = diff;
-          closestSnap = snap;
+        const age = now - snap.timestamp;
+        // Accept snapshots between 6h and 18h old
+        if (age >= 6 * 3600 * 1000 && age <= 18 * 3600 * 1000) {
+          const diff = Math.abs(snap.timestamp - targetTime);
+          if (diff < minDiff) {
+            minDiff = diff;
+            closestSnap = snap;
+          }
         }
       }
 
       if (closestSnap && closestSnap.prices) {
         pastMap = closestSnap.prices;
       }
+    }
+
+    // Fallback: If hourlySnapshots does not yet have a 12h-old snapshot, seed once from DB
+    if (Object.keys(pastMap).length === 0) {
+      try {
+        const seedRes = await db.execute(`
+          SELECT item_name, price
+          FROM resource_prices
+          WHERE datetime(recorded_at) >= datetime('now', '-14 hours')
+            AND datetime(recorded_at) <= datetime('now', '-10 hours')
+          GROUP BY item_name;
+        `);
+        readsUsed += (seedRes.rows ? seedRes.rows.length : 0);
+
+        if (seedRes.rows && seedRes.rows.length > 0) {
+          seedRes.rows.forEach(r => {
+            pastMap[r.item_name.toLowerCase()] = parseFloat(r.price);
+          });
+
+          // Seed this 12-hour snapshot directly into hourlySnapshots so subsequent runs use 1 read!
+          hourlySnapshots.unshift({
+            timestamp: now - TWELVE_HOURS_MS,
+            prices: pastMap
+          });
+        }
+      } catch (seedErr) {
+        console.warn("[cron] Seed baseline error:", seedErr.message);
+      }
+    }
+
+    // Fallback 2: If still empty (e.g. items added recently), use oldest recorded in last 24h
+    if (Object.keys(pastMap).length < latestPrices.length / 2) {
+      try {
+        const oldRes = await db.execute(`
+          SELECT item_name, price
+          FROM (
+            SELECT item_name, price,
+                   ROW_NUMBER() OVER (PARTITION BY item_name ORDER BY recorded_at ASC) as rn
+            FROM resource_prices
+            WHERE datetime(recorded_at) >= datetime('now', '-24 hours')
+          )
+          WHERE rn = 1;
+        `);
+        readsUsed += (oldRes.rows ? oldRes.rows.length : 0);
+
+        if (oldRes.rows && oldRes.rows.length > 0) {
+          oldRes.rows.forEach(r => {
+            const k = r.item_name.toLowerCase();
+            if (pastMap[k] === undefined) {
+              pastMap[k] = parseFloat(r.price);
+            }
+          });
+        }
+      } catch (_) {}
     }
 
     // Append new hourly snapshot if >= 45 minutes have elapsed since the last one
@@ -154,7 +212,7 @@ export default async function handler(req, res) {
       inserted: batchStatements.length,
       gainers: gainers.length,
       losers: losers.length,
-      reads_used: 1
+      reads_used: readsUsed
     });
 
   } catch (error) {
