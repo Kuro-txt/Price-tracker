@@ -1,12 +1,12 @@
 import { getDb, ensureTablesExist } from "./lib/db.js";
 import { fetchLiveMarketPrices } from "./lib/collectibles.js";
 
-const TEN_MINUTES_MS = 10 * 60 * 1000;
+const FIFTEEN_MINUTES_MS = 15 * 60 * 1000;
 
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
-  // Global Edge CDN cache: Vercel serves market data for 60s across all global visitors with 0 Turso reads
-  res.setHeader("Cache-Control", "public, s-maxage=60, stale-while-revalidate=120");
+  // Global Edge CDN cache: Vercel serves market data for 90s across all global visitors with 0 Turso reads
+  res.setHeader("Cache-Control", "public, s-maxage=90, stale-while-revalidate=180");
 
   let prices = [];
   let movers = { gainers: [], losers: [], changesMap: {} };
@@ -37,8 +37,8 @@ export default async function handler(req, res) {
   }
 
   const now = Date.now();
-  // If cache is empty or older than 10 minutes, trigger self-healing auto-sync
-  if (!prices || prices.length === 0 || (now - lastUpdated) > TEN_MINUTES_MS) {
+  // If cache is empty or older than 15 minutes, trigger self-healing auto-sync
+  if (!prices || prices.length === 0 || (now - lastUpdated) > FIFTEEN_MINUTES_MS) {
     cacheStale = true;
   }
 

@@ -148,27 +148,40 @@ function resetSlideView() {
     if (fullHistoryData.length > 0) renderChart();
 }
 
+const clientHistoryCache = new Map();
+const CLIENT_CACHE_TTL   = 3 * 60 * 1000; // 3 minutes
+
 async function loadItemHistoryGraph(itemName) {
     const spinner = document.getElementById("chartSpinner");
-    if (spinner) spinner.classList.remove("hidden");
-
     let historyData = [];
 
-    // Step 1: Try fetching history from API
-    try {
-        const res = await fetch(`/api/history?item=${encodeURIComponent(itemName)}&range=${selectedRange}`);
-        if (res.ok) {
-            const text = await res.text();
-            try {
-                const raw = JSON.parse(text);
-                if (Array.isArray(raw)) historyData = raw;
-                else if (raw && Array.isArray(raw.rows)) historyData = raw.rows;
-            } catch (_) {}
+    const cacheKey = `${itemName}:${selectedRange}`;
+    const cached = clientHistoryCache.get(cacheKey);
+    const now = Date.now();
+
+    if (cached && (now - cached.timestamp) < CLIENT_CACHE_TTL && Array.isArray(cached.data) && cached.data.length > 0) {
+        historyData = cached.data;
+    } else {
+        if (spinner) spinner.classList.remove("hidden");
+        // Step 1: Try fetching history from API
+        try {
+            const res = await fetch(`/api/history?item=${encodeURIComponent(itemName)}&range=${selectedRange}`);
+            if (res.ok) {
+                const text = await res.text();
+                try {
+                    const raw = JSON.parse(text);
+                    if (Array.isArray(raw)) historyData = raw;
+                    else if (raw && Array.isArray(raw.rows)) historyData = raw.rows;
+                } catch (_) {}
+            }
+            if (historyData && historyData.length > 0) {
+                clientHistoryCache.set(cacheKey, { timestamp: now, data: historyData });
+            }
+        } catch (err) {
+            console.warn("[chart] History fetch warning:", err.message);
+        } finally {
+            if (spinner) spinner.classList.add("hidden");
         }
-    } catch (err) {
-        console.warn("[chart] History fetch warning:", err.message);
-    } finally {
-        if (spinner) spinner.classList.add("hidden");
     }
 
     // Step 2: If API returned empty (e.g. initial setup or SSO active), load local series
