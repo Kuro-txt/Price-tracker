@@ -151,7 +151,10 @@
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                     <div class="bg-emerald-500/10 dark:bg-emerald-950/20 border border-emerald-600/25 dark:border-emerald-500/20 rounded-xl p-2.5 space-y-1.5">
                         <div class="text-[10px] font-black text-emerald-900 dark:text-emerald-400 uppercase tracking-wide flex items-center justify-between">
-                            <span>🌱 Gainers</span>
+                            <span class="flex items-center gap-1.5">
+                                🌱 Gainers
+                                <span id="gainersCountBadge" class="px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-900 dark:text-emerald-300 font-mono text-[9px]">0</span>
+                            </span>
                             <span class="text-[9px] font-mono opacity-70">Pulsing dot = ±5%+</span>
                         </div>
                         <div id="gainersList" class="space-y-1 max-h-80 overflow-y-auto no-scrollbar">
@@ -160,7 +163,10 @@
                     </div>
                     <div class="bg-rose-500/10 dark:bg-rose-950/20 border border-rose-600/25 dark:border-rose-500/20 rounded-xl p-2.5 space-y-1.5">
                         <div class="text-[10px] font-black text-rose-900 dark:text-rose-400 uppercase tracking-wide flex items-center justify-between">
-                            <span>🍂 Losers</span>
+                            <span class="flex items-center gap-1.5">
+                                🍂 Losers
+                                <span id="losersCountBadge" class="px-1.5 py-0.5 rounded-full bg-rose-500/20 text-rose-900 dark:text-rose-300 font-mono text-[9px]">0</span>
+                            </span>
                             <span class="text-[9px] font-mono opacity-70">Tap to inspect</span>
                         </div>
                         <div id="losersList" class="space-y-1 max-h-80 overflow-y-auto no-scrollbar">

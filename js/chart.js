@@ -14,7 +14,7 @@ let dragStartYPadding  = 1.0;
 
 let gesturesAttached = false;
 
-const LOCKED_STRETCH_RANGES = ["6h", "12h", "24h", "7d"];
+const LOCKED_STRETCH_RANGES = ["6h", "12h", "24h", "7d", "30d", "90d", "all"];
 
 // ─── 4 Seasons in Exact Order: Spring -> Summer -> Autumn -> Winter ──────────
 const SEASONS = [

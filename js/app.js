@@ -262,7 +262,12 @@ function renderMovers(allGainers, allLosers) {
 
     const gainersList = document.getElementById("gainersList");
     const losersList  = document.getElementById("losersList");
-    const badge       = document.getElementById("moversCountBadge");
+    const badge        = document.getElementById("moversCountBadge");
+    const gainersBadge = document.getElementById("gainersCountBadge");
+    const losersBadge  = document.getElementById("losersCountBadge");
+
+    if (gainersBadge) gainersBadge.innerText = _lastGainers.length;
+    if (losersBadge)  losersBadge.innerText  = _lastLosers.length;
 
     const total = _lastGainers.length + _lastLosers.length;
     if (badge) {
