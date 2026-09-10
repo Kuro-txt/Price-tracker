@@ -1,5 +1,36 @@
 import { getDb } from "./lib/db.js";
 
+function hasFullData(range, rows) {
+  if (!rows || rows.length === 0) return false;
+
+  const now = Date.now();
+  const oldestTime = new Date(rows[0].recorded_at).getTime();
+  if (isNaN(oldestTime)) return false;
+
+  const spanDays = (now - oldestTime) / (1000 * 60 * 60 * 24);
+
+  switch (range) {
+    case "7d":
+      // Must cover at least 6.5 days AND have at least 140 hourly points
+      return spanDays >= 6.5 && rows.length >= 140;
+
+    case "30d":
+      // Must cover at least 28 days AND have at least 600 hourly points
+      return spanDays >= 28 && rows.length >= 600;
+
+    case "90d":
+      // Must cover at least 85 days AND have at least 75 daily points
+      return spanDays >= 85 && rows.length >= 75;
+
+    case "all":
+      // Must span at least 180 days AND have at least 150 daily points
+      return spanDays >= 180 && rows.length >= 150;
+
+    default:
+      return true;
+  }
+}
+
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
 
@@ -85,12 +116,10 @@ export default async function handler(req, res) {
     let result = await db.execute({ sql, args: [item, timeModifier] });
     let rows = result.rows || [];
 
-    // Fallback: rollup tables are sparse right after deploy (only a few rows).
-    // Fall back to raw resource_prices until each rollup has enough coverage:
-    //   price_hourly: need ≥ 48 rows to confidently cover 2+ days (7d / 30d)
-    //   price_daily:  need ≥  7 rows to confidently cover 1+ week (90d / all)
-    const minRows = { "7d": 48, "30d": 48, "90d": 7, "all": 7 };
-    const needsFallback = (range in minRows) && rows.length < minRows[range];
+    // Fallback: until rollup tables accumulate genuine full history,
+    // fallback to raw resource_prices so charts always show complete data.
+    const rollupRanges = ["7d", "30d", "90d", "all"];
+    const needsFallback = rollupRanges.includes(range) && !hasFullData(range, rows);
 
     if (needsFallback) {
       const rawLimit = range === "all" ? 2000 : 1500;
