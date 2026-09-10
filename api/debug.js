@@ -3,48 +3,55 @@ import { getDb } from "./lib/db.js";
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
 
-  const report = {
-    node_version: process.version,
-    env_turso_url_set: !!process.env.TURSO_DATABASE_URL,
-    env_turso_token_set: !!process.env.TURSO_AUTH_TOKEN,
-    db_connection: "not tested",
-    db_error: null,
-  };
+  const report = {};
 
   try {
-    if (!process.env.TURSO_DATABASE_URL) {
-      report.db_connection = "skipped - TURSO_DATABASE_URL not set";
-      return res.status(200).json(report);
-    }
-
     const db = getDb();
 
-    const tablesRes = await db.execute(
-      `SELECT name FROM sqlite_master WHERE type='table' ORDER BY name;`
-    );
-    report.tables = tablesRes.rows.map(r => r.name);
-    report.db_connection = "success";
+    // 1. Check existing indexes
+    const idxRes = await db.execute("PRAGMA index_list('resource_prices');");
+    report.indexes = idxRes.rows;
 
-    // Test pastRes baseline query:
-    const pastRes = await db.execute(`
-      SELECT item_name, price AS past_price, recorded_at
-      FROM (
-        SELECT item_name, price, recorded_at,
-               ROW_NUMBER() OVER (PARTITION BY item_name ORDER BY recorded_at DESC) as rn
-        FROM resource_prices
-        WHERE recorded_at <= datetime('now', '-12 hours')
-          AND recorded_at >= datetime('now', '-16 hours')
-      )
-      WHERE rn = 1;
-    `);
+    // 2. Explain query plan for the 30d query
+    const explain30d = await db.execute({
+      sql: `EXPLAIN QUERY PLAN
+            SELECT price, recorded_at
+            FROM resource_prices
+            WHERE item_name = ? COLLATE NOCASE
+              AND datetime(recorded_at) >= datetime('now', '-30 days')
+            GROUP BY strftime('%Y-%m-%d %H:00', recorded_at)
+            ORDER BY recorded_at ASC
+            LIMIT 1000;`,
+      args: ["Sunflower"]
+    });
+    report.explain_30d = explain30d.rows;
 
-    report.past_items_found = pastRes.rows.length;
-    report.sample_past_items = pastRes.rows.slice(0, 10);
+    // 3. Explain query plan without GROUP BY
+    const explainNoGroup = await db.execute({
+      sql: `EXPLAIN QUERY PLAN
+            SELECT price, recorded_at
+            FROM resource_prices
+            WHERE item_name = ? COLLATE NOCASE
+              AND recorded_at >= datetime('now', '-30 days')
+            ORDER BY recorded_at ASC
+            LIMIT 1000;`,
+      args: ["Sunflower"]
+    });
+    report.explain_no_group = explainNoGroup.rows;
 
+    // 4. Check row count for Sunflower
+    const countRes = await db.execute({
+      sql: "SELECT count(*) as count FROM resource_prices WHERE item_name = 'Sunflower';",
+      args: []
+    });
+    report.sunflower_rows = countRes.rows[0];
+
+    // 5. Total rows in resource_prices
+    const totalRes = await db.execute("SELECT count(*) as total FROM resource_prices;");
+    report.total_rows = totalRes.rows[0];
+
+    return res.status(200).json(report);
   } catch (err) {
-    report.db_connection = "failed";
-    report.db_error = err.message;
+    return res.status(500).json({ error: err.message });
   }
-
-  return res.status(200).json(report);
 }
