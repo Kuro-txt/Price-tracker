@@ -1,0 +1,22 @@
+{
+  "headers": [
+    {
+      "source": "/api/history",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, s-maxage=600, stale-while-revalidate=1200"
+        }
+      ]
+    },
+    {
+      "source": "/api/market",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, s-maxage=90, stale-while-revalidate=180"
+        }
+      ]
+    }
+  ]
+}
