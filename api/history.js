@@ -85,10 +85,15 @@ export default async function handler(req, res) {
     let result = await db.execute({ sql, args: [item, timeModifier] });
     let rows = result.rows || [];
 
-    // Fallback: if hourly/daily tables have no data yet (brand-new tables),
-    // fall back to raw resource_prices so charts still work on first deploy.
-    if (rows.length === 0 && (range === "7d" || range === "30d" || range === "90d" || range === "all")) {
-      const rawLimit = range === "all" ? 2000 : range === "90d" ? 1500 : 1500;
+    // Fallback: rollup tables are sparse right after deploy (only a few rows).
+    // Fall back to raw resource_prices until each rollup has enough coverage:
+    //   price_hourly: need ≥ 48 rows to confidently cover 2+ days (7d / 30d)
+    //   price_daily:  need ≥  7 rows to confidently cover 1+ week (90d / all)
+    const minRows = { "7d": 48, "30d": 48, "90d": 7, "all": 7 };
+    const needsFallback = (range in minRows) && rows.length < minRows[range];
+
+    if (needsFallback) {
+      const rawLimit = range === "all" ? 2000 : 1500;
       const fallback = await db.execute({
         sql: `
           SELECT price,
