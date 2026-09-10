@@ -28,6 +28,27 @@ export default async function handler(req, res) {
       await db.batch(batchStatements);
     }
 
+    // 2b. Upsert into hourly + daily rollup tables (write only - 0 reads)
+    // price_hourly: one row per (item, UTC hour) — updated on each cron run within the same hour
+    // price_daily:  one row per (item, UTC date) — updated on each cron run within the same day
+    const hourlySql = `
+      INSERT INTO price_hourly (item_name, avg_price, hour_at)
+      VALUES (?, ?, strftime('%Y-%m-%dT%H:00:00Z', 'now'))
+      ON CONFLICT(item_name, hour_at) DO UPDATE SET avg_price = excluded.avg_price;`;
+    const dailySql = `
+      INSERT INTO price_daily (item_name, avg_price, day_at)
+      VALUES (?, ?, strftime('%Y-%m-%d', 'now'))
+      ON CONFLICT(item_name, day_at) DO UPDATE SET avg_price = excluded.avg_price;`;
+
+    const rollupStatements = latestPrices.flatMap(item => [
+      { sql: hourlySql, args: [item.name, parseFloat(item.price)] },
+      { sql: dailySql,  args: [item.name, parseFloat(item.price)] },
+    ]);
+
+    if (rollupStatements.length > 0) {
+      await db.batch(rollupStatements);
+    }
+
     // Current price lookup dictionary
     const currentPriceMap = {};
     latestPrices.forEach(item => {
