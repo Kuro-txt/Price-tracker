@@ -13,17 +13,18 @@ export default async function handler(req, res) {
   };
   const timeModifier = timeModifiers[range] ?? "-24 hours";
 
-  // Encompasses the full timeframe while preventing oversized payloads
+  // Encompasses the full timeframe without truncation
+  // 6h = 24 points, 12h = 48 points, 24h = 96 points, 7d = 672 points
   const rangeLimits = {
-    "6h": 80,
-    "12h": 120,
-    "24h": 200,
-    "7d": 600,
-    "30d": 800,
+    "6h": 100,
+    "12h": 150,
+    "24h": 250,
+    "7d": 800,
+    "30d": 1000,
     "90d": 1000,
-    "all": 1200,
+    "all": 1500,
   };
-  const safeLimit = Number(rangeLimits[range]) || 200;
+  const safeLimit = Number(rangeLimits[range]) || 250;
 
   // Ultra-Lean Read Optimization:
   // Edge CDN caching: Longer ranges change very slowly.
@@ -47,10 +48,55 @@ export default async function handler(req, res) {
 
     const db = getDb();
 
-    // Uses idx_item_time_nocase directly (item_name COLLATE NOCASE, recorded_at ASC)
-    // Avoids wrapping recorded_at in functions so SQLite performs an O(log N) index seek
-    const result = await db.execute({
-      sql: `
+    let sql;
+    if (range === "30d") {
+      // 1-hour downsampling: guarantees all 30 days are fully displayed across ~720 points
+      sql = `
+        SELECT price,
+               CASE 
+                 WHEN recorded_at LIKE '%T%Z' THEN recorded_at
+                 ELSE strftime('%Y-%m-%dT%H:%M:%SZ', recorded_at)
+               END AS recorded_at
+        FROM resource_prices
+        WHERE item_name = ? COLLATE NOCASE
+          AND datetime(recorded_at) >= datetime('now', ?)
+        GROUP BY strftime('%Y-%m-%d %H:00', recorded_at)
+        ORDER BY recorded_at ASC
+        LIMIT ${safeLimit};
+      `;
+    } else if (range === "90d") {
+      // 3-hour downsampling: guarantees all 90 days are fully displayed across ~720 points
+      sql = `
+        SELECT price,
+               CASE 
+                 WHEN recorded_at LIKE '%T%Z' THEN recorded_at
+                 ELSE strftime('%Y-%m-%dT%H:%M:%SZ', recorded_at)
+               END AS recorded_at
+        FROM resource_prices
+        WHERE item_name = ? COLLATE NOCASE
+          AND datetime(recorded_at) >= datetime('now', ?)
+        GROUP BY strftime('%Y-%m-%d ', recorded_at) || printf('%02d', (CAST(strftime('%H', recorded_at) AS INTEGER) / 3) * 3)
+        ORDER BY recorded_at ASC
+        LIMIT ${safeLimit};
+      `;
+    } else if (range === "all") {
+      // 6-hour downsampling: encompasses entire available history
+      sql = `
+        SELECT price,
+               CASE 
+                 WHEN recorded_at LIKE '%T%Z' THEN recorded_at
+                 ELSE strftime('%Y-%m-%dT%H:%M:%SZ', recorded_at)
+               END AS recorded_at
+        FROM resource_prices
+        WHERE item_name = ? COLLATE NOCASE
+          AND datetime(recorded_at) >= datetime('now', ?)
+        GROUP BY strftime('%Y-%m-%d ', recorded_at) || printf('%02d', (CAST(strftime('%H', recorded_at) AS INTEGER) / 6) * 6)
+        ORDER BY recorded_at ASC
+        LIMIT ${safeLimit};
+      `;
+    } else {
+      // Full 15-minute resolution for 6h, 12h, 24h, 7d
+      sql = `
         SELECT price,
                CASE 
                  WHEN recorded_at LIKE '%T%Z' THEN recorded_at
@@ -60,12 +106,16 @@ export default async function handler(req, res) {
           SELECT price, recorded_at
           FROM resource_prices
           WHERE item_name = ? COLLATE NOCASE
-            AND recorded_at >= datetime('now', ?)
+            AND datetime(recorded_at) >= datetime('now', ?)
           ORDER BY recorded_at DESC
           LIMIT ${safeLimit}
         )
         ORDER BY recorded_at ASC;
-      `,
+      `;
+    }
+
+    const result = await db.execute({
+      sql,
       args: [item, timeModifier],
     });
 
