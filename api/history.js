@@ -15,16 +15,17 @@ function hasFullData(range, rows) {
       return spanDays >= 6.5 && rows.length >= 140;
 
     case "30d":
-      // Must cover at least 28 days AND have at least 600 hourly points
-      return spanDays >= 28 && rows.length >= 600;
+      // Covers at least 28 days (with >=600 rows) OR spans all the way back to the start of tracking (August 2026)
+      if (spanDays >= 28 && rows.length >= 600) return true;
+      if (rows.length >= 350 && rows[0].recorded_at <= "2026-08-28T00:00:00Z") return true;
+      return false;
 
     case "90d":
-      // Must cover at least 85 days AND have at least 75 daily points
-      return spanDays >= 85 && rows.length >= 75;
-
     case "all":
-      // Must span at least 180 days AND have at least 150 daily points
-      return spanDays >= 180 && rows.length >= 150;
+      // Covers requested span OR spans all the way back to the start of tracking (August 2026)
+      if (spanDays >= 85 && rows.length >= 75) return true;
+      if (rows.length >= 20 && rows[0].recorded_at <= "2026-08-28T00:00:00Z") return true;
+      return false;
 
     default:
       return true;
@@ -122,7 +123,7 @@ export default async function handler(req, res) {
     const needsFallback = rollupRanges.includes(range) && !hasFullData(range, rows);
 
     if (needsFallback) {
-      const rawLimit = range === "all" ? 2000 : 1500;
+      const rawLimit = range === "all" ? 5000 : 3500;
       const fallback = await db.execute({
         sql: `
           SELECT price,
