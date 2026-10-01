@@ -50,6 +50,21 @@ export default async function handler(req, res) {
       await db.batch(rollupStatements);
     }
 
+    // 2c. Automated Rolling Retention: prune raw points older than 8 days once daily (at 00 UTC)
+    // Keeps resource_prices capped at ~50k rows forever (0 DB reads - pure write)
+    const currentUtcHour = new Date().getUTCHours();
+    const currentUtcMin  = new Date().getUTCMinutes();
+    if (currentUtcHour === 0 && currentUtcMin < 20) {
+      try {
+        await db.execute(`
+          DELETE FROM resource_prices
+          WHERE recorded_at < datetime('now', '-8 days');
+        `);
+      } catch (pruneErr) {
+        console.warn("[cron] Rolling retention prune warning:", pruneErr.message);
+      }
+    }
+
     // Current price lookup dictionary
     const currentPriceMap = {};
     latestPrices.forEach(item => {

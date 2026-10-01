@@ -95,6 +95,33 @@ export default async function handler(req, res) {
       };
     }
 
+    // 8. Storage management cleanup action: ?action=cleanup_storage
+    if (req.query.action === "cleanup_storage") {
+      const startMs = Date.now();
+
+      // Prune raw resource_prices older than 8 days
+      const pruneRes = await db.execute(`
+        DELETE FROM resource_prices
+        WHERE datetime(recorded_at) < datetime('now', '-8 days');
+      `);
+
+      // Drop 3 duplicate legacy indexes
+      await db.execute("DROP INDEX IF EXISTS idx_item_time;");
+      await db.execute("DROP INDEX IF EXISTS idx_resource_nocase;");
+      await db.execute("DROP INDEX IF EXISTS idx_resource_time;");
+
+      // Verify remaining indexes and row count
+      const remainingIdx = await db.execute("PRAGMA index_list('resource_prices');");
+      const remainingRows = await db.execute("SELECT count(*) as count FROM resource_prices;");
+
+      report.cleanup_storage = {
+        elapsed_ms: Date.now() - startMs,
+        rows_deleted: pruneRes.rowsAffected,
+        remaining_rows: remainingRows.rows[0].count,
+        remaining_indexes: remainingIdx.rows
+      };
+    }
+
     return res.status(200).json(report);
   } catch (err) {
     return res.status(500).json({ error: err.message });
