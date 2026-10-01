@@ -1,4 +1,4 @@
-const CACHE_NAME = "sunchart-v7";
+const CACHE_NAME = "sunchart-v8";
 const ASSETS = [
   "/",
   "/index.html",

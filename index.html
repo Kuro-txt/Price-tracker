@@ -139,12 +139,19 @@
         <div id="moversTabContent" class="space-y-2.5">
             <div class="glass-panel rounded-2xl p-3 space-y-2.5">
 
-                <!-- Header -->
+                <!-- Header with 12H / 24H Toggle -->
                 <div class="flex items-center justify-between gap-2 pb-2 border-b border-[#dfd4c0] dark:border-white/5">
-                    <span class="text-[11px] font-black uppercase tracking-wider text-[#241a12] dark:text-zinc-300 flex items-center gap-1.5">
-                        <i class="fa-solid fa-bolt text-amber-600 dark:text-amber-500 text-xs"></i> 12H Market Movers
-                    </span>
-                    <span class="text-[9px] text-[#6d5e4d] dark:text-zinc-400 font-bold">12-Hour shifts</span>
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <span class="text-[11px] font-black uppercase tracking-wider text-[#241a12] dark:text-zinc-300 flex items-center gap-1.5">
+                            <i class="fa-solid fa-bolt text-amber-600 dark:text-amber-500 text-xs"></i> <span id="moversTitleWindow">12H</span> Market Movers
+                        </span>
+                        <!-- 12H / 24H Toggle -->
+                        <div class="inline-flex items-center bg-[#ede3d1] dark:bg-white/5 border border-[#cbbeaa] dark:border-white/10 rounded-lg p-0.5 text-[9px] font-black">
+                            <button type="button" id="moverBtn12h" onclick="setMoversWindow('12h')" class="px-2 py-0.5 rounded-md transition active:scale-95 bg-amber-500 text-black shadow-xs font-black">12H</button>
+                            <button type="button" id="moverBtn24h" onclick="setMoversWindow('24h')" class="px-2 py-0.5 rounded-md transition active:scale-95 text-[#6d5e4d] dark:text-zinc-400 hover:text-amber-600 font-bold">24H</button>
+                        </div>
+                    </div>
+                    <span id="moversSubtitle" class="text-[9px] text-[#6d5e4d] dark:text-zinc-400 font-bold">12-Hour shifts</span>
                 </div>
 
                 <!-- Two-column all items mover lists (both scrollable) -->

@@ -7,6 +7,13 @@ let autoRefreshTimer = null;
 let currentTab       = "movers";
 let currentTaxRate   = 10.0;
 let movers12hMap     = {};
+let activeMoversMap  = {};
+let rawMoversData    = null;
+let currentMoversWindow = "12h";
+try {
+    const savedWin = localStorage.getItem("sunchart_movers_window");
+    if (savedWin === "12h" || savedWin === "24h") currentMoversWindow = savedWin;
+} catch (_) {}
 let _lastGainers     = [];
 let _lastLosers      = [];
 
@@ -216,16 +223,12 @@ async function fetchMarket() {
             } catch (_) {}
         }
 
-        movers12hMap = moversData.changesMap || {};
-        const gainers = Array.isArray(moversData.gainers) ? moversData.gainers : [];
-        const losers  = Array.isArray(moversData.losers)  ? moversData.losers  : [];
-
+        rawMoversData = moversData || {};
         loadingState?.classList.add("hidden");
         errorState?.classList.add("hidden");
 
         populateDropdown();
-        renderMovers(gainers, losers);
-        renderWatchlist();
+        updateMoversUI();
 
         if (window.activeItem) {
             const fresh = allItems.find(i => i.name.toLowerCase() === window.activeItem.name.toLowerCase());
@@ -254,6 +257,59 @@ async function fetchMarket() {
 window.fetchPrices = fetchMarket;
 window.fetchMovers = fetchMarket;
 window.fetchMarket = fetchMarket;
+
+// ─── Movers Window Toggle ───────────────────────────────────────────────────
+function setMoversWindow(win) {
+    if (win !== "12h" && win !== "24h") win = "12h";
+    currentMoversWindow = win;
+    try { localStorage.setItem("sunchart_movers_window", win); } catch (_) {}
+    updateMoversUI();
+}
+window.setMoversWindow = setMoversWindow;
+
+function updateMoversUI() {
+    const btn12    = document.getElementById("moverBtn12h");
+    const btn24    = document.getElementById("moverBtn24h");
+    const titleWin = document.getElementById("moversTitleWindow");
+    const subtitle = document.getElementById("moversSubtitle");
+
+    const activeClasses   = ["bg-amber-500", "text-black", "shadow-xs", "font-black"];
+    const inactiveClasses = ["text-[#6d5e4d]", "dark:text-zinc-400", "hover:text-amber-600", "font-bold"];
+
+    if (btn12 && btn24) {
+        if (currentMoversWindow === "12h") {
+            btn12.classList.add(...activeClasses);
+            btn12.classList.remove(...inactiveClasses);
+            btn24.classList.remove(...activeClasses);
+            btn24.classList.add(...inactiveClasses);
+        } else {
+            btn24.classList.add(...activeClasses);
+            btn24.classList.remove(...inactiveClasses);
+            btn12.classList.remove(...activeClasses);
+            btn12.classList.add(...inactiveClasses);
+        }
+    }
+
+    if (titleWin) titleWin.innerText = currentMoversWindow.toUpperCase();
+    if (subtitle) subtitle.innerText = currentMoversWindow === "12h" ? "12-Hour shifts" : "24-Hour shifts";
+
+    let winData = null;
+    if (rawMoversData) {
+        if (rawMoversData[currentMoversWindow]) {
+            winData = rawMoversData[currentMoversWindow];
+        } else if (currentMoversWindow === "12h") {
+            winData = rawMoversData;
+        }
+    }
+
+    const gainers = winData && Array.isArray(winData.gainers) ? winData.gainers : [];
+    const losers  = winData && Array.isArray(winData.losers)  ? winData.losers  : [];
+    activeMoversMap = winData && winData.changesMap ? winData.changesMap : (rawMoversData?.changesMap || {});
+    movers12hMap    = activeMoversMap; // keep backward compatibility for watchlist cards
+
+    renderMovers(gainers, losers);
+    renderWatchlist();
+}
 
 // ─── Movers Renderer ──────────────────────────────────────────────────────────
 function renderMovers(allGainers, allLosers) {
@@ -298,13 +354,13 @@ function renderMovers(allGainers, allLosers) {
 
     if (gainersList) {
         gainersList.innerHTML = _lastGainers.length === 0
-            ? `<span class="text-[11px] text-[#6d5e4d] dark:text-zinc-400 font-bold italic py-1">No gainers in last 12h</span>`
+            ? `<span class="text-[11px] text-[#6d5e4d] dark:text-zinc-400 font-bold italic py-1">No gainers in last ${currentMoversWindow}</span>`
             : _lastGainers.map(item => buildMoverRow(item, true)).join("");
     }
 
     if (losersList) {
         losersList.innerHTML = _lastLosers.length === 0
-            ? `<span class="text-[11px] text-[#6d5e4d] dark:text-zinc-400 font-bold italic py-1">No losers in last 12h</span>`
+            ? `<span class="text-[11px] text-[#6d5e4d] dark:text-zinc-400 font-bold italic py-1">No losers in last ${currentMoversWindow}</span>`
             : _lastLosers.map(item => buildMoverRow(item, false)).join("");
     }
 }
@@ -653,3 +709,4 @@ window.onDropdownSelect     = onDropdownSelect;
 window.handleSearchInput    = handleSearchInput;
 window.showAutocomplete     = showAutocomplete;
 window.calculateCustomStack = calculateCustomStack;
+window.setMoversWindow      = setMoversWindow;
