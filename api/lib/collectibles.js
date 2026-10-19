@@ -65,7 +65,7 @@ export const MARKETPLACE_COLLECTIBLES_MAP = {
   "collectibles-743": "Sunflorian Emblem",
   "collectibles-744": "Nightshade Emblem",
 
-  // Exotic & Foraged Resources (8)
+  // Exotic & Foraged Resources (9)
   "collectibles-2631": "Ruffroot",
   "collectibles-2632": "Chewed Bone",
   "collectibles-2633": "Heart Leaf",
@@ -74,6 +74,7 @@ export const MARKETPLACE_COLLECTIBLES_MAP = {
   "collectibles-2637": "Dewberry",
   "collectibles-2638": "Wild Grass",
   "collectibles-2639": "Frost Pebble",
+  "collectibles-3091": "Crystal Leaf",
 
   // Baits & Fishing (3)
   "collectibles-2986": "Capsule Bait",
