@@ -78,12 +78,11 @@ export const MARKETPLACE_COLLECTIBLES_MAP = {
   "collectibles-3091": "Crystal Leaf",
   "collectibles-3090": "Truffle",
 
-  // Beetles (5)
+  // Beetles (4)
   "collectibles-3084": "Green Beetle",
   "collectibles-3085": "Blue Beetle",
   "collectibles-3086": "Pink Beetle",
   "collectibles-3087": "Amber Beetle",
-  "collectibles-2115": "Scarab Beetle",
 
   // Baits & Fishing (3)
   "collectibles-2986": "Capsule Bait",
