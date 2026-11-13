@@ -25,5 +25,23 @@ export default async function handler(req, res) {
     } catch (_) {}
   }
 
+  // Support Discord bot / specific item query: /api/prices?item=truffle
+  const itemQuery = req.query?.item ? String(req.query.item).trim() : null;
+  if (itemQuery) {
+    const q = itemQuery.toLowerCase();
+    const exact = prices.find(p => p.name.toLowerCase() === q);
+    if (exact) {
+      return res.status(200).json(exact);
+    }
+    const matching = prices.filter(p => p.name.toLowerCase().includes(q));
+    if (matching.length === 1) {
+      return res.status(200).json(matching[0]);
+    }
+    if (matching.length > 1) {
+      return res.status(200).json({ query: itemQuery, count: matching.length, matches: matching });
+    }
+    return res.status(404).json({ error: `Item '${itemQuery}' not found`, count: 0, available: prices.map(p => p.name) });
+  }
+
   return res.status(200).json(prices || []);
 }

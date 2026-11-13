@@ -50,7 +50,7 @@ export const MARKETPLACE_COLLECTIBLES_MAP = {
   "collectibles-665": "Salt",
   "collectibles-663": "Obsidian",
 
-  // Animal Resources (7)
+  // Animal Resources (8)
   "collectibles-605": "Egg",
   "collectibles-614": "Honey",
   "collectibles-641": "Leather",
@@ -58,6 +58,7 @@ export const MARKETPLACE_COLLECTIBLES_MAP = {
   "collectibles-643": "Merino Wool",
   "collectibles-644": "Feather",
   "collectibles-645": "Milk",
+  "collectibles-3089": "Pig Bristles",
 
   // Faction Emblems (4)
   "collectibles-741": "Goblin Emblem",
@@ -65,7 +66,7 @@ export const MARKETPLACE_COLLECTIBLES_MAP = {
   "collectibles-743": "Sunflorian Emblem",
   "collectibles-744": "Nightshade Emblem",
 
-  // Exotic & Foraged Resources (9)
+  // Exotic & Foraged Resources (10)
   "collectibles-2631": "Ruffroot",
   "collectibles-2632": "Chewed Bone",
   "collectibles-2633": "Heart Leaf",
@@ -75,6 +76,14 @@ export const MARKETPLACE_COLLECTIBLES_MAP = {
   "collectibles-2638": "Wild Grass",
   "collectibles-2639": "Frost Pebble",
   "collectibles-3091": "Crystal Leaf",
+  "collectibles-3090": "Truffle",
+
+  // Beetles (5)
+  "collectibles-3084": "Green Beetle",
+  "collectibles-3085": "Blue Beetle",
+  "collectibles-3086": "Pink Beetle",
+  "collectibles-3087": "Amber Beetle",
+  "collectibles-2115": "Scarab Beetle",
 
   // Baits & Fishing (3)
   "collectibles-2986": "Capsule Bait",
